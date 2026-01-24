@@ -105,6 +105,21 @@ type CDCConfig struct {
 
 	// Checkpoint holds checkpointing configuration
 	Checkpoint CheckpointConfig
+
+	// Buffer holds buffer database configuration
+	Buffer BufferConfig
+}
+
+// BufferConfig holds buffer database configuration.
+type BufferConfig struct {
+	// Enabled enables event buffering
+	Enabled bool
+
+	// Retention is how long to keep processed events before cleanup
+	Retention time.Duration
+
+	// CleanupInterval is how often to run the cleanup job
+	CleanupInterval time.Duration
 }
 
 // SourceConfig holds the source PostgreSQL database configuration.
@@ -245,6 +260,11 @@ func Load() (*Config, error) {
 			Checkpoint: CheckpointConfig{
 				Enabled:  getBoolEnv("PHILOTES_CDC_CHECKPOINT_ENABLED", true),
 				Interval: getDurationEnv("PHILOTES_CDC_CHECKPOINT_INTERVAL", 10*time.Second),
+			},
+			Buffer: BufferConfig{
+				Enabled:         getBoolEnv("PHILOTES_BUFFER_ENABLED", true),
+				Retention:       getDurationEnv("PHILOTES_BUFFER_RETENTION", 168*time.Hour), // 7 days
+				CleanupInterval: getDurationEnv("PHILOTES_BUFFER_CLEANUP_INTERVAL", time.Hour),
 			},
 		},
 

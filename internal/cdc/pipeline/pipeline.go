@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/janovincze/philotes/internal/cdc"
+	"github.com/janovincze/philotes/internal/cdc/buffer"
 	"github.com/janovincze/philotes/internal/cdc/checkpoint"
 	"github.com/janovincze/philotes/internal/cdc/source"
 )
@@ -17,6 +18,7 @@ import (
 type Pipeline struct {
 	source      source.Source
 	checkpoint  checkpoint.Manager
+	buffer      buffer.Manager
 	logger      *slog.Logger
 	config      Config
 
@@ -33,6 +35,9 @@ type Config struct {
 
 	// CheckpointEnabled enables checkpoint saving.
 	CheckpointEnabled bool
+
+	// BufferEnabled enables writing events to buffer.
+	BufferEnabled bool
 }
 
 // DefaultConfig returns a Config with sensible defaults.
@@ -40,12 +45,14 @@ func DefaultConfig() Config {
 	return Config{
 		CheckpointInterval: 10 * time.Second,
 		CheckpointEnabled:  true,
+		BufferEnabled:      true,
 	}
 }
 
 // Stats holds pipeline statistics.
 type Stats struct {
 	EventsProcessed   int64
+	EventsBuffered    int64
 	LastEventTime     time.Time
 	LastCheckpointLSN string
 	LastCheckpointAt  time.Time
@@ -53,7 +60,7 @@ type Stats struct {
 }
 
 // New creates a new CDC pipeline.
-func New(src source.Source, cp checkpoint.Manager, cfg Config, logger *slog.Logger) *Pipeline {
+func New(src source.Source, cp checkpoint.Manager, buf buffer.Manager, cfg Config, logger *slog.Logger) *Pipeline {
 	if logger == nil {
 		logger = slog.Default()
 	}
@@ -61,6 +68,7 @@ func New(src source.Source, cp checkpoint.Manager, cfg Config, logger *slog.Logg
 	return &Pipeline{
 		source:     src,
 		checkpoint: cp,
+		buffer:     buf,
 		config:     cfg,
 		logger:     logger.With("component", "pipeline", "source", src.Name()),
 	}
@@ -158,10 +166,20 @@ func (p *Pipeline) processEvent(ctx context.Context, event cdc.Event) error {
 		"lsn", event.LSN,
 	)
 
-	// In the full implementation, this is where we would:
-	// 1. Write to the buffer database
-	// 2. Transform events if needed
-	// 3. Apply business logic
+	// Write event to buffer if enabled
+	if p.config.BufferEnabled && p.buffer != nil {
+		if err := p.buffer.Write(ctx, []cdc.Event{event}); err != nil {
+			p.logger.Error("failed to write event to buffer",
+				"error", err,
+				"lsn", event.LSN,
+			)
+			return fmt.Errorf("buffer write: %w", err)
+		}
+
+		p.mu.Lock()
+		p.stats.EventsBuffered++
+		p.mu.Unlock()
+	}
 
 	return nil
 }
