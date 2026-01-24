@@ -103,7 +103,7 @@ func (m *PostgresManager) Write(ctx context.Context, events []cdc.Event) error {
 			event.Table,        // table_name
 			event.Operation,    // operation
 			event.LSN,          // lsn
-			event.TransactionID,// transaction_id
+			event.TransactionID, // transaction_id
 			keyColumnsJSON,     // key_columns
 			beforeDataJSON,     // before_data
 			afterDataJSON,      // after_data
@@ -130,12 +130,12 @@ func (m *PostgresManager) ReadBatch(ctx context.Context, sourceID string, limit 
 			   transaction_id, key_columns, before_data, after_data,
 			   event_time, metadata, created_at, processed_at
 		FROM philotes.cdc_events
-		WHERE processed_at IS NULL
+		WHERE processed_at IS NULL AND source_id = $1
 		ORDER BY created_at ASC
-		LIMIT $1
+		LIMIT $2
 	`
 
-	rows, err := m.db.QueryContext(ctx, query, limit)
+	rows, err := m.db.QueryContext(ctx, query, sourceID, limit)
 	if err != nil {
 		return nil, fmt.Errorf("query events: %w", err)
 	}
