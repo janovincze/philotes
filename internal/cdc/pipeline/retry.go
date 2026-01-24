@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
-	"math/rand"
+	"math/rand/v2"
 	"time"
 )
 
@@ -203,7 +203,7 @@ func (r *Retryer) calculateBackoff(attempt int) time.Duration {
 	// Add jitter if enabled (±25%)
 	if r.policy.Jitter {
 		jitter := duration / 4
-		duration = duration - jitter + time.Duration(rand.Int63n(int64(jitter*2)))
+		duration = duration - jitter + time.Duration(rand.Int64N(int64(jitter*2)))
 	}
 
 	return duration
