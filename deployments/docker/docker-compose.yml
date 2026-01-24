@@ -1,0 +1,156 @@
+# Philotes Local Development Environment
+# Usage: docker compose -f deployments/docker/docker-compose.yml up -d
+
+services:
+  # PostgreSQL - Buffer database and source for testing
+  postgres:
+    image: postgres:16-alpine
+    container_name: philotes-postgres
+    environment:
+      POSTGRES_USER: philotes
+      POSTGRES_PASSWORD: philotes
+      POSTGRES_DB: philotes
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U philotes -d philotes"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    command:
+      - "postgres"
+      - "-c"
+      - "wal_level=logical"
+      - "-c"
+      - "max_replication_slots=10"
+      - "-c"
+      - "max_wal_senders=10"
+
+  # PostgreSQL - Source database for CDC testing
+  postgres-source:
+    image: postgres:16-alpine
+    container_name: philotes-postgres-source
+    environment:
+      POSTGRES_USER: source
+      POSTGRES_PASSWORD: source
+      POSTGRES_DB: source
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_source_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U source -d source"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    command:
+      - "postgres"
+      - "-c"
+      - "wal_level=logical"
+      - "-c"
+      - "max_replication_slots=10"
+      - "-c"
+      - "max_wal_senders=10"
+
+  # MinIO - S3-compatible object storage for Iceberg data
+  minio:
+    image: minio/minio:latest
+    container_name: philotes-minio
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # MinIO client - Create initial buckets
+  minio-init:
+    image: minio/mc:latest
+    container_name: philotes-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 minioadmin minioadmin;
+      mc mb local/philotes --ignore-existing;
+      mc mb local/warehouse --ignore-existing;
+      mc anonymous set public local/warehouse;
+      echo 'MinIO buckets initialized';
+      "
+
+  # Lakekeeper - Iceberg REST Catalog
+  lakekeeper:
+    image: lakekeeper/catalog:latest
+    container_name: philotes-lakekeeper
+    environment:
+      LAKEKEEPER__BASE_URI: http://lakekeeper:8181
+      LAKEKEEPER__PG__DATABASE_URL: postgresql://philotes:philotes@postgres:5432/philotes
+      LAKEKEEPER__PG__SCHEMA: lakekeeper
+      LAKEKEEPER__AUTHZ__ENABLED: "false"
+      LAKEKEEPER__OPENID__ENABLED: "false"
+    ports:
+      - "8181:8181"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8181/catalog/v1/config"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Prometheus - Metrics collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: philotes-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+
+  # Grafana - Metrics visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: philotes-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
+
+volumes:
+  postgres_data:
+  postgres_source_data:
+  minio_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  default:
+    name: philotes-network

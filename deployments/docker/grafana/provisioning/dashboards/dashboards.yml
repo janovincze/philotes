@@ -1,0 +1,13 @@
+# Grafana Dashboard Provisioning
+apiVersion: 1
+
+providers:
+  - name: 'Philotes'
+    orgId: 1
+    folder: 'Philotes'
+    folderUid: 'philotes'
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/json

@@ -1,0 +1,90 @@
+# Binaries
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test artifacts
+*.test
+*.out
+coverage.out
+coverage.html
+
+# Go workspace
+go.work
+go.work.sum
+
+# IDE and editor directories
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment files with secrets
+.env
+.env.local
+.env.*.local
+*.env
+
+# Build output
+dist/
+build/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+*.log
+
+# Debug files
+debug
+*.prof
+
+# Vendor directory (we use Go modules)
+vendor/
+
+# Local development
+.local/
+*.local.*
+
+# Secrets and credentials
+*.pem
+*.key
+*.crt
+secrets/
+credentials/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Docker volumes (local)
+.docker-data/
+
+# Node.js (for web dashboard)
+node_modules/
+.next/
+out/
+.turbo/
+.pnpm-store/
+
+# Test and coverage
+__snapshots__/
+*.lcov
+
+# Pulumi
+.pulumi/
+Pulumi.*.yaml.bak
+
+# Helm
+charts/*.tgz
+*.tgz
+
+# Air (live reload)
+air.toml.local
