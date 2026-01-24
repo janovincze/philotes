@@ -11,19 +11,24 @@ import (
 	"github.com/janovincze/philotes/internal/cdc"
 	"github.com/janovincze/philotes/internal/cdc/buffer"
 	"github.com/janovincze/philotes/internal/cdc/checkpoint"
+	"github.com/janovincze/philotes/internal/cdc/health"
 	"github.com/janovincze/philotes/internal/cdc/source"
 )
 
 // Pipeline orchestrates the CDC flow from source to checkpointing.
 type Pipeline struct {
-	source      source.Source
-	checkpoint  checkpoint.Manager
-	buffer      buffer.Manager
-	logger      *slog.Logger
-	config      Config
+	source       source.Source
+	checkpoint   checkpoint.Manager
+	buffer       buffer.Manager
+	logger       *slog.Logger
+	config       Config
+	stateMachine *StateMachine
+
+	// Optional components
+	backpressure *BackpressureController
+	retryer      *Retryer
 
 	mu      sync.RWMutex
-	running bool
 	lastLSN string
 	stats   Stats
 }
@@ -38,6 +43,12 @@ type Config struct {
 
 	// BufferEnabled enables writing events to buffer.
 	BufferEnabled bool
+
+	// RetryPolicy configures retry behavior.
+	RetryPolicy RetryPolicy
+
+	// BackpressureConfig configures backpressure handling.
+	BackpressureConfig BackpressureConfig
 }
 
 // DefaultConfig returns a Config with sensible defaults.
@@ -46,6 +57,8 @@ func DefaultConfig() Config {
 		CheckpointInterval: 10 * time.Second,
 		CheckpointEnabled:  true,
 		BufferEnabled:      true,
+		RetryPolicy:        DefaultRetryPolicy(),
+		BackpressureConfig: DefaultBackpressureConfig(),
 	}
 }
 
@@ -57,6 +70,8 @@ type Stats struct {
 	LastCheckpointLSN string
 	LastCheckpointAt  time.Time
 	Errors            int64
+	RetryCount        int64
+	State             State
 }
 
 // New creates a new CDC pipeline.
@@ -65,29 +80,43 @@ func New(src source.Source, cp checkpoint.Manager, buf buffer.Manager, cfg Confi
 		logger = slog.Default()
 	}
 
-	return &Pipeline{
-		source:     src,
-		checkpoint: cp,
-		buffer:     buf,
-		config:     cfg,
-		logger:     logger.With("component", "pipeline", "source", src.Name()),
+	p := &Pipeline{
+		source:       src,
+		checkpoint:   cp,
+		buffer:       buf,
+		config:       cfg,
+		logger:       logger.With("component", "pipeline", "source", src.Name()),
+		stateMachine: NewStateMachine(),
+		retryer:      NewRetryer(cfg.RetryPolicy, logger),
 	}
+
+	// Add state change listener for logging
+	p.stateMachine.AddListener(func(from, to State) {
+		p.logger.Info("pipeline state changed", "from", from, "to", to)
+		p.mu.Lock()
+		p.stats.State = to
+		p.mu.Unlock()
+	})
+
+	return p
+}
+
+// SetBackpressureController sets the backpressure controller.
+func (p *Pipeline) SetBackpressureController(bp *BackpressureController) {
+	p.backpressure = bp
 }
 
 // Run starts the pipeline and blocks until context is cancelled or an error occurs.
 func (p *Pipeline) Run(ctx context.Context) error {
-	p.mu.Lock()
-	if p.running {
-		p.mu.Unlock()
-		return fmt.Errorf("pipeline already running")
+	if err := p.stateMachine.Transition(StateRunning); err != nil {
+		// Already starting or running
+		return fmt.Errorf("pipeline state transition failed: %w", err)
 	}
-	p.running = true
-	p.mu.Unlock()
 
 	defer func() {
-		p.mu.Lock()
-		p.running = false
-		p.mu.Unlock()
+		if err := p.stateMachine.Transition(StateStopped); err != nil {
+			p.logger.Warn("failed to transition to stopped state", "error", err)
+		}
 	}()
 
 	p.logger.Info("starting CDC pipeline")
@@ -98,6 +127,11 @@ func (p *Pipeline) Run(ctx context.Context) error {
 			p.logger.Warn("failed to restore checkpoint", "error", err)
 			// Continue without checkpoint
 		}
+	}
+
+	// Start backpressure controller if configured
+	if p.backpressure != nil {
+		go p.backpressure.Start(ctx)
 	}
 
 	// Start the source
@@ -118,6 +152,9 @@ func (p *Pipeline) Run(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			p.logger.Info("pipeline stopping", "reason", ctx.Err())
+			if err := p.stateMachine.Transition(StateStopping); err != nil {
+				p.logger.Warn("failed to transition to stopping state", "error", err)
+			}
 			// Save final checkpoint before exiting
 			if p.config.CheckpointEnabled && p.checkpoint != nil {
 				if err := p.saveCheckpoint(context.Background()); err != nil {
@@ -132,6 +169,12 @@ func (p *Pipeline) Run(ctx context.Context) error {
 				p.stats.Errors++
 				p.mu.Unlock()
 				p.logger.Error("source error", "error", err)
+
+				// Transition to failed state
+				if transErr := p.stateMachine.Transition(StateFailed); transErr != nil {
+					p.logger.Warn("failed to transition to failed state", "error", transErr)
+				}
+
 				return fmt.Errorf("source error: %w", err)
 			}
 
@@ -140,7 +183,21 @@ func (p *Pipeline) Run(ctx context.Context) error {
 				p.logger.Info("event channel closed")
 				return nil
 			}
-			if err := p.processEvent(ctx, event); err != nil {
+
+			// Check if we should process (not paused due to backpressure)
+			if !p.stateMachine.CanProcess() {
+				// Wait for resume or context cancellation
+				p.logger.Debug("pipeline paused, waiting to resume")
+				for !p.stateMachine.CanProcess() {
+					select {
+					case <-ctx.Done():
+						return ctx.Err()
+					case <-time.After(100 * time.Millisecond):
+					}
+				}
+			}
+
+			if err := p.processEventWithRetry(ctx, event); err != nil {
 				p.logger.Error("failed to process event", "error", err)
 				// Continue processing other events
 			}
@@ -151,6 +208,13 @@ func (p *Pipeline) Run(ctx context.Context) error {
 			}
 		}
 	}
+}
+
+// processEventWithRetry processes an event with retry logic.
+func (p *Pipeline) processEventWithRetry(ctx context.Context, event cdc.Event) error {
+	return p.retryer.Execute(ctx, func(ctx context.Context) error {
+		return p.processEvent(ctx, event)
+	})
 }
 
 func (p *Pipeline) processEvent(ctx context.Context, event cdc.Event) error {
@@ -242,12 +306,50 @@ func (p *Pipeline) restoreCheckpoint(ctx context.Context) error {
 func (p *Pipeline) Stats() Stats {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	return p.stats
+	stats := p.stats
+	stats.State = p.stateMachine.State()
+	return stats
 }
 
 // IsRunning returns whether the pipeline is currently running.
 func (p *Pipeline) IsRunning() bool {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-	return p.running
+	return p.stateMachine.IsRunning()
+}
+
+// State returns the current pipeline state.
+func (p *Pipeline) State() State {
+	return p.stateMachine.State()
+}
+
+// Pause pauses the pipeline.
+func (p *Pipeline) Pause() error {
+	return p.stateMachine.Transition(StatePaused)
+}
+
+// Resume resumes the pipeline.
+func (p *Pipeline) Resume() error {
+	return p.stateMachine.Transition(StateRunning)
+}
+
+// HealthChecker returns a health checker for the pipeline.
+func (p *Pipeline) HealthChecker() health.HealthChecker {
+	return health.NewComponentChecker("pipeline", func(ctx context.Context) (health.Status, string, error) {
+		state := p.stateMachine.State()
+		switch state {
+		case StateRunning:
+			return health.StatusHealthy, "pipeline is running", nil
+		case StatePaused:
+			return health.StatusDegraded, "pipeline is paused", nil
+		case StateStarting:
+			return health.StatusDegraded, "pipeline is starting", nil
+		case StateStopping:
+			return health.StatusDegraded, "pipeline is stopping", nil
+		case StateStopped:
+			return health.StatusUnhealthy, "pipeline is stopped", nil
+		case StateFailed:
+			return health.StatusUnhealthy, "pipeline has failed", nil
+		default:
+			return health.StatusUnknown, "unknown state", nil
+		}
+	})
 }

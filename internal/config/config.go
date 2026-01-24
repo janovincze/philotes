@@ -108,6 +108,69 @@ type CDCConfig struct {
 
 	// Buffer holds buffer database configuration
 	Buffer BufferConfig
+
+	// Retry holds retry policy configuration
+	Retry RetryConfig
+
+	// DeadLetter holds dead-letter queue configuration
+	DeadLetter DeadLetterConfig
+
+	// Health holds health check configuration
+	Health HealthConfig
+
+	// Backpressure holds backpressure configuration
+	Backpressure BackpressureConfig
+}
+
+// RetryConfig holds retry policy configuration.
+type RetryConfig struct {
+	// MaxAttempts is the maximum number of retry attempts
+	MaxAttempts int
+
+	// InitialInterval is the initial backoff interval
+	InitialInterval time.Duration
+
+	// MaxInterval is the maximum backoff interval
+	MaxInterval time.Duration
+
+	// Multiplier is the backoff multiplier
+	Multiplier float64
+}
+
+// DeadLetterConfig holds dead-letter queue configuration.
+type DeadLetterConfig struct {
+	// Enabled enables the dead-letter queue
+	Enabled bool
+
+	// Retention is how long to keep dead-letter events
+	Retention time.Duration
+}
+
+// HealthConfig holds health check configuration.
+type HealthConfig struct {
+	// Enabled enables health check endpoints
+	Enabled bool
+
+	// ListenAddr is the address for health check endpoints
+	ListenAddr string
+
+	// ReadinessTimeout is how long to wait for readiness checks
+	ReadinessTimeout time.Duration
+}
+
+// BackpressureConfig holds backpressure configuration.
+type BackpressureConfig struct {
+	// Enabled enables backpressure handling
+	Enabled bool
+
+	// HighWatermark is the buffer size threshold to trigger pause
+	HighWatermark int
+
+	// LowWatermark is the buffer size threshold to resume processing
+	LowWatermark int
+
+	// CheckInterval is how often to check buffer size
+	CheckInterval time.Duration
 }
 
 // BufferConfig holds buffer database configuration.
@@ -266,6 +329,27 @@ func Load() (*Config, error) {
 				Retention:       getDurationEnv("PHILOTES_BUFFER_RETENTION", 168*time.Hour), // 7 days
 				CleanupInterval: getDurationEnv("PHILOTES_BUFFER_CLEANUP_INTERVAL", time.Hour),
 			},
+			Retry: RetryConfig{
+				MaxAttempts:     getIntEnv("PHILOTES_RETRY_MAX_ATTEMPTS", 3),
+				InitialInterval: getDurationEnv("PHILOTES_RETRY_INITIAL_INTERVAL", time.Second),
+				MaxInterval:     getDurationEnv("PHILOTES_RETRY_MAX_INTERVAL", 30*time.Second),
+				Multiplier:      getFloatEnv("PHILOTES_RETRY_MULTIPLIER", 2.0),
+			},
+			DeadLetter: DeadLetterConfig{
+				Enabled:   getBoolEnv("PHILOTES_DLQ_ENABLED", true),
+				Retention: getDurationEnv("PHILOTES_DLQ_RETENTION", 168*time.Hour), // 7 days
+			},
+			Health: HealthConfig{
+				Enabled:          getBoolEnv("PHILOTES_HEALTH_ENABLED", true),
+				ListenAddr:       getEnv("PHILOTES_HEALTH_LISTEN_ADDR", ":8081"),
+				ReadinessTimeout: getDurationEnv("PHILOTES_HEALTH_READINESS_TIMEOUT", 5*time.Second),
+			},
+			Backpressure: BackpressureConfig{
+				Enabled:       getBoolEnv("PHILOTES_BACKPRESSURE_ENABLED", true),
+				HighWatermark: getIntEnv("PHILOTES_BACKPRESSURE_HIGH_WATERMARK", 8000),
+				LowWatermark:  getIntEnv("PHILOTES_BACKPRESSURE_LOW_WATERMARK", 5000),
+				CheckInterval: getDurationEnv("PHILOTES_BACKPRESSURE_CHECK_INTERVAL", time.Second),
+			},
 		},
 
 		Iceberg: IcebergConfig{
@@ -319,6 +403,15 @@ func getDurationEnv(key string, defaultValue time.Duration) time.Duration {
 	if value := os.Getenv(key); value != "" {
 		if d, err := time.ParseDuration(value); err == nil {
 			return d
+		}
+	}
+	return defaultValue
+}
+
+func getFloatEnv(key string, defaultValue float64) float64 {
+	if value := os.Getenv(key); value != "" {
+		if f, err := strconv.ParseFloat(value, 64); err == nil {
+			return f
 		}
 	}
 	return defaultValue
