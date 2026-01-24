@@ -1,7 +1,6 @@
 package writer
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -72,9 +71,8 @@ func (p *ParquetWriter) WriteEvents(events []cdcbuffer.BufferedEvent) (*ParquetR
 		return nil, fmt.Errorf("no events to write")
 	}
 
-	// Create an in-memory buffer
-	buf := new(bytes.Buffer)
-	fw := buffer.NewBufferFileFromBytes(buf.Bytes())
+	// Create an in-memory buffer file for writing
+	fw := buffer.NewBufferFile()
 
 	// Create Parquet writer
 	pw, err := writer.NewParquetWriter(fw, new(CDCRecord), 4)

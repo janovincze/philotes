@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/janovincze/philotes/internal/cdc"
 	"github.com/janovincze/philotes/internal/cdc/buffer"
@@ -230,19 +231,11 @@ func (w *IcebergWriter) ensureTable(ctx context.Context, namespace, tableName st
 // parseTableKey parses a table key (schema.table) into namespace and table name.
 func (w *IcebergWriter) parseTableKey(tableKey string) (namespace, tableName string) {
 	// Use the source schema as the namespace, or default namespace if not specified
-	namespace = w.config.DefaultNamespace
-	tableName = tableKey
-
-	// Try to split on "."
-	for i := 0; i < len(tableKey); i++ {
-		if tableKey[i] == '.' {
-			namespace = tableKey[:i]
-			tableName = tableKey[i+1:]
-			break
-		}
+	parts := strings.SplitN(tableKey, ".", 2)
+	if len(parts) == 2 {
+		return parts[0], parts[1]
 	}
-
-	return namespace, tableName
+	return w.config.DefaultNamespace, tableKey
 }
 
 // getTableDataPath returns the data path for a table.
