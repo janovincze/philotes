@@ -1,0 +1,96 @@
+# Philotes golangci-lint configuration
+# https://golangci-lint.run/usage/configuration/
+
+run:
+  timeout: 5m
+  tests: true
+  modules-download-mode: readonly
+
+linters:
+  enable:
+    - errcheck       # Check for unchecked errors
+    - gosimple       # Simplify code
+    - govet          # Report suspicious constructs
+    - ineffassign    # Detect ineffectual assignments
+    - staticcheck    # Static analysis checks
+    - unused         # Check for unused code
+    - gofmt          # Check formatting
+    - goimports      # Check import ordering
+    - misspell       # Find misspelled words
+    - unconvert      # Remove unnecessary type conversions
+    - gocritic       # Comprehensive linter
+    - revive         # Fast, configurable linter
+    - bodyclose      # Check HTTP response body is closed
+    - noctx          # Check context usage
+    - prealloc       # Find slice preallocation opportunities
+    - exportloopref  # Check for loop variable references
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+    exclude-functions:
+      - (*os.File).Close
+      - (io.Closer).Close
+      - (*database/sql.Rows).Close
+
+  govet:
+    enable-all: true
+    disable:
+      - fieldalignment  # Too noisy, optimize manually when needed
+
+  goimports:
+    local-prefixes: github.com/janovincze/philotes
+
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - style
+      - performance
+    disabled-checks:
+      - hugeParam  # We'll use pointers explicitly when needed
+
+  revive:
+    rules:
+      - name: blank-imports
+      - name: context-as-argument
+      - name: context-keys-type
+      - name: dot-imports
+      - name: error-return
+      - name: error-strings
+      - name: error-naming
+      - name: exported
+      - name: increment-decrement
+      - name: indent-error-flow
+      - name: package-comments
+      - name: range
+      - name: receiver-naming
+      - name: time-naming
+      - name: unexported-return
+      - name: var-declaration
+      - name: var-naming
+
+  misspell:
+    locale: US
+
+issues:
+  exclude-rules:
+    # Allow unused parameters in main functions
+    - path: cmd/
+      linters:
+        - unused
+
+    # Allow dot imports in tests
+    - path: _test\.go
+      linters:
+        - revive
+      text: "dot-imports"
+
+    # Allow magic numbers in tests
+    - path: _test\.go
+      linters:
+        - gocritic
+      text: "magic number"
+
+  max-issues-per-linter: 50
+  max-same-issues: 3

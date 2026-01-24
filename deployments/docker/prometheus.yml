@@ -1,0 +1,39 @@
+# Prometheus configuration for Philotes local development
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+alerting:
+  alertmanagers: []
+
+rule_files: []
+
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Philotes API
+  - job_name: 'philotes-api'
+    static_configs:
+      - targets: ['host.docker.internal:8080']
+    metrics_path: '/metrics'
+
+  # Philotes Worker
+  - job_name: 'philotes-worker'
+    static_configs:
+      - targets: ['host.docker.internal:9091']
+    metrics_path: '/metrics'
+
+  # MinIO
+  - job_name: 'minio'
+    static_configs:
+      - targets: ['minio:9000']
+    metrics_path: '/minio/v2/metrics/cluster'
+
+  # PostgreSQL (via postgres_exporter if added)
+  # - job_name: 'postgres'
+  #   static_configs:
+  #     - targets: ['postgres-exporter:9187']
