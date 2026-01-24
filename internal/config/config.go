@@ -95,6 +95,73 @@ type CDCConfig struct {
 
 	// FlushInterval is the interval for flushing events
 	FlushInterval time.Duration
+
+	// Source is the source PostgreSQL database configuration
+	Source SourceConfig
+
+	// Replication holds replication slot and publication settings
+	Replication ReplicationConfig
+
+	// Checkpoint holds checkpointing configuration
+	Checkpoint CheckpointConfig
+}
+
+// SourceConfig holds the source PostgreSQL database configuration.
+type SourceConfig struct {
+	// Host is the source database host
+	Host string
+
+	// Port is the source database port
+	Port int
+
+	// Database is the source database name
+	Database string
+
+	// User is the source database user
+	User string
+
+	// Password is the source database password
+	Password string
+
+	// SSLMode is the SSL mode for the source connection
+	SSLMode string
+}
+
+// DSN returns the source database connection string.
+func (s SourceConfig) DSN() string {
+	return fmt.Sprintf(
+		"host=%s port=%d dbname=%s user=%s password=%s sslmode=%s",
+		s.Host, s.Port, s.Database, s.User, s.Password, s.SSLMode,
+	)
+}
+
+// URL returns the source database connection URL.
+func (s SourceConfig) URL() string {
+	return fmt.Sprintf(
+		"postgres://%s:%s@%s:%d/%s?sslmode=%s",
+		s.User, s.Password, s.Host, s.Port, s.Database, s.SSLMode,
+	)
+}
+
+// ReplicationConfig holds replication slot and publication settings.
+type ReplicationConfig struct {
+	// SlotName is the name of the replication slot
+	SlotName string
+
+	// PublicationName is the name of the publication to subscribe to
+	PublicationName string
+
+	// Tables is a list of tables to replicate (empty means all tables in publication)
+	Tables []string
+}
+
+// CheckpointConfig holds checkpointing configuration.
+type CheckpointConfig struct {
+	// Enabled enables checkpointing
+	Enabled bool
+
+	// Interval is the interval between checkpoints
+	Interval time.Duration
 }
 
 // IcebergConfig holds Apache Iceberg configuration.
@@ -161,6 +228,23 @@ func Load() (*Config, error) {
 			BufferSize:    getIntEnv("PHILOTES_CDC_BUFFER_SIZE", 10000),
 			BatchSize:     getIntEnv("PHILOTES_CDC_BATCH_SIZE", 1000),
 			FlushInterval: getDurationEnv("PHILOTES_CDC_FLUSH_INTERVAL", 5*time.Second),
+			Source: SourceConfig{
+				Host:     getEnv("PHILOTES_CDC_SOURCE_HOST", "localhost"),
+				Port:     getIntEnv("PHILOTES_CDC_SOURCE_PORT", 5433),
+				Database: getEnv("PHILOTES_CDC_SOURCE_DATABASE", "source"),
+				User:     getEnv("PHILOTES_CDC_SOURCE_USER", "source"),
+				Password: getEnv("PHILOTES_CDC_SOURCE_PASSWORD", "source"),
+				SSLMode:  getEnv("PHILOTES_CDC_SOURCE_SSLMODE", "disable"),
+			},
+			Replication: ReplicationConfig{
+				SlotName:        getEnv("PHILOTES_CDC_REPLICATION_SLOT", "philotes_cdc"),
+				PublicationName: getEnv("PHILOTES_CDC_PUBLICATION", "philotes_pub"),
+				Tables:          getSliceEnv("PHILOTES_CDC_TABLES", nil),
+			},
+			Checkpoint: CheckpointConfig{
+				Enabled:  getBoolEnv("PHILOTES_CDC_CHECKPOINT_ENABLED", true),
+				Interval: getDurationEnv("PHILOTES_CDC_CHECKPOINT_INTERVAL", 10*time.Second),
+			},
 		},
 
 		Iceberg: IcebergConfig{
@@ -217,4 +301,59 @@ func getDurationEnv(key string, defaultValue time.Duration) time.Duration {
 		}
 	}
 	return defaultValue
+}
+
+func getSliceEnv(key string, defaultValue []string) []string {
+	if value := os.Getenv(key); value != "" {
+		var result []string
+		for _, v := range splitAndTrim(value, ",") {
+			if v != "" {
+				result = append(result, v)
+			}
+		}
+		if len(result) > 0 {
+			return result
+		}
+	}
+	return defaultValue
+}
+
+func splitAndTrim(s, sep string) []string {
+	parts := make([]string, 0)
+	for _, p := range splitString(s, sep) {
+		trimmed := trimSpace(p)
+		if trimmed != "" {
+			parts = append(parts, trimmed)
+		}
+	}
+	return parts
+}
+
+func splitString(s, sep string) []string {
+	if s == "" {
+		return nil
+	}
+	var result []string
+	start := 0
+	for i := 0; i <= len(s)-len(sep); i++ {
+		if s[i:i+len(sep)] == sep {
+			result = append(result, s[start:i])
+			start = i + len(sep)
+			i += len(sep) - 1
+		}
+	}
+	result = append(result, s[start:])
+	return result
+}
+
+func trimSpace(s string) string {
+	start := 0
+	end := len(s)
+	for start < end && (s[start] == ' ' || s[start] == '\t') {
+		start++
+	}
+	for end > start && (s[end-1] == ' ' || s[end-1] == '\t') {
+		end--
+	}
+	return s[start:end]
 }
