@@ -16,6 +16,8 @@ import (
 	"github.com/janovincze/philotes/internal/cdc/pipeline"
 	"github.com/janovincze/philotes/internal/cdc/source/postgres"
 	"github.com/janovincze/philotes/internal/config"
+	"github.com/janovincze/philotes/internal/iceberg/catalog"
+	"github.com/janovincze/philotes/internal/iceberg/writer"
 )
 
 func main() {
@@ -106,6 +108,62 @@ func run(ctx context.Context, cfg *config.Config, logger *slog.Logger) error {
 		defer bufferMgr.Close()
 	}
 
+	// Create the Iceberg writer and batch processor if buffering is enabled
+	var batchProcessor *buffer.BatchProcessor
+	if cfg.CDC.Buffer.Enabled && bufferMgr != nil {
+		// Create Iceberg writer
+		writerCfg := writer.Config{
+			Catalog: catalog.Config{
+				CatalogURL: cfg.Iceberg.CatalogURL,
+				Warehouse:  cfg.Iceberg.Warehouse,
+			},
+			S3: writer.S3Config{
+				Endpoint:  cfg.Storage.Endpoint,
+				AccessKey: cfg.Storage.AccessKey,
+				SecretKey: cfg.Storage.SecretKey,
+				UseSSL:    cfg.Storage.UseSSL,
+			},
+			Bucket:           cfg.Storage.Bucket,
+			WarehousePath:    "warehouse",
+			DefaultNamespace: "cdc",
+		}
+
+		icebergWriter, err := writer.NewIcebergWriter(writerCfg, logger)
+		if err != nil {
+			return fmt.Errorf("create iceberg writer: %w", err)
+		}
+		defer icebergWriter.Close()
+
+		// Create batch processor with Iceberg handler
+		batchCfg := buffer.BatchConfig{
+			SourceID:        fmt.Sprintf("postgres-%s", cfg.CDC.Source.Database),
+			BatchSize:       cfg.CDC.BatchSize,
+			FlushInterval:   cfg.CDC.FlushInterval,
+			Retention:       cfg.CDC.Buffer.Retention,
+			CleanupInterval: cfg.CDC.Buffer.CleanupInterval,
+		}
+
+		batchProcessor = buffer.NewBatchProcessor(
+			bufferMgr,
+			writer.BatchHandler(icebergWriter),
+			batchCfg,
+			logger,
+		)
+
+		// Start the batch processor
+		if err := batchProcessor.Start(ctx); err != nil {
+			return fmt.Errorf("start batch processor: %w", err)
+		}
+		defer batchProcessor.Stop(context.Background())
+
+		logger.Info("Iceberg writer configured",
+			"catalog_url", cfg.Iceberg.CatalogURL,
+			"warehouse", cfg.Iceberg.Warehouse,
+			"storage_endpoint", cfg.Storage.Endpoint,
+			"bucket", cfg.Storage.Bucket,
+		)
+	}
+
 	// Create and run the pipeline
 	pipelineCfg := pipeline.Config{
 		CheckpointInterval: cfg.CDC.Checkpoint.Interval,
@@ -123,6 +181,7 @@ func run(ctx context.Context, cfg *config.Config, logger *slog.Logger) error {
 		"checkpoint_enabled", cfg.CDC.Checkpoint.Enabled,
 		"checkpoint_interval", cfg.CDC.Checkpoint.Interval,
 		"buffer_enabled", cfg.CDC.Buffer.Enabled,
+		"iceberg_enabled", batchProcessor != nil,
 	)
 
 	if err := p.Run(ctx); err != nil {
