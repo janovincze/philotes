@@ -82,9 +82,9 @@ func (sm *StateMachine) State() State {
 // Returns an error if the transition is not valid.
 func (sm *StateMachine) Transition(target State) error {
 	sm.mu.Lock()
-	defer sm.mu.Unlock()
 
 	if !sm.canTransition(target) {
+		sm.mu.Unlock()
 		return fmt.Errorf("invalid state transition from %s to %s", sm.state, target)
 	}
 
@@ -97,10 +97,10 @@ func (sm *StateMachine) Transition(target State) error {
 
 	// Release lock before calling listeners
 	sm.mu.Unlock()
+
 	for _, listener := range listeners {
 		listener(from, target)
 	}
-	sm.mu.Lock()
 
 	return nil
 }

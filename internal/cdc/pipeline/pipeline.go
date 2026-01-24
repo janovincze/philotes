@@ -104,6 +104,8 @@ func New(src source.Source, cp checkpoint.Manager, buf buffer.Manager, cfg Confi
 // SetBackpressureController sets the backpressure controller.
 func (p *Pipeline) SetBackpressureController(bp *BackpressureController) {
 	p.backpressure = bp
+	// Set the state machine so the controller can pause/resume the pipeline
+	bp.SetStateMachine(p.stateMachine)
 }
 
 // Run starts the pipeline and blocks until context is cancelled or an error occurs.

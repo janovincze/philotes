@@ -348,8 +348,9 @@ func (m *PostgresManager) GetStats(ctx context.Context) (Stats, error) {
 }
 
 // nullableInt64 converts an int64 to a sql.NullInt64.
+// Note: Event IDs are always positive (BIGSERIAL), so 0 indicates no original event.
 func nullableInt64(v int64) sql.NullInt64 {
-	if v == 0 {
+	if v <= 0 {
 		return sql.NullInt64{}
 	}
 	return sql.NullInt64{Int64: v, Valid: true}

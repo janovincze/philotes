@@ -3,6 +3,7 @@ package pipeline
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 )
@@ -177,7 +178,7 @@ func TestRetryer_CalculateBackoff(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run("", func(t *testing.T) {
+		t.Run(fmt.Sprintf("attempt_%d", tt.attempt), func(t *testing.T) {
 			got := retryer.calculateBackoff(tt.attempt)
 			if got != tt.expected {
 				t.Errorf("calculateBackoff(%d) = %v, want %v", tt.attempt, got, tt.expected)

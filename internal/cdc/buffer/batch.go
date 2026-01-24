@@ -316,8 +316,10 @@ func (p *BatchProcessor) sendToDLQ(ctx context.Context, events []BufferedEvent, 
 	}
 }
 
+// processBatch processes a batch of events.
+// Deprecated: This wrapper is kept for backward compatibility.
+// Use processBatchWithRetry instead.
 func (p *BatchProcessor) processBatch(ctx context.Context) error {
-	// This method is kept for backward compatibility
 	return p.processBatchWithRetry(ctx)
 }
 

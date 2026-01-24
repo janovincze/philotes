@@ -171,6 +171,11 @@ func (c *BackpressureController) IsPaused() bool {
 	return c.paused
 }
 
+// SetStateMachine sets the state machine for the controller.
+func (c *BackpressureController) SetStateMachine(sm *StateMachine) {
+	c.stateMachine = sm
+}
+
 // Stats returns backpressure statistics.
 func (c *BackpressureController) Stats() BackpressureStats {
 	c.mu.RLock()
