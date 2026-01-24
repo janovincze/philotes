@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/janovincze/philotes/internal/cdc/buffer"
 	"github.com/janovincze/philotes/internal/cdc/checkpoint"
 	"github.com/janovincze/philotes/internal/cdc/pipeline"
 	"github.com/janovincze/philotes/internal/cdc/source/postgres"
@@ -86,13 +87,33 @@ func run(ctx context.Context, cfg *config.Config, logger *slog.Logger) error {
 		defer checkpointMgr.Close()
 	}
 
+	// Create the buffer manager
+	var bufferMgr buffer.Manager
+	if cfg.CDC.Buffer.Enabled {
+		bufCfg := buffer.Config{
+			Enabled:         true,
+			DSN:             cfg.Database.DSN(),
+			MaxOpenConns:    cfg.Database.MaxOpenConns,
+			MaxIdleConns:    cfg.Database.MaxIdleConns,
+			Retention:       cfg.CDC.Buffer.Retention,
+			CleanupInterval: cfg.CDC.Buffer.CleanupInterval,
+		}
+
+		bufferMgr, err = buffer.NewPostgresManager(ctx, bufCfg, logger)
+		if err != nil {
+			return fmt.Errorf("create buffer manager: %w", err)
+		}
+		defer bufferMgr.Close()
+	}
+
 	// Create and run the pipeline
 	pipelineCfg := pipeline.Config{
 		CheckpointInterval: cfg.CDC.Checkpoint.Interval,
 		CheckpointEnabled:  cfg.CDC.Checkpoint.Enabled,
+		BufferEnabled:      cfg.CDC.Buffer.Enabled,
 	}
 
-	p := pipeline.New(reader, checkpointMgr, pipelineCfg, logger)
+	p := pipeline.New(reader, checkpointMgr, bufferMgr, pipelineCfg, logger)
 
 	logger.Info("CDC pipeline configured",
 		"source_host", cfg.CDC.Source.Host,
@@ -101,6 +122,7 @@ func run(ctx context.Context, cfg *config.Config, logger *slog.Logger) error {
 		"replication_slot", cfg.CDC.Replication.SlotName,
 		"checkpoint_enabled", cfg.CDC.Checkpoint.Enabled,
 		"checkpoint_interval", cfg.CDC.Checkpoint.Interval,
+		"buffer_enabled", cfg.CDC.Buffer.Enabled,
 	)
 
 	if err := p.Run(ctx); err != nil {
