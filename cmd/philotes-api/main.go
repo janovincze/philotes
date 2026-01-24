@@ -63,9 +63,9 @@ func run(ctx context.Context, cfg *config.Config) error {
 	server := &http.Server{
 		Addr:         cfg.API.ListenAddr,
 		Handler:      mux,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
-		IdleTimeout:  60 * time.Second,
+		ReadTimeout:  cfg.API.ReadTimeout,
+		WriteTimeout: cfg.API.WriteTimeout,
+		IdleTimeout:  cfg.API.ReadTimeout * 4,
 	}
 
 	// Start server in goroutine
