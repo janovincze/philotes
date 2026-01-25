@@ -4,86 +4,99 @@ package main
 
 import (
 	"context"
-	"fmt"
-	"net/http"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/janovincze/philotes/internal/api"
+	"github.com/janovincze/philotes/internal/api/middleware"
+	"github.com/janovincze/philotes/internal/cdc/health"
 	"github.com/janovincze/philotes/internal/config"
 )
 
 func main() {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	// Setup structured logging
+	logLevel := slog.LevelInfo
+	if os.Getenv("PHILOTES_LOG_LEVEL") == "debug" {
+		logLevel = slog.LevelDebug
+	}
+
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: logLevel,
+	}))
+	slog.SetDefault(logger)
+
+	// Load configuration
+	cfg, err := config.Load()
+	if err != nil {
+		logger.Error("failed to load config", "error", err)
+		os.Exit(1)
+	}
+
+	logger.Info("starting Philotes API",
+		"version", cfg.Version,
+		"environment", cfg.Environment,
+		"listen_addr", cfg.API.ListenAddr,
+	)
+
+	// Create health manager
+	healthManager := health.NewManager(health.DefaultManagerConfig(), logger)
+
+	// Register a basic API health checker
+	healthManager.Register(health.NewComponentChecker("api", func(ctx context.Context) (health.Status, string, error) {
+		return health.StatusHealthy, "API server is running", nil
+	}))
+
+	// Create server configuration
+	serverCfg := api.ServerConfig{
+		Config:        cfg,
+		Logger:        logger,
+		HealthManager: healthManager,
+		CORSConfig: middleware.CORSConfig{
+			AllowedOrigins:   cfg.API.CORSOrigins,
+			AllowCredentials: false,
+			MaxAge:           12 * time.Hour,
+		},
+		RateLimitConfig: middleware.RateLimitConfig{
+			RequestsPerSecond: cfg.API.RateLimitRPS,
+			BurstSize:         cfg.API.RateLimitBurst,
+			PerClient:         true,
+		},
+	}
+
+	// Create and start server
+	server := api.NewServer(serverCfg)
 
 	// Handle shutdown signals
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
-	go func() {
-		<-sigCh
-		fmt.Println("\nShutting down...")
-		cancel()
-	}()
-
-	cfg, err := config.Load()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to load config: %v\n", err)
-		os.Exit(1)
-	}
-
-	if err := run(ctx, cfg); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
-	}
-}
-
-func run(ctx context.Context, cfg *config.Config) error {
-	fmt.Printf("Starting Philotes API v%s\n", cfg.Version)
-
-	// Create HTTP server
-	mux := http.NewServeMux()
-
-	// Health check endpoint
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, `{"status":"healthy","version":"%s"}`, cfg.Version)
-	})
-
-	// Readiness endpoint
-	mux.HandleFunc("/ready", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, `{"ready":true}`)
-	})
-
-	server := &http.Server{
-		Addr:         cfg.API.ListenAddr,
-		Handler:      mux,
-		ReadTimeout:  cfg.API.ReadTimeout,
-		WriteTimeout: cfg.API.WriteTimeout,
-		IdleTimeout:  cfg.API.ReadTimeout * 4,
-	}
-
 	// Start server in goroutine
 	errCh := make(chan error, 1)
 	go func() {
-		fmt.Printf("API server listening on %s\n", cfg.API.ListenAddr)
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := server.Start(); err != nil {
 			errCh <- err
 		}
 	}()
 
 	// Wait for shutdown signal or error
 	select {
-	case <-ctx.Done():
-		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer shutdownCancel()
-		return server.Shutdown(shutdownCtx)
+	case sig := <-sigCh:
+		logger.Info("received shutdown signal", "signal", sig)
 	case err := <-errCh:
-		return err
+		logger.Error("server error", "error", err)
 	}
+
+	// Graceful shutdown
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer shutdownCancel()
+
+	if err := server.Stop(shutdownCtx); err != nil {
+		logger.Error("failed to stop server gracefully", "error", err)
+		os.Exit(1)
+	}
+
+	logger.Info("server stopped")
 }

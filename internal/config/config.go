@@ -49,6 +49,15 @@ type APIConfig struct {
 
 	// WriteTimeout is the maximum duration before timing out writes of the response
 	WriteTimeout time.Duration
+
+	// CORSOrigins is a list of allowed CORS origins (use "*" for all)
+	CORSOrigins []string
+
+	// RateLimitRPS is the rate limit in requests per second
+	RateLimitRPS float64
+
+	// RateLimitBurst is the maximum burst size for rate limiting
+	RateLimitBurst int
 }
 
 // DatabaseConfig holds database connection configuration.
@@ -286,10 +295,13 @@ func Load() (*Config, error) {
 		Environment: getEnv("PHILOTES_ENV", "development"),
 
 		API: APIConfig{
-			ListenAddr:   getEnv("PHILOTES_API_LISTEN_ADDR", ":8080"),
-			BaseURL:      getEnv("PHILOTES_API_BASE_URL", "http://localhost:8080"),
-			ReadTimeout:  getDurationEnv("PHILOTES_API_READ_TIMEOUT", 15*time.Second),
-			WriteTimeout: getDurationEnv("PHILOTES_API_WRITE_TIMEOUT", 15*time.Second),
+			ListenAddr:     getEnv("PHILOTES_API_LISTEN_ADDR", ":8080"),
+			BaseURL:        getEnv("PHILOTES_API_BASE_URL", "http://localhost:8080"),
+			ReadTimeout:    getDurationEnv("PHILOTES_API_READ_TIMEOUT", 15*time.Second),
+			WriteTimeout:   getDurationEnv("PHILOTES_API_WRITE_TIMEOUT", 15*time.Second),
+			CORSOrigins:    getSliceEnv("PHILOTES_API_CORS_ORIGINS", []string{"*"}),
+			RateLimitRPS:   getFloatEnv("PHILOTES_API_RATE_LIMIT_RPS", 100),
+			RateLimitBurst: getIntEnv("PHILOTES_API_RATE_LIMIT_BURST", 200),
 		},
 
 		Database: DatabaseConfig{
