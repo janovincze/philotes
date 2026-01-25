@@ -12,17 +12,20 @@ import (
 
 	"github.com/janovincze/philotes/internal/api/handlers"
 	"github.com/janovincze/philotes/internal/api/middleware"
+	"github.com/janovincze/philotes/internal/api/services"
 	"github.com/janovincze/philotes/internal/cdc/health"
 	"github.com/janovincze/philotes/internal/config"
 )
 
 // Server is the HTTP API server.
 type Server struct {
-	cfg           *config.Config
-	logger        *slog.Logger
-	healthManager *health.Manager
-	httpServer    *http.Server
-	router        *gin.Engine
+	cfg             *config.Config
+	logger          *slog.Logger
+	healthManager   *health.Manager
+	sourceService   *services.SourceService
+	pipelineService *services.PipelineService
+	httpServer      *http.Server
+	router          *gin.Engine
 }
 
 // ServerConfig holds server configuration options.
@@ -35,6 +38,12 @@ type ServerConfig struct {
 
 	// HealthManager is the health check manager.
 	HealthManager *health.Manager
+
+	// SourceService is the source service for source CRUD operations.
+	SourceService *services.SourceService
+
+	// PipelineService is the pipeline service for pipeline CRUD operations.
+	PipelineService *services.PipelineService
 
 	// CORSConfig is the CORS configuration.
 	CORSConfig middleware.CORSConfig
@@ -78,10 +87,12 @@ func NewServer(serverCfg ServerConfig) *Server {
 
 	// Create server
 	s := &Server{
-		cfg:           serverCfg.Config,
-		logger:        logger.With("component", "api-server"),
-		healthManager: serverCfg.HealthManager,
-		router:        router,
+		cfg:             serverCfg.Config,
+		logger:          logger.With("component", "api-server"),
+		healthManager:   serverCfg.HealthManager,
+		sourceService:   serverCfg.SourceService,
+		pipelineService: serverCfg.PipelineService,
+		router:          router,
 	}
 
 	// Register routes
@@ -105,7 +116,16 @@ func (s *Server) registerRoutes() {
 	healthHandler := handlers.NewHealthHandler(s.healthManager)
 	versionHandler := handlers.NewVersionHandler(s.cfg.Version)
 	configHandler := handlers.NewConfigHandler(s.cfg)
-	stubHandler := handlers.NewStubHandler()
+
+	// Create source and pipeline handlers (may be nil if services not provided)
+	var sourceHandler *handlers.SourceHandler
+	var pipelineHandler *handlers.PipelineHandler
+	if s.sourceService != nil {
+		sourceHandler = handlers.NewSourceHandler(s.sourceService)
+	}
+	if s.pipelineService != nil {
+		pipelineHandler = handlers.NewPipelineHandler(s.pipelineService)
+	}
 
 	// Health endpoints (no versioning)
 	s.router.GET("/health", healthHandler.GetHealth)
@@ -119,10 +139,30 @@ func (s *Server) registerRoutes() {
 		v1.GET("/version", versionHandler.GetVersion)
 		v1.GET("/config", configHandler.GetConfig)
 
-		// Stub endpoints for future implementation
-		v1.GET("/sources", stubHandler.ListSources)
-		v1.GET("/pipelines", stubHandler.ListPipelines)
-		v1.GET("/destinations", stubHandler.ListDestinations)
+		// Source endpoints
+		if sourceHandler != nil {
+			v1.POST("/sources", sourceHandler.Create)
+			v1.GET("/sources", sourceHandler.List)
+			v1.GET("/sources/:id", sourceHandler.Get)
+			v1.PUT("/sources/:id", sourceHandler.Update)
+			v1.DELETE("/sources/:id", sourceHandler.Delete)
+			v1.POST("/sources/:id/test", sourceHandler.TestConnection)
+			v1.GET("/sources/:id/tables", sourceHandler.DiscoverTables)
+		}
+
+		// Pipeline endpoints
+		if pipelineHandler != nil {
+			v1.POST("/pipelines", pipelineHandler.Create)
+			v1.GET("/pipelines", pipelineHandler.List)
+			v1.GET("/pipelines/:id", pipelineHandler.Get)
+			v1.PUT("/pipelines/:id", pipelineHandler.Update)
+			v1.DELETE("/pipelines/:id", pipelineHandler.Delete)
+			v1.POST("/pipelines/:id/start", pipelineHandler.Start)
+			v1.POST("/pipelines/:id/stop", pipelineHandler.Stop)
+			v1.GET("/pipelines/:id/status", pipelineHandler.GetStatus)
+			v1.POST("/pipelines/:id/tables", pipelineHandler.AddTableMapping)
+			v1.DELETE("/pipelines/:id/tables/:mappingId", pipelineHandler.RemoveTableMapping)
+		}
 	}
 }
 

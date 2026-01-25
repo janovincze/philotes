@@ -131,13 +131,14 @@ func TestServer_ConfigEndpoint(t *testing.T) {
 	}
 }
 
-func TestServer_StubEndpoints(t *testing.T) {
+func TestServer_EndpointsWithoutServices(t *testing.T) {
+	// When no services are configured, source/pipeline endpoints are not registered
+	// and should return 404
 	server := newTestServer(t)
 
 	endpoints := []string{
 		"/api/v1/sources",
 		"/api/v1/pipelines",
-		"/api/v1/destinations",
 	}
 
 	for _, endpoint := range endpoints {
@@ -147,23 +148,9 @@ func TestServer_StubEndpoints(t *testing.T) {
 
 			server.Router().ServeHTTP(w, req)
 
-			if w.Code != http.StatusNotImplemented {
-				t.Errorf("expected status %d, got %d", http.StatusNotImplemented, w.Code)
-			}
-
-			// Check content type for problem details
-			contentType := w.Header().Get("Content-Type")
-			if contentType != "application/problem+json" {
-				t.Errorf("expected Content-Type 'application/problem+json', got '%s'", contentType)
-			}
-
-			var response models.ProblemDetails
-			if err := json.NewDecoder(w.Body).Decode(&response); err != nil {
-				t.Fatalf("failed to decode response: %v", err)
-			}
-
-			if response.Status != http.StatusNotImplemented {
-				t.Errorf("expected status %d in body, got %d", http.StatusNotImplemented, response.Status)
+			// Without services configured, routes are not registered
+			if w.Code != http.StatusNotFound {
+				t.Errorf("expected status %d, got %d", http.StatusNotFound, w.Code)
 			}
 		})
 	}
