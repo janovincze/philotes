@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -199,6 +200,7 @@ func sanitizeConnectionError(err error) string {
 		return ""
 	}
 	errStr := err.Error()
+	errLower := strings.ToLower(errStr)
 	// Common safe error patterns to pass through
 	safePatterns := []string{
 		"connection refused",
@@ -210,44 +212,15 @@ func sanitizeConnectionError(err error) string {
 		"password authentication failed",
 		"database",
 		"does not exist",
-		"SSL",
+		"ssl",
 	}
 	for _, pattern := range safePatterns {
-		if containsIgnoreCase(errStr, pattern) {
+		if strings.Contains(errLower, pattern) {
 			return errStr
 		}
 	}
 	// Generic message for unknown errors
 	return "connection failed"
-}
-
-// containsIgnoreCase checks if s contains substr (case-insensitive).
-func containsIgnoreCase(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr ||
-		len(s) > 0 && findSubstringIgnoreCase(s, substr))
-}
-
-func findSubstringIgnoreCase(s, substr string) bool {
-	s = toLower(s)
-	substr = toLower(substr)
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
-}
-
-func toLower(s string) string {
-	b := make([]byte, len(s))
-	for i := range s {
-		c := s[i]
-		if c >= 'A' && c <= 'Z' {
-			c += 'a' - 'A'
-		}
-		b[i] = c
-	}
-	return string(b)
 }
 
 // DiscoverTables discovers tables in a source database.

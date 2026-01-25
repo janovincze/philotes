@@ -1,7 +1,6 @@
 package services
 
 import (
-	"context"
 	"testing"
 
 	"github.com/google/uuid"
@@ -241,9 +240,6 @@ func TestSource_UUID(t *testing.T) {
 
 // Test that validation catches bad port values
 func TestCreateSourceRequest_Validate_Port(t *testing.T) {
-	ctx := context.Background()
-	_ = ctx // Would be used with actual service
-
 	req := &models.CreateSourceRequest{
 		Name:         "test",
 		Host:         "localhost",
