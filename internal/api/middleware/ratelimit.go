@@ -70,11 +70,64 @@ type clientLimiter struct {
 	lastAccess time.Time
 }
 
+// rateLimiterStore holds the shared state for per-client rate limiting.
+// Using a singleton pattern ensures only one cleanup goroutine runs globally.
+type rateLimiterStore struct {
+	mu       sync.Mutex
+	limiters map[string]*clientLimiter
+	once     sync.Once
+	ttl      time.Duration
+	interval time.Duration
+}
+
+// cleanup runs periodically to remove stale client limiters.
+func (s *rateLimiterStore) cleanup() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	now := time.Now()
+	for ip, cl := range s.limiters {
+		if now.Sub(cl.lastAccess) > s.ttl {
+			delete(s.limiters, ip)
+		}
+	}
+}
+
+// startCleanup starts the cleanup goroutine exactly once.
+func (s *rateLimiterStore) startCleanup() {
+	s.once.Do(func() {
+		go func() {
+			ticker := time.NewTicker(s.interval)
+			defer ticker.Stop()
+
+			for range ticker.C {
+				s.cleanup()
+			}
+		}()
+	})
+}
+
+// getOrCreateLimiter returns the limiter for a client IP, creating one if needed.
+func (s *rateLimiterStore) getOrCreateLimiter(clientIP string, rps float64, burst int) *rate.Limiter {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	now := time.Now()
+	cl, exists := s.limiters[clientIP]
+	if !exists {
+		cl = &clientLimiter{
+			limiter:    rate.NewLimiter(rate.Limit(rps), burst),
+			lastAccess: now,
+		}
+		s.limiters[clientIP] = cl
+	} else {
+		cl.lastAccess = now
+	}
+	return cl.limiter
+}
+
 // perClientRateLimiter creates a limiter per client IP with automatic cleanup.
 func perClientRateLimiter(cfg RateLimitConfig) gin.HandlerFunc {
-	var mu sync.Mutex
-	limiters := make(map[string]*clientLimiter)
-
 	// Set defaults if not configured
 	clientTTL := cfg.ClientTTL
 	if clientTTL == 0 {
@@ -85,40 +138,19 @@ func perClientRateLimiter(cfg RateLimitConfig) gin.HandlerFunc {
 		cleanupInterval = 10 * time.Minute
 	}
 
-	// Start cleanup goroutine
-	go func() {
-		ticker := time.NewTicker(cleanupInterval)
-		defer ticker.Stop()
+	// Create store for this rate limiter instance
+	store := &rateLimiterStore{
+		limiters: make(map[string]*clientLimiter),
+		ttl:      clientTTL,
+		interval: cleanupInterval,
+	}
 
-		for range ticker.C {
-			mu.Lock()
-			now := time.Now()
-			for ip, cl := range limiters {
-				if now.Sub(cl.lastAccess) > clientTTL {
-					delete(limiters, ip)
-				}
-			}
-			mu.Unlock()
-		}
-	}()
+	// Start cleanup goroutine (only once per store instance)
+	store.startCleanup()
 
 	return func(c *gin.Context) {
 		clientIP := c.ClientIP()
-		now := time.Now()
-
-		mu.Lock()
-		cl, exists := limiters[clientIP]
-		if !exists {
-			cl = &clientLimiter{
-				limiter:    rate.NewLimiter(rate.Limit(cfg.RequestsPerSecond), cfg.BurstSize),
-				lastAccess: now,
-			}
-			limiters[clientIP] = cl
-		} else {
-			cl.lastAccess = now
-		}
-		limiter := cl.limiter
-		mu.Unlock()
+		limiter := store.getOrCreateLimiter(clientIP, cfg.RequestsPerSecond, cfg.BurstSize)
 
 		if !limiter.Allow() {
 			c.Header("Retry-After", "1")
