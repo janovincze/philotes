@@ -1,0 +1,461 @@
+openapi: 3.0.3
+info:
+  title: Philotes Management API
+  description: |
+    RESTful API for managing Philotes CDC pipelines, sources, and destinations.
+
+    ## Error Handling
+    All errors follow RFC 7807 Problem Details format.
+  version: 1.0.0
+  contact:
+    name: Philotes Team
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+  - url: https://api.philotes.io
+    description: Production server
+
+tags:
+  - name: Health
+    description: Health check endpoints for monitoring and orchestration
+  - name: System
+    description: System information and configuration
+  - name: Sources
+    description: Source database management (future)
+  - name: Pipelines
+    description: CDC pipeline management (future)
+  - name: Destinations
+    description: Iceberg destination configuration (future)
+
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      summary: Get overall health status
+      description: Returns the overall health status including all component checks
+      tags:
+        - Health
+      responses:
+        '200':
+          description: System is healthy or degraded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '503':
+          description: System is unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /health/live:
+    get:
+      operationId: getLiveness
+      summary: Kubernetes liveness probe
+      description: Returns 200 if the service is alive and responding
+      tags:
+        - Health
+      responses:
+        '200':
+          description: Service is alive
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LivenessResponse'
+
+  /health/ready:
+    get:
+      operationId: getReadiness
+      summary: Kubernetes readiness probe
+      description: Returns 200 if the service is ready to accept traffic
+      tags:
+        - Health
+      responses:
+        '200':
+          description: Service is ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessResponse'
+        '503':
+          description: Service is not ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessResponse'
+
+  /api/v1/version:
+    get:
+      operationId: getVersion
+      summary: Get API version information
+      description: Returns version information for the API and service
+      tags:
+        - System
+      responses:
+        '200':
+          description: Version information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionResponse'
+
+  /api/v1/config:
+    get:
+      operationId: getConfig
+      summary: Get system configuration
+      description: Returns a safe subset of the system configuration (no secrets)
+      tags:
+        - System
+      responses:
+        '200':
+          description: Configuration information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfigResponse'
+
+  # Future endpoints (API-002)
+  /api/v1/sources:
+    get:
+      operationId: listSources
+      summary: List all sources
+      description: Returns a list of configured source databases
+      tags:
+        - Sources
+      responses:
+        '200':
+          description: List of sources
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SourceListResponse'
+        '501':
+          description: Not implemented
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
+  /api/v1/pipelines:
+    get:
+      operationId: listPipelines
+      summary: List all pipelines
+      description: Returns a list of CDC pipelines
+      tags:
+        - Pipelines
+      responses:
+        '200':
+          description: List of pipelines
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PipelineListResponse'
+        '501':
+          description: Not implemented
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
+  /api/v1/destinations:
+    get:
+      operationId: listDestinations
+      summary: List all destinations
+      description: Returns a list of Iceberg destinations
+      tags:
+        - Destinations
+      responses:
+        '200':
+          description: List of destinations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DestinationListResponse'
+        '501':
+          description: Not implemented
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
+components:
+  schemas:
+    # Health Schemas
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - timestamp
+      properties:
+        status:
+          type: string
+          enum: [healthy, unhealthy, degraded, unknown]
+          description: Overall health status
+        components:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/ComponentHealth'
+          description: Individual component health checks
+        timestamp:
+          type: string
+          format: date-time
+          description: When the health check was performed
+
+    ComponentHealth:
+      type: object
+      required:
+        - name
+        - status
+      properties:
+        name:
+          type: string
+          description: Component name
+        status:
+          type: string
+          enum: [healthy, unhealthy, degraded, unknown]
+        message:
+          type: string
+          description: Additional status message
+        duration_ms:
+          type: integer
+          description: How long the check took in milliseconds
+        last_check:
+          type: string
+          format: date-time
+        error:
+          type: string
+          description: Error message if unhealthy
+
+    LivenessResponse:
+      type: object
+      required:
+        - status
+        - timestamp
+      properties:
+        status:
+          type: string
+          enum: [alive]
+        timestamp:
+          type: string
+          format: date-time
+
+    ReadinessResponse:
+      type: object
+      required:
+        - status
+        - timestamp
+      properties:
+        status:
+          type: string
+          enum: [ready, not_ready]
+        timestamp:
+          type: string
+          format: date-time
+
+    # System Schemas
+    VersionResponse:
+      type: object
+      required:
+        - version
+        - api_version
+      properties:
+        version:
+          type: string
+          description: Application version
+          example: "0.1.0"
+        api_version:
+          type: string
+          description: API version
+          example: "v1"
+        go_version:
+          type: string
+          description: Go runtime version
+          example: "go1.25.5"
+        build_time:
+          type: string
+          format: date-time
+          description: When the binary was built
+        git_commit:
+          type: string
+          description: Git commit SHA
+
+    ConfigResponse:
+      type: object
+      required:
+        - environment
+        - api
+      properties:
+        environment:
+          type: string
+          enum: [development, staging, production]
+        api:
+          type: object
+          properties:
+            listen_addr:
+              type: string
+              example: ":8080"
+            base_url:
+              type: string
+              example: "http://localhost:8080"
+        cdc:
+          type: object
+          properties:
+            buffer_size:
+              type: integer
+            batch_size:
+              type: integer
+            flush_interval:
+              type: string
+              example: "5s"
+        metrics:
+          type: object
+          properties:
+            enabled:
+              type: boolean
+            listen_addr:
+              type: string
+
+    # Future Resource Schemas (stubs)
+    SourceListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Source'
+        total:
+          type: integer
+
+    Source:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        type:
+          type: string
+          enum: [postgresql]
+        status:
+          type: string
+          enum: [active, inactive, error]
+        created_at:
+          type: string
+          format: date-time
+
+    PipelineListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Pipeline'
+        total:
+          type: integer
+
+    Pipeline:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        source_id:
+          type: string
+          format: uuid
+        destination_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [starting, running, paused, stopped, failed]
+        created_at:
+          type: string
+          format: date-time
+
+    DestinationListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Destination'
+        total:
+          type: integer
+
+    Destination:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        type:
+          type: string
+          enum: [iceberg]
+        catalog_url:
+          type: string
+        warehouse:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    # Error Schema (RFC 7807)
+    ProblemDetails:
+      type: object
+      required:
+        - type
+        - title
+        - status
+      properties:
+        type:
+          type: string
+          format: uri
+          description: URI reference identifying the problem type
+          example: "https://philotes.io/errors/validation-error"
+        title:
+          type: string
+          description: Short human-readable summary
+          example: "Validation Error"
+        status:
+          type: integer
+          description: HTTP status code
+          example: 400
+        detail:
+          type: string
+          description: Human-readable explanation specific to this occurrence
+          example: "The request body contains invalid fields"
+        instance:
+          type: string
+          format: uri
+          description: URI reference identifying the specific occurrence
+          example: "/api/v1/sources"
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/FieldError'
+          description: Detailed field-level errors for validation failures
+
+    FieldError:
+      type: object
+      required:
+        - field
+        - message
+      properties:
+        field:
+          type: string
+          description: The field that caused the error
+          example: "host"
+        message:
+          type: string
+          description: Error message for this field
+          example: "host is required"
