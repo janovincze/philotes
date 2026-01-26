@@ -1,0 +1,80 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "philotes-worker.fullname" . }}
+  labels:
+    {{- include "philotes-worker.labels" . | nindent 4 }}
+data:
+  # Environment
+  PHILOTES_ENV: "production"
+
+  # CDC configuration
+  PHILOTES_CDC_BUFFER_SIZE: {{ .Values.cdc.bufferSize | quote }}
+  PHILOTES_CDC_BATCH_SIZE: {{ .Values.cdc.batchSize | quote }}
+  PHILOTES_CDC_FLUSH_INTERVAL: {{ .Values.cdc.flushInterval | quote }}
+
+  # Source database
+  PHILOTES_CDC_SOURCE_HOST: {{ .Values.source.host | quote }}
+  PHILOTES_CDC_SOURCE_PORT: {{ .Values.source.port | quote }}
+  PHILOTES_CDC_SOURCE_DATABASE: {{ .Values.source.database | quote }}
+  PHILOTES_CDC_SOURCE_USER: {{ .Values.source.user | quote }}
+  PHILOTES_CDC_SOURCE_SSLMODE: {{ .Values.source.sslMode | quote }}
+
+  # Replication settings
+  PHILOTES_CDC_REPLICATION_SLOT: {{ .Values.cdc.replication.slotName | quote }}
+  PHILOTES_CDC_PUBLICATION: {{ .Values.cdc.replication.publicationName | quote }}
+  {{- if .Values.cdc.replication.tables }}
+  PHILOTES_CDC_TABLES: {{ .Values.cdc.replication.tables | quote }}
+  {{- end }}
+
+  # Checkpoint settings
+  PHILOTES_CDC_CHECKPOINT_ENABLED: {{ .Values.cdc.checkpoint.enabled | quote }}
+  PHILOTES_CDC_CHECKPOINT_INTERVAL: {{ .Values.cdc.checkpoint.interval | quote }}
+
+  # Buffer database settings
+  PHILOTES_BUFFER_ENABLED: {{ .Values.cdc.buffer.enabled | quote }}
+  PHILOTES_BUFFER_RETENTION: {{ .Values.cdc.buffer.retention | quote }}
+  PHILOTES_BUFFER_CLEANUP_INTERVAL: {{ .Values.cdc.buffer.cleanupInterval | quote }}
+
+  # Retry settings
+  PHILOTES_RETRY_MAX_ATTEMPTS: {{ .Values.cdc.retry.maxAttempts | quote }}
+  PHILOTES_RETRY_INITIAL_INTERVAL: {{ .Values.cdc.retry.initialInterval | quote }}
+  PHILOTES_RETRY_MAX_INTERVAL: {{ .Values.cdc.retry.maxInterval | quote }}
+  PHILOTES_RETRY_MULTIPLIER: {{ .Values.cdc.retry.multiplier | quote }}
+
+  # Dead letter queue
+  PHILOTES_DLQ_ENABLED: {{ .Values.cdc.deadLetter.enabled | quote }}
+  PHILOTES_DLQ_RETENTION: {{ .Values.cdc.deadLetter.retention | quote }}
+
+  # Backpressure settings
+  PHILOTES_BACKPRESSURE_ENABLED: {{ .Values.cdc.backpressure.enabled | quote }}
+  PHILOTES_BACKPRESSURE_HIGH_WATERMARK: {{ .Values.cdc.backpressure.highWatermark | quote }}
+  PHILOTES_BACKPRESSURE_LOW_WATERMARK: {{ .Values.cdc.backpressure.lowWatermark | quote }}
+  PHILOTES_BACKPRESSURE_CHECK_INTERVAL: {{ .Values.cdc.backpressure.checkInterval | quote }}
+
+  # Buffer/Metadata database
+  PHILOTES_DB_HOST: {{ .Values.database.host | quote }}
+  PHILOTES_DB_PORT: {{ .Values.database.port | quote }}
+  PHILOTES_DB_NAME: {{ .Values.database.name | quote }}
+  PHILOTES_DB_USER: {{ .Values.database.user | quote }}
+  PHILOTES_DB_SSLMODE: {{ .Values.database.sslMode | quote }}
+  PHILOTES_DB_MAX_OPEN_CONNS: {{ .Values.database.maxOpenConns | quote }}
+  PHILOTES_DB_MAX_IDLE_CONNS: {{ .Values.database.maxIdleConns | quote }}
+
+  # Object storage
+  PHILOTES_STORAGE_ENDPOINT: {{ .Values.storage.endpoint | quote }}
+  PHILOTES_STORAGE_BUCKET: {{ .Values.storage.bucket | quote }}
+  PHILOTES_STORAGE_USE_SSL: {{ .Values.storage.useSSL | quote }}
+
+  # Iceberg configuration
+  PHILOTES_ICEBERG_CATALOG_URL: {{ .Values.iceberg.catalogUrl | quote }}
+  PHILOTES_ICEBERG_WAREHOUSE: {{ .Values.iceberg.warehouse | quote }}
+
+  # Metrics configuration
+  PHILOTES_METRICS_ENABLED: {{ .Values.metrics.enabled | quote }}
+  PHILOTES_METRICS_LISTEN_ADDR: {{ printf ":%d" (int .Values.metrics.port) | quote }}
+
+  # Health configuration
+  PHILOTES_HEALTH_ENABLED: {{ .Values.health.enabled | quote }}
+  PHILOTES_HEALTH_LISTEN_ADDR: {{ .Values.health.listenAddr | quote }}
+  PHILOTES_HEALTH_READINESS_TIMEOUT: {{ .Values.health.readinessTimeout | quote }}

@@ -1,0 +1,176 @@
+# Production environment values
+# Usage: helm install philotes ./charts/philotes -f ./charts/philotes/values-production.yaml -n philotes
+
+# API - High availability with HPA
+api:
+  enabled: true
+  replicaCount: 3
+
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 200m
+      memory: 256Mi
+
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+      nginx.ingress.kubernetes.io/rate-limit: "100"
+      nginx.ingress.kubernetes.io/rate-limit-window: "1s"
+    hosts:
+      - host: api.philotes.example.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: philotes-api-tls
+        hosts:
+          - api.philotes.example.com
+
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+  pdb:
+    enabled: true
+    minAvailable: 2
+
+  networkPolicy:
+    enabled: true
+
+  api:
+    corsOrigins: "https://dashboard.philotes.example.com"
+    rateLimitRPS: "100"
+    rateLimitBurst: "200"
+
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      labels:
+        release: prometheus
+
+  alerting:
+    enabled: true
+    prometheusUrl: "http://prometheus-kube-prometheus-prometheus.monitoring:9090"
+
+  # Pod anti-affinity for HA
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: philotes-api
+            topologyKey: kubernetes.io/hostname
+
+# Worker - KEDA enabled for production
+worker:
+  enabled: true
+  replicaCount: 2
+
+  resources:
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+    requests:
+      cpu: 500m
+      memory: 512Mi
+
+  keda:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    pollingInterval: 30
+    cooldownPeriod: 300
+    postgresql:
+      host: ""  # Set via --set
+      database: ""
+      user: ""
+      existingSecret: "philotes-source-credentials"
+    triggers:
+      - type: postgresql
+        metadata:
+          query: "SELECT COALESCE(pg_wal_lsn_diff(pg_current_wal_lsn(), confirmed_flush_lsn), 0) FROM pg_replication_slots WHERE slot_name = 'philotes_cdc'"
+          targetQueryValue: "10000000"  # 10MB lag threshold
+
+  pdb:
+    enabled: true
+    minAvailable: 1
+
+  networkPolicy:
+    enabled: true
+
+  # Configure for production source database
+  source:
+    host: ""  # Set via --set or external secret
+    port: "5432"
+    database: ""
+    user: ""
+    sslMode: "require"
+    existingSecret: "philotes-source-credentials"
+
+  storage:
+    endpoint: ""  # Use managed S3 or configure MinIO endpoint
+    bucket: "philotes-production"
+    useSSL: "true"
+    existingSecret: "philotes-storage-credentials"
+
+  iceberg:
+    catalogUrl: "http://philotes-lakekeeper:8181"
+
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      labels:
+        release: prometheus
+
+  # Pod anti-affinity for HA
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: philotes-worker
+            topologyKey: kubernetes.io/hostname
+
+# Lakekeeper - HA for production
+lakekeeper:
+  enabled: true
+  replicaCount: 2
+
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 200m
+      memory: 256Mi
+
+  # Consider enabling auth for production
+  config:
+    authz:
+      enabled: false  # Enable when ready
+    openid:
+      enabled: false  # Enable when ready
+
+# PostgreSQL - Use managed PostgreSQL in production
+# Set enabled: false and configure external database
+postgresql:
+  enabled: false  # Use managed PostgreSQL (RDS, Cloud SQL, etc.)
+
+# MinIO - Use managed S3 in production
+# Set enabled: false and configure external S3
+minio:
+  enabled: false  # Use managed S3 (AWS S3, Hetzner Object Storage, etc.)

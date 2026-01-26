@@ -1,0 +1,114 @@
+
+===========================================================
+ ____  _     _ _       _
+|  _ \| |__ (_) | ___ | |_ ___  ___
+| |_) | '_ \| | |/ _ \| __/ _ \/ __|
+|  __/| | | | | | (_) | ||  __/\__ \
+|_|   |_| |_|_|_|\___/ \__\___||___/
+
+  Change Data Capture for PostgreSQL to Iceberg
+===========================================================
+
+Thank you for installing {{ .Chart.Name }}!
+
+Your release is named: {{ .Release.Name }}
+Namespace: {{ .Release.Namespace }}
+
+===========================================================
+COMPONENTS DEPLOYED
+===========================================================
+
+{{- if .Values.api.enabled }}
+API Server: ENABLED
+{{- else }}
+API Server: DISABLED
+{{- end }}
+
+{{- if .Values.worker.enabled }}
+CDC Worker: ENABLED
+{{- else }}
+CDC Worker: DISABLED
+{{- end }}
+
+{{- if .Values.lakekeeper.enabled }}
+Lakekeeper Catalog: ENABLED
+{{- else }}
+Lakekeeper Catalog: DISABLED
+{{- end }}
+
+{{- if .Values.postgresql.enabled }}
+PostgreSQL: ENABLED (Bitnami)
+{{- else }}
+PostgreSQL: DISABLED (using external)
+{{- end }}
+
+{{- if .Values.minio.enabled }}
+MinIO: ENABLED
+{{- else }}
+MinIO: DISABLED (using external S3)
+{{- end }}
+
+===========================================================
+ACCESSING THE API
+===========================================================
+
+{{- if .Values.api.enabled }}
+{{- if .Values.api.ingress.enabled }}
+{{- range $host := .Values.api.ingress.hosts }}
+  {{- range .paths }}
+API URL: http{{ if $.Values.api.ingress.tls }}s{{ end }}://{{ $host.host }}{{ .path }}
+  {{- end }}
+{{- end }}
+{{- else }}
+To access the API, run:
+  kubectl port-forward svc/{{ .Release.Name }}-api 8080:8080 -n {{ .Release.Namespace }}
+
+Then visit: http://localhost:8080
+{{- end }}
+{{- end }}
+
+===========================================================
+QUICK START
+===========================================================
+
+1. Verify all pods are running:
+   kubectl get pods -n {{ .Release.Namespace }}
+
+2. Check API health:
+   curl http://localhost:8080/health
+
+3. List configured sources:
+   curl http://localhost:8080/api/v1/sources
+
+4. View worker logs:
+   kubectl logs -l app.kubernetes.io/component=worker -n {{ .Release.Namespace }} -f
+
+===========================================================
+CONFIGURATION
+===========================================================
+
+{{- if .Values.worker.enabled }}
+Before the CDC worker can replicate data, ensure:
+
+1. Source PostgreSQL is configured with:
+   - wal_level = logical
+   - A replication slot named: {{ .Values.worker.cdc.replication.slotName | default "philotes_cdc" }}
+   - A publication named: {{ .Values.worker.cdc.replication.publicationName | default "philotes_pub" }}
+
+2. Source database credentials are configured via:
+   {{- if .Values.worker.source.existingSecret }}
+   - Existing secret: {{ .Values.worker.source.existingSecret }}
+   {{- else }}
+   - Values: worker.source.host, worker.source.database, etc.
+   {{- end }}
+{{- end }}
+
+===========================================================
+DOCUMENTATION
+===========================================================
+
+- GitHub: https://github.com/janovincze/philotes
+- Documentation: https://github.com/janovincze/philotes/docs
+
+For support, please open an issue at:
+https://github.com/janovincze/philotes/issues

@@ -1,0 +1,65 @@
+{{- if .Values.keda.enabled }}
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{ include "philotes-worker.fullname" . }}
+  labels:
+    {{- include "philotes-worker.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    name: {{ include "philotes-worker.fullname" . }}
+  pollingInterval: {{ .Values.keda.pollingInterval }}
+  cooldownPeriod: {{ .Values.keda.cooldownPeriod }}
+  minReplicaCount: {{ .Values.keda.minReplicas }}
+  maxReplicaCount: {{ .Values.keda.maxReplicas }}
+  triggers:
+    {{- range .Values.keda.triggers }}
+    - type: {{ .type }}
+      {{- if and (eq .type "postgresql") $.Values.keda.postgresql.existingSecret }}
+      authenticationRef:
+        name: {{ include "philotes-worker.fullname" $ }}-keda-auth
+      {{- end }}
+      metadata:
+        {{- if eq .type "postgresql" }}
+        {{- if not $.Values.keda.postgresql.existingSecret }}
+        connectionFromEnv: KEDA_PG_CONNECTION
+        {{- end }}
+        query: {{ .metadata.query | quote }}
+        targetQueryValue: {{ .metadata.targetQueryValue | quote }}
+        {{- if $.Values.keda.postgresql.existingSecret }}
+        host: {{ $.Values.keda.postgresql.host | quote }}
+        port: "5432"
+        dbName: {{ $.Values.keda.postgresql.database | quote }}
+        userName: {{ $.Values.keda.postgresql.user | quote }}
+        sslmode: "disable"
+        {{- end }}
+        {{- else }}
+        {{- toYaml .metadata | nindent 8 }}
+        {{- end }}
+    {{- end }}
+{{- if .Values.keda.postgresql.existingSecret }}
+---
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: {{ include "philotes-worker.fullname" . }}-keda-auth
+  labels:
+    {{- include "philotes-worker.labels" . | nindent 4 }}
+spec:
+  secretTargetRef:
+    - parameter: password
+      name: {{ .Values.keda.postgresql.existingSecret }}
+      key: {{ .Values.keda.postgresql.passwordKey | default "password" }}
+{{- else }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "philotes-worker.fullname" . }}-keda
+  labels:
+    {{- include "philotes-worker.labels" . | nindent 4 }}
+type: Opaque
+stringData:
+  KEDA_PG_CONNECTION: "host={{ .Values.keda.postgresql.host }} dbname={{ .Values.keda.postgresql.database }} user={{ .Values.keda.postgresql.user }} password={{ .Values.keda.postgresql.password | default "" }} sslmode=disable"
+{{- end }}
+{{- end }}

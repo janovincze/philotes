@@ -1,0 +1,136 @@
+# Development environment values
+# Usage: helm install philotes ./charts/philotes -f ./charts/philotes/values-dev.yaml
+
+# API - minimal resources for development
+api:
+  enabled: true
+  replicaCount: 1
+
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
+  ingress:
+    enabled: false
+
+  autoscaling:
+    enabled: false
+
+  pdb:
+    enabled: false
+
+  networkPolicy:
+    enabled: false
+
+  api:
+    corsOrigins: "*"
+    rateLimitRPS: "1000"
+
+  database:
+    host: "philotes-postgresql"
+    existingSecret: "philotes-postgresql"
+
+# Worker - single replica for development
+worker:
+  enabled: true
+  replicaCount: 1
+
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+  keda:
+    enabled: false
+
+  pdb:
+    enabled: false
+
+  networkPolicy:
+    enabled: false
+
+  # Development source database (docker-compose postgres-source)
+  source:
+    host: "postgres-source"
+    port: "5432"
+    database: "source"
+    user: "source"
+
+  database:
+    host: "philotes-postgresql"
+    existingSecret: "philotes-postgresql"
+
+  storage:
+    endpoint: "philotes-minio:9000"
+    bucket: "philotes"
+    useSSL: "false"
+
+  iceberg:
+    catalogUrl: "http://philotes-lakekeeper:8181"
+
+# Lakekeeper
+lakekeeper:
+  enabled: true
+  replicaCount: 1
+
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 50m
+      memory: 128Mi
+
+  database:
+    host: "philotes-postgresql"
+    existingSecret: "philotes-postgresql"
+
+# PostgreSQL - smaller for development
+postgresql:
+  enabled: true
+
+  auth:
+    username: philotes
+    password: philotes
+    database: philotes
+
+  primary:
+    persistence:
+      enabled: true
+      size: 5Gi
+
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 100m
+        memory: 256Mi
+
+# MinIO - smaller for development
+minio:
+  enabled: true
+
+  mode: standalone
+
+  rootUser: minioadmin
+  rootPassword: minioadmin
+
+  persistence:
+    enabled: true
+    size: 10Gi
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi

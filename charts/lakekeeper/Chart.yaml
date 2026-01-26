@@ -1,0 +1,17 @@
+apiVersion: v2
+name: lakekeeper
+description: Lakekeeper - Apache Iceberg REST Catalog
+type: application
+version: 0.1.0
+appVersion: "latest"
+keywords:
+  - iceberg
+  - catalog
+  - lakekeeper
+  - data-lake
+home: https://github.com/lakekeeper/lakekeeper
+sources:
+  - https://github.com/lakekeeper/lakekeeper
+maintainers:
+  - name: Janos Vincze
+    url: https://github.com/janovincze

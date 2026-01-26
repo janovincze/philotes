@@ -1,0 +1,205 @@
+# Default values for Philotes umbrella chart
+# This is a YAML-formatted file.
+
+# Global settings shared across all sub-charts
+global:
+  # Image pull secrets for all charts
+  imagePullSecrets: []
+  # Storage class for persistent volumes
+  storageClass: ""
+
+# ============================================================
+# Philotes API Configuration
+# ============================================================
+api:
+  enabled: true
+
+  replicaCount: 1
+
+  image:
+    repository: ghcr.io/janovincze/philotes-api
+    tag: ""
+
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+  ingress:
+    enabled: false
+
+  autoscaling:
+    enabled: false
+
+  pdb:
+    enabled: true
+
+  networkPolicy:
+    enabled: false
+
+  database:
+    host: "philotes-postgresql"
+    port: "5432"
+    name: "philotes"
+    user: "philotes"
+    existingSecret: "philotes-postgresql"
+
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: false
+
+  alerting:
+    enabled: true
+    prometheusUrl: "http://prometheus:9090"
+
+# ============================================================
+# Philotes Worker Configuration
+# ============================================================
+worker:
+  enabled: true
+
+  replicaCount: 1
+
+  image:
+    repository: ghcr.io/janovincze/philotes-worker
+    tag: ""
+
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 200m
+      memory: 256Mi
+
+  keda:
+    enabled: false
+
+  pdb:
+    enabled: true
+
+  networkPolicy:
+    enabled: false
+
+  # Source database (must be configured for your environment)
+  source:
+    host: ""
+    port: "5432"
+    database: ""
+    user: ""
+    existingSecret: ""
+
+  database:
+    host: "philotes-postgresql"
+    port: "5432"
+    name: "philotes"
+    user: "philotes"
+    existingSecret: "philotes-postgresql"
+
+  storage:
+    endpoint: "philotes-minio:9000"
+    bucket: "philotes"
+    existingSecret: "philotes-minio"
+
+  iceberg:
+    catalogUrl: "http://philotes-lakekeeper:8181"
+    warehouse: "philotes"
+
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: false
+
+# ============================================================
+# Lakekeeper (Iceberg Catalog) Configuration
+# ============================================================
+lakekeeper:
+  enabled: true
+
+  replicaCount: 1
+
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+  database:
+    host: "philotes-postgresql"
+    port: "5432"
+    name: "philotes"
+    schema: "lakekeeper"
+    user: "philotes"
+    existingSecret: "philotes-postgresql"
+
+  config:
+    authz:
+      enabled: false
+    openid:
+      enabled: false
+
+# ============================================================
+# PostgreSQL Configuration (Bitnami chart)
+# ============================================================
+postgresql:
+  enabled: true
+
+  auth:
+    username: philotes
+    password: philotes
+    database: philotes
+
+  primary:
+    persistence:
+      enabled: true
+      size: 10Gi
+
+    # Enable logical replication for CDC
+    extendedConfiguration: |
+      wal_level = logical
+      max_replication_slots = 10
+      max_wal_senders = 10
+
+  # Initialize Philotes schema
+  primary:
+    initdb:
+      scriptsConfigMap: ""
+
+# ============================================================
+# MinIO Configuration (MinIO chart)
+# ============================================================
+minio:
+  enabled: true
+
+  mode: standalone
+
+  rootUser: minioadmin
+  rootPassword: minioadmin
+
+  persistence:
+    enabled: true
+    size: 50Gi
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  # Create default bucket
+  buckets:
+    - name: philotes
+      policy: none
+      purge: false
+
+  # Console access
+  consoleIngress:
+    enabled: false

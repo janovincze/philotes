@@ -1,0 +1,162 @@
+# Staging environment values
+# Usage: helm install philotes ./charts/philotes -f ./charts/philotes/values-staging.yaml -n philotes-staging
+
+# API - multiple replicas, HPA enabled
+api:
+  enabled: true
+  replicaCount: 2
+
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-staging
+    hosts:
+      - host: api.philotes-staging.example.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: philotes-api-tls
+        hosts:
+          - api.philotes-staging.example.com
+
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 80
+
+  pdb:
+    enabled: true
+    minAvailable: 1
+
+  networkPolicy:
+    enabled: true
+
+  api:
+    corsOrigins: "https://dashboard.philotes-staging.example.com"
+    rateLimitRPS: "100"
+
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      labels:
+        release: prometheus
+
+  alerting:
+    enabled: true
+    prometheusUrl: "http://prometheus-kube-prometheus-prometheus.monitoring:9090"
+
+# Worker - KEDA disabled, manual scaling for staging
+worker:
+  enabled: true
+  replicaCount: 1
+
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 200m
+      memory: 256Mi
+
+  keda:
+    enabled: false
+
+  pdb:
+    enabled: true
+    minAvailable: 1
+
+  networkPolicy:
+    enabled: true
+
+  # Configure for staging source database
+  source:
+    host: ""  # Set via --set or separate secret
+    port: "5432"
+    database: ""
+    user: ""
+    existingSecret: "philotes-source-credentials"
+
+  storage:
+    endpoint: "philotes-minio:9000"
+    bucket: "philotes-staging"
+    useSSL: "false"
+    existingSecret: "philotes-minio"
+
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      labels:
+        release: prometheus
+
+# Lakekeeper
+lakekeeper:
+  enabled: true
+  replicaCount: 1
+
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+# PostgreSQL - production-like settings
+postgresql:
+  enabled: true
+
+  auth:
+    username: philotes
+    existingSecret: "philotes-postgresql-credentials"
+
+  primary:
+    persistence:
+      enabled: true
+      size: 20Gi
+      storageClass: ""
+
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+      requests:
+        cpu: 250m
+        memory: 512Mi
+
+# MinIO
+minio:
+  enabled: true
+
+  mode: standalone
+
+  existingSecret: "philotes-minio-credentials"
+
+  persistence:
+    enabled: true
+    size: 100Gi
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  buckets:
+    - name: philotes-staging
+      policy: none
+      purge: false

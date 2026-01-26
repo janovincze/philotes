@@ -1,0 +1,31 @@
+Philotes CDC Worker has been deployed!
+
+1. Check the worker status:
+  kubectl get pods -l "app.kubernetes.io/name={{ include "philotes-worker.name" . }},app.kubernetes.io/instance={{ .Release.Name }}"
+
+2. View worker logs:
+  kubectl logs -l "app.kubernetes.io/name={{ include "philotes-worker.name" . }},app.kubernetes.io/instance={{ .Release.Name }}" -f
+
+3. Check health status:
+  kubectl port-forward svc/{{ include "philotes-worker.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }}
+  curl http://localhost:{{ .Values.service.port }}/health
+
+{{- if .Values.keda.enabled }}
+
+4. KEDA autoscaling is enabled:
+  - Min replicas: {{ .Values.keda.minReplicas }}
+  - Max replicas: {{ .Values.keda.maxReplicas }}
+  - Check ScaledObject: kubectl get scaledobject {{ include "philotes-worker.fullname" . }}
+{{- end }}
+
+{{- if .Values.metrics.enabled }}
+
+5. Metrics are available at port {{ .Values.metrics.port }}:
+  kubectl port-forward svc/{{ include "philotes-worker.fullname" . }} {{ .Values.metrics.port }}:{{ .Values.metrics.port }}
+  curl http://localhost:{{ .Values.metrics.port }}/metrics
+{{- end }}
+
+Important: Make sure the source PostgreSQL database is configured with:
+- wal_level = logical
+- A replication slot named: {{ .Values.cdc.replication.slotName }}
+- A publication named: {{ .Values.cdc.replication.publicationName }}
