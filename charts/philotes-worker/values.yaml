@@ -52,35 +52,123 @@ resources:
 # KEDA autoscaling (preferred over HPA for CDC workers)
 keda:
   enabled: false
-  # Minimum replicas
+  # Minimum replicas (when not scaling to zero)
   minReplicas: 1
   # Maximum replicas
-  maxReplicas: 5
+  maxReplicas: 10
   # Polling interval in seconds
   pollingInterval: 30
   # Cooldown period in seconds
   cooldownPeriod: 300
-  # PostgreSQL connection string for metrics (use secretTargetRef for password)
+
+  # Scale to zero support (KEDA 2.8+)
+  # WARNING: Scale-to-zero can cause delays when pods spin up and may miss
+  # initial CDC events. Only enable if you understand the trade-offs.
+  # Set idleReplicaCount to 0 and minReplicaCount to 0 to enable scale-to-zero.
+  # When enabled, activationThreshold determines when to wake up from zero.
+  idleReplicaCount: ""  # Empty = disabled. Set to 0 to enable scale-to-zero.
+  # Minimum replicas when active (default: 1 to ensure always-on processing)
+  minReplicaCount: 1
+
+  # Advanced scaling behavior (KEDA v2)
+  advanced:
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleDown:
+          stabilizationWindowSeconds: 300
+          policies:
+            - type: Percent
+              value: 50
+              periodSeconds: 60
+        scaleUp:
+          stabilizationWindowSeconds: 0
+          policies:
+            - type: Percent
+              value: 100
+              periodSeconds: 15
+            - type: Pods
+              value: 4
+              periodSeconds: 15
+          selectPolicy: Max
+
+  # Prometheus scaler (primary - recommended)
+  prometheus:
+    enabled: true
+    # Prometheus server address
+    serverAddress: "http://prometheus:9090"
+    # Lag-based scaling trigger
+    lagTrigger:
+      enabled: true
+      metricName: philotes_cdc_lag_seconds
+      query: "max(philotes_cdc_lag_seconds)"
+      # Scale up when lag exceeds 5 minutes (300s)
+      threshold: "300"
+      # Activate scaling when lag exceeds 1 minute (60s)
+      activationThreshold: "60"
+    # Buffer depth scaling trigger
+    bufferTrigger:
+      enabled: true
+      metricName: philotes_buffer_depth
+      query: "max(philotes_buffer_depth)"
+      # Scale up when buffer depth exceeds 8000 events
+      threshold: "8000"
+      # Activate scaling when buffer depth exceeds 1000 events
+      activationThreshold: "1000"
+    # Events per second scaling trigger
+    throughputTrigger:
+      enabled: false
+      metricName: philotes_buffer_events_processed_total
+      query: "sum(rate(philotes_buffer_events_processed_total[5m]))"
+      # Scale up when processing rate exceeds 1000 events/sec
+      threshold: "1000"
+
+  # PostgreSQL scaler (alternative to Prometheus)
   postgresql:
+    enabled: false
     # Host for metrics query
     host: ""
+    # Port for metrics query
+    port: "5432"
     # Database for metrics query
     database: ""
     # User for metrics query
     user: ""
     # Password for metrics query (if not using existingSecret)
     password: ""
+    # SSL mode
+    sslMode: "disable"
     # Existing secret containing password
     existingSecret: ""
     # Key in secret containing password
     passwordKey: "password"
-  # Scale based on replication lag
-  triggers:
-    - type: postgresql
-      metadata:
-        # Query to get lag in bytes
-        query: "SELECT COALESCE(pg_wal_lsn_diff(pg_current_wal_lsn(), confirmed_flush_lsn), 0) FROM pg_replication_slots WHERE slot_name = 'philotes_cdc'"
-        targetQueryValue: "1000000"  # 1MB lag threshold
+    # Query to get replication lag in bytes
+    query: "SELECT COALESCE(pg_wal_lsn_diff(pg_current_wal_lsn(), confirmed_flush_lsn), 0) FROM pg_replication_slots WHERE slot_name = 'philotes_cdc'"
+    # Scale up when lag exceeds 1MB
+    targetQueryValue: "1000000"
+    # Activate scaling when lag exceeds 100KB
+    activationTargetQueryValue: "100000"
+
+  # CPU/Memory fallback scaler
+  cpu:
+    enabled: false
+    # MetricType: Utilization or AverageValue
+    metricType: "Utilization"
+    # Target CPU utilization percentage
+    value: "80"
+  memory:
+    enabled: false
+    # MetricType: Utilization or AverageValue
+    metricType: "Utilization"
+    # Target memory utilization percentage
+    value: "80"
+
+# Standard HPA autoscaling (fallback for non-KEDA environments)
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
 
 # Pod Disruption Budget
 pdb:

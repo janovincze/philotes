@@ -10,56 +10,111 @@ spec:
     name: {{ include "philotes-worker.fullname" . }}
   pollingInterval: {{ .Values.keda.pollingInterval }}
   cooldownPeriod: {{ .Values.keda.cooldownPeriod }}
-  minReplicaCount: {{ .Values.keda.minReplicas }}
+  minReplicaCount: {{ .Values.keda.minReplicaCount | default .Values.keda.minReplicas }}
   maxReplicaCount: {{ .Values.keda.maxReplicas }}
+  {{- if or (eq (toString .Values.keda.idleReplicaCount) "0") (and .Values.keda.idleReplicaCount (ne (toString .Values.keda.idleReplicaCount) "")) }}
+  idleReplicaCount: {{ .Values.keda.idleReplicaCount }}
+  {{- end }}
+  {{- if .Values.keda.advanced }}
+  advanced:
+    {{- toYaml .Values.keda.advanced | nindent 4 }}
+  {{- end }}
   triggers:
-    {{- range .Values.keda.triggers }}
-    - type: {{ .type }}
-      {{- if and (eq .type "postgresql") $.Values.keda.postgresql.existingSecret }}
-      authenticationRef:
-        name: {{ include "philotes-worker.fullname" $ }}-keda-auth
-      {{- end }}
+    {{- /* Prometheus Lag Trigger */}}
+    {{- if and .Values.keda.prometheus.enabled .Values.keda.prometheus.lagTrigger.enabled }}
+    - type: prometheus
       metadata:
-        {{- if eq .type "postgresql" }}
-        {{- if not $.Values.keda.postgresql.existingSecret }}
-        connectionFromEnv: KEDA_PG_CONNECTION
-        {{- end }}
-        query: {{ .metadata.query | quote }}
-        targetQueryValue: {{ .metadata.targetQueryValue | quote }}
-        {{- if $.Values.keda.postgresql.existingSecret }}
-        host: {{ $.Values.keda.postgresql.host | quote }}
-        port: "5432"
-        dbName: {{ $.Values.keda.postgresql.database | quote }}
-        userName: {{ $.Values.keda.postgresql.user | quote }}
-        sslmode: "disable"
-        {{- end }}
-        {{- else }}
-        {{- toYaml .metadata | nindent 8 }}
+        serverAddress: {{ .Values.keda.prometheus.serverAddress | quote }}
+        metricName: {{ .Values.keda.prometheus.lagTrigger.metricName | quote }}
+        query: {{ .Values.keda.prometheus.lagTrigger.query | quote }}
+        threshold: {{ .Values.keda.prometheus.lagTrigger.threshold | quote }}
+        {{- if .Values.keda.prometheus.lagTrigger.activationThreshold }}
+        activationThreshold: {{ .Values.keda.prometheus.lagTrigger.activationThreshold | quote }}
         {{- end }}
     {{- end }}
-{{- if .Values.keda.postgresql.existingSecret }}
+    {{- /* Prometheus Buffer Trigger */}}
+    {{- if and .Values.keda.prometheus.enabled .Values.keda.prometheus.bufferTrigger.enabled }}
+    - type: prometheus
+      metadata:
+        serverAddress: {{ .Values.keda.prometheus.serverAddress | quote }}
+        metricName: {{ .Values.keda.prometheus.bufferTrigger.metricName | quote }}
+        query: {{ .Values.keda.prometheus.bufferTrigger.query | quote }}
+        threshold: {{ .Values.keda.prometheus.bufferTrigger.threshold | quote }}
+        {{- if .Values.keda.prometheus.bufferTrigger.activationThreshold }}
+        activationThreshold: {{ .Values.keda.prometheus.bufferTrigger.activationThreshold | quote }}
+        {{- end }}
+    {{- end }}
+    {{- /* Prometheus Throughput Trigger */}}
+    {{- if and .Values.keda.prometheus.enabled .Values.keda.prometheus.throughputTrigger.enabled }}
+    - type: prometheus
+      metadata:
+        serverAddress: {{ .Values.keda.prometheus.serverAddress | quote }}
+        metricName: {{ .Values.keda.prometheus.throughputTrigger.metricName | quote }}
+        query: {{ .Values.keda.prometheus.throughputTrigger.query | quote }}
+        threshold: {{ .Values.keda.prometheus.throughputTrigger.threshold | quote }}
+    {{- end }}
+    {{- /* PostgreSQL Trigger */}}
+    {{- if .Values.keda.postgresql.enabled }}
+    - type: postgresql
+      metadata:
+        host: {{ .Values.keda.postgresql.host | quote }}
+        port: {{ .Values.keda.postgresql.port | quote }}
+        dbName: {{ .Values.keda.postgresql.database | quote }}
+        userName: {{ .Values.keda.postgresql.user | quote }}
+        sslmode: {{ .Values.keda.postgresql.sslMode | quote }}
+        query: {{ .Values.keda.postgresql.query | quote }}
+        targetQueryValue: {{ .Values.keda.postgresql.targetQueryValue | quote }}
+        {{- if .Values.keda.postgresql.activationTargetQueryValue }}
+        activationTargetQueryValue: {{ .Values.keda.postgresql.activationTargetQueryValue | quote }}
+        {{- end }}
+      authenticationRef:
+        name: {{ include "philotes-worker.fullname" . }}-keda-postgres
+    {{- end }}
+    {{- /* CPU Trigger */}}
+    {{- if .Values.keda.cpu.enabled }}
+    - type: cpu
+      metricType: {{ .Values.keda.cpu.metricType }}
+      metadata:
+        value: {{ .Values.keda.cpu.value | quote }}
+    {{- end }}
+    {{- /* Memory Trigger */}}
+    {{- if .Values.keda.memory.enabled }}
+    - type: memory
+      metricType: {{ .Values.keda.memory.metricType }}
+      metadata:
+        value: {{ .Values.keda.memory.value | quote }}
+    {{- end }}
+{{- /* TriggerAuthentication for PostgreSQL */}}
+{{- if .Values.keda.postgresql.enabled }}
 ---
 apiVersion: keda.sh/v1alpha1
 kind: TriggerAuthentication
 metadata:
-  name: {{ include "philotes-worker.fullname" . }}-keda-auth
+  name: {{ include "philotes-worker.fullname" . }}-keda-postgres
   labels:
     {{- include "philotes-worker.labels" . | nindent 4 }}
 spec:
   secretTargetRef:
+    {{- if .Values.keda.postgresql.existingSecret }}
     - parameter: password
       name: {{ .Values.keda.postgresql.existingSecret }}
-      key: {{ .Values.keda.postgresql.passwordKey | default "password" }}
-{{- else }}
+      key: {{ .Values.keda.postgresql.passwordKey }}
+    {{- else }}
+    - parameter: password
+      name: {{ include "philotes-worker.fullname" . }}-keda-postgres
+      key: password
+    {{- end }}
 ---
+{{- if not .Values.keda.postgresql.existingSecret }}
 apiVersion: v1
 kind: Secret
 metadata:
-  name: {{ include "philotes-worker.fullname" . }}-keda
+  name: {{ include "philotes-worker.fullname" . }}-keda-postgres
   labels:
     {{- include "philotes-worker.labels" . | nindent 4 }}
 type: Opaque
-stringData:
-  KEDA_PG_CONNECTION: "host={{ .Values.keda.postgresql.host }} dbname={{ .Values.keda.postgresql.database }} user={{ .Values.keda.postgresql.user }} password={{ .Values.keda.postgresql.password | default "" }} sslmode=disable"
+data:
+  password: {{ .Values.keda.postgresql.password | b64enc | quote }}
+{{- end }}
 {{- end }}
 {{- end }}
