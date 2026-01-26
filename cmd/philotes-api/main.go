@@ -19,6 +19,7 @@ import (
 	"github.com/janovincze/philotes/internal/api/services"
 	"github.com/janovincze/philotes/internal/cdc/health"
 	"github.com/janovincze/philotes/internal/config"
+	"github.com/janovincze/philotes/internal/vault"
 )
 
 func main() {
@@ -45,6 +46,45 @@ func main() {
 		"environment", cfg.Environment,
 		"listen_addr", cfg.API.ListenAddr,
 	)
+
+	// Initialize secret provider (Vault or environment fallback)
+	vaultCfg := &vault.Config{
+		Enabled:               cfg.Vault.Enabled,
+		Address:               cfg.Vault.Address,
+		Namespace:             cfg.Vault.Namespace,
+		AuthMethod:            cfg.Vault.AuthMethod,
+		Role:                  cfg.Vault.Role,
+		TokenPath:             cfg.Vault.TokenPath,
+		Token:                 cfg.Vault.Token,
+		TLSSkipVerify:         cfg.Vault.TLSSkipVerify,
+		CACert:                cfg.Vault.CACert,
+		SecretMountPath:       cfg.Vault.SecretMountPath,
+		TokenRenewalInterval:  cfg.Vault.TokenRenewalInterval,
+		SecretRefreshInterval: cfg.Vault.SecretRefreshInterval,
+		FallbackToEnv:         cfg.Vault.FallbackToEnv,
+		SecretPaths: vault.SecretPaths{
+			DatabaseBuffer: cfg.Vault.SecretPaths.DatabaseBuffer,
+			DatabaseSource: cfg.Vault.SecretPaths.DatabaseSource,
+			StorageMinio:   cfg.Vault.SecretPaths.StorageMinio,
+		},
+	}
+
+	secretProvider, err := vault.NewSecretProvider(context.Background(), vaultCfg, logger)
+	if err != nil {
+		logger.Error("failed to create secret provider", "error", err)
+		os.Exit(1)
+	}
+	defer secretProvider.Close()
+
+	// Get database password from secret provider if Vault is enabled
+	if cfg.Vault.Enabled {
+		dbPassword, err := secretProvider.GetDatabasePassword(context.Background())
+		if err != nil {
+			logger.Warn("failed to get database password from vault, using config value", "error", err)
+		} else {
+			cfg.Database.Password = dbPassword
+		}
+	}
 
 	// Initialize database connection
 	db, err := sql.Open("pgx", cfg.Database.DSN())
@@ -88,6 +128,16 @@ func main() {
 		}
 		return health.StatusHealthy, "database connection OK", nil
 	}))
+
+	// Register Vault health checker if enabled
+	if cfg.Vault.Enabled {
+		healthManager.Register(health.NewComponentChecker("vault", func(ctx context.Context) (health.Status, string, error) {
+			if err := secretProvider.Refresh(ctx); err != nil {
+				return health.StatusDegraded, "vault connection degraded", err
+			}
+			return health.StatusHealthy, "vault connection OK", nil
+		}))
+	}
 
 	// Create server configuration
 	serverCfg := api.ServerConfig{

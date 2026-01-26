@@ -22,6 +22,7 @@ import (
 	"github.com/janovincze/philotes/internal/config"
 	"github.com/janovincze/philotes/internal/iceberg/catalog"
 	"github.com/janovincze/philotes/internal/iceberg/writer"
+	"github.com/janovincze/philotes/internal/vault"
 )
 
 func main() {
@@ -62,6 +63,62 @@ func run(ctx context.Context, cfg *config.Config, logger *slog.Logger) error {
 		"environment", cfg.Environment,
 	)
 
+	// Initialize secret provider (Vault or environment fallback)
+	vaultCfg := &vault.Config{
+		Enabled:               cfg.Vault.Enabled,
+		Address:               cfg.Vault.Address,
+		Namespace:             cfg.Vault.Namespace,
+		AuthMethod:            cfg.Vault.AuthMethod,
+		Role:                  cfg.Vault.Role,
+		TokenPath:             cfg.Vault.TokenPath,
+		Token:                 cfg.Vault.Token,
+		TLSSkipVerify:         cfg.Vault.TLSSkipVerify,
+		CACert:                cfg.Vault.CACert,
+		SecretMountPath:       cfg.Vault.SecretMountPath,
+		TokenRenewalInterval:  cfg.Vault.TokenRenewalInterval,
+		SecretRefreshInterval: cfg.Vault.SecretRefreshInterval,
+		FallbackToEnv:         cfg.Vault.FallbackToEnv,
+		SecretPaths: vault.SecretPaths{
+			DatabaseBuffer: cfg.Vault.SecretPaths.DatabaseBuffer,
+			DatabaseSource: cfg.Vault.SecretPaths.DatabaseSource,
+			StorageMinio:   cfg.Vault.SecretPaths.StorageMinio,
+		},
+	}
+
+	secretProvider, err := vault.NewSecretProvider(ctx, vaultCfg, logger)
+	if err != nil {
+		return fmt.Errorf("create secret provider: %w", err)
+	}
+	defer secretProvider.Close()
+
+	// Get secrets from Vault if enabled
+	if cfg.Vault.Enabled {
+		// Get buffer database password
+		dbPassword, err := secretProvider.GetDatabasePassword(ctx)
+		if err != nil {
+			logger.Warn("failed to get database password from vault, using config value", "error", err)
+		} else {
+			cfg.Database.Password = dbPassword
+		}
+
+		// Get source database password
+		sourcePassword, err := secretProvider.GetSourcePassword(ctx)
+		if err != nil {
+			logger.Warn("failed to get source password from vault, using config value", "error", err)
+		} else {
+			cfg.CDC.Source.Password = sourcePassword
+		}
+
+		// Get storage credentials
+		accessKey, secretKey, err := secretProvider.GetStorageCredentials(ctx)
+		if err != nil {
+			logger.Warn("failed to get storage credentials from vault, using config values", "error", err)
+		} else {
+			cfg.Storage.AccessKey = accessKey
+			cfg.Storage.SecretKey = secretKey
+		}
+	}
+
 	// Create health manager
 	healthMgr := health.NewManager(health.DefaultManagerConfig(), logger)
 
@@ -82,6 +139,16 @@ func run(ctx context.Context, cfg *config.Config, logger *slog.Logger) error {
 		defer healthServer.Stop(context.Background())
 
 		logger.Info("health server started", "addr", cfg.CDC.Health.ListenAddr)
+	}
+
+	// Register Vault health checker if enabled
+	if cfg.Vault.Enabled {
+		healthMgr.Register(health.NewComponentChecker("vault", func(ctx context.Context) (health.Status, string, error) {
+			if err := secretProvider.Refresh(ctx); err != nil {
+				return health.StatusDegraded, "vault connection degraded", err
+			}
+			return health.StatusHealthy, "vault connection OK", nil
+		}))
 	}
 
 	// Create the PostgreSQL source reader

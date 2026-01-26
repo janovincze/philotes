@@ -144,12 +144,68 @@ services:
     depends_on:
       - prometheus
 
+  # HashiCorp Vault - Secrets management (dev mode for testing)
+  vault:
+    image: hashicorp/vault:1.15
+    container_name: philotes-vault
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: dev-root-token
+      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+      VAULT_ADDR: http://127.0.0.1:8200
+    ports:
+      - "8200:8200"
+    cap_add:
+      - IPC_LOCK
+    healthcheck:
+      test: ["CMD", "vault", "status"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Vault initialization - Configure secrets for local testing
+  vault-init:
+    image: hashicorp/vault:1.15
+    container_name: philotes-vault-init
+    depends_on:
+      vault:
+        condition: service_healthy
+    environment:
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: dev-root-token
+    entrypoint: >
+      /bin/sh -c "
+      echo 'Waiting for Vault to be ready...';
+      sleep 2;
+
+      echo 'Enabling KV secrets engine...';
+      vault secrets enable -path=secret kv-v2 2>/dev/null || true;
+
+      echo 'Creating database buffer credentials...';
+      vault kv put secret/philotes/database/buffer \
+        password=philotes \
+        username=philotes;
+
+      echo 'Creating database source credentials...';
+      vault kv put secret/philotes/database/source \
+        password=source \
+        username=source;
+
+      echo 'Creating MinIO storage credentials...';
+      vault kv put secret/philotes/storage/minio \
+        access_key=minioadmin \
+        secret_key=minioadmin;
+
+      echo 'Vault secrets initialized successfully!';
+      vault kv list secret/philotes/;
+      "
+
 volumes:
   postgres_data:
   postgres_source_data:
   minio_data:
   prometheus_data:
   grafana_data:
+  vault_data:
 
 networks:
   default:

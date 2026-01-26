@@ -9,6 +9,45 @@ global:
   storageClass: ""
 
 # ============================================================
+# Vault Configuration (shared by API and Worker)
+# ============================================================
+vault:
+  # Enable Vault integration
+  enabled: false
+  # Vault server address
+  address: ""
+  # Vault namespace (Enterprise feature, leave empty for OSS)
+  namespace: ""
+  # Authentication method: "kubernetes" or "token"
+  authMethod: "kubernetes"
+  # Vault role for Kubernetes auth
+  role: "philotes"
+  # Path to Kubernetes service account token
+  tokenPath: "/var/run/secrets/kubernetes.io/serviceaccount/token"
+  # Static token (for development only, use authMethod: "token")
+  token: ""
+  # Skip TLS verification (not recommended for production)
+  tlsSkipVerify: "false"
+  # CA certificate path for Vault TLS
+  caCert: ""
+  # Secret mount path in Vault
+  secretMountPath: "secret"
+  # Token renewal interval (matches config.go default)
+  tokenRenewalInterval: "1h"
+  # Secret refresh interval (matches config.go default)
+  secretRefreshInterval: "5m"
+  # Fall back to environment variables if Vault is unavailable
+  fallbackToEnv: "true"
+  # Secret paths in Vault
+  secretPaths:
+    # Path to buffer database credentials
+    databaseBuffer: "philotes/database/buffer"
+    # Path to source database credentials
+    databaseSource: "philotes/database/source"
+    # Path to MinIO/S3 storage credentials
+    storageMinio: "philotes/storage/minio"
+
+# ============================================================
 # Philotes API Configuration
 # ============================================================
 api:
@@ -55,6 +94,9 @@ api:
   alerting:
     enabled: true
     prometheusUrl: "http://prometheus:9090"
+
+  # Vault configuration (inherits from top-level vault if not specified)
+  vault: {}
 
 # ============================================================
 # Philotes Worker Configuration
@@ -113,6 +155,9 @@ worker:
     enabled: true
     serviceMonitor:
       enabled: false
+
+  # Vault configuration (inherits from top-level vault if not specified)
+  vault: {}
 
 # ============================================================
 # Lakekeeper (Iceberg Catalog) Configuration
