@@ -103,29 +103,63 @@ func (c *EmailChannel) Send(ctx context.Context, notification alerting.Notificat
 // Test sends a test email to verify the channel configuration.
 func (c *EmailChannel) Test(ctx context.Context) error {
 	subject := "[TEST] Philotes Alert Test"
-	body := `
+	body, err := c.buildTestEmailBody()
+	if err != nil {
+		return fmt.Errorf("failed to build test email body: %w", err)
+	}
+	return c.sendEmail(ctx, subject, body)
+}
+
+// buildTestEmailBody builds the HTML body for a test email using template.
+func (c *EmailChannel) buildTestEmailBody() (string, error) {
+	const testEmailTemplate = `
 <!DOCTYPE html>
 <html>
 <head>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; }
+        .container { max-width: 600px; margin: 20px auto; background-color: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .header { background-color: #17a2b8; color: white; padding: 20px; }
+        .header h2 { margin: 0; }
         .content { padding: 20px; }
+        .footer { background-color: #f8f9fa; padding: 15px; text-align: center; font-size: 12px; color: #666; }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h2>Test Notification</h2>
-    </div>
-    <div class="content">
-        <p>This is a test notification from Philotes alerting system.</p>
-        <p>If you received this email, your email channel configuration is working correctly.</p>
-        <p><small>Sent at: ` + time.Now().Format(time.RFC3339) + `</small></p>
+    <div class="container">
+        <div class="header">
+            <h2>Test Notification</h2>
+        </div>
+        <div class="content">
+            <p>This is a test notification from Philotes alerting system.</p>
+            <p>If you received this email, your email channel configuration is working correctly.</p>
+            <p><small>Sent at: {{.SentAt}}</small></p>
+        </div>
+        <div class="footer">
+            Philotes Alerting System
+        </div>
     </div>
 </body>
 </html>
 `
-	return c.sendEmail(ctx, subject, body)
+
+	data := struct {
+		SentAt string
+	}{
+		SentAt: time.Now().Format(time.RFC3339),
+	}
+
+	tmpl, err := template.New("test-email").Parse(testEmailTemplate)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse test email template: %w", err)
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return "", fmt.Errorf("failed to execute test email template: %w", err)
+	}
+
+	return buf.String(), nil
 }
 
 // sendEmail sends an email using SMTP.

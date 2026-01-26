@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS philotes.alert_history (
     alert_id UUID NOT NULL REFERENCES philotes.alert_instances(id) ON DELETE CASCADE,
     rule_id UUID NOT NULL REFERENCES philotes.alert_rules(id) ON DELETE CASCADE,
     event_type TEXT NOT NULL CHECK (event_type IN ('fired', 'resolved', 'acknowledged', 'notification_sent', 'notification_failed')),
-    message TEXT,
+    message TEXT NOT NULL DEFAULT '',
     value DOUBLE PRECISION,
     metadata JSONB NOT NULL DEFAULT '{}',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

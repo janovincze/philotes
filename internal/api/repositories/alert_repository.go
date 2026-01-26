@@ -752,7 +752,6 @@ func (r *AlertRepository) ListHistory(ctx context.Context, alertID *uuid.UUID, r
 	var history []alerting.AlertHistory
 	for rows.Next() {
 		var h alerting.AlertHistory
-		var message sql.NullString
 		var value sql.NullFloat64
 		var metadata []byte
 
@@ -761,7 +760,7 @@ func (r *AlertRepository) ListHistory(ctx context.Context, alertID *uuid.UUID, r
 			&h.AlertID,
 			&h.RuleID,
 			&h.EventType,
-			&message,
+			&h.Message,
 			&value,
 			&metadata,
 			&h.CreatedAt,
@@ -770,9 +769,6 @@ func (r *AlertRepository) ListHistory(ctx context.Context, alertID *uuid.UUID, r
 			return nil, fmt.Errorf("failed to scan alert history row: %w", err)
 		}
 
-		if message.Valid {
-			h.Message = message.String
-		}
 		if value.Valid {
 			h.Value = &value.Float64
 		}
