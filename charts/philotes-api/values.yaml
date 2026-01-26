@@ -94,6 +94,8 @@ affinity: {}
 
 # API Server configuration
 api:
+  # Environment (development, staging, production)
+  env: "production"
   # Listen address
   listenAddr: ":8080"
   # Base URL for the API (used in responses)
