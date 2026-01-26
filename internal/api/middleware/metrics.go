@@ -20,8 +20,8 @@ func Metrics() gin.HandlerFunc {
 		// This prevents cardinality explosion from unique IDs
 		path := c.FullPath()
 		if path == "" {
-			// Fallback to the actual path if no route matched (404s)
-			path = c.Request.URL.Path
+			// Use a constant for unmatched routes (404s) to prevent cardinality explosion
+			path = "/not_found"
 		}
 
 		method := c.Request.Method

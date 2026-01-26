@@ -174,10 +174,14 @@ func (w *IcebergWriter) writeTableEvents(ctx context.Context, tableKey string, e
 
 	// Record Iceberg metrics
 	duration := time.Since(startTime).Seconds()
-	metrics.IcebergCommitsTotal.WithLabelValues(w.sourceName, tableKey).Inc()
-	metrics.IcebergCommitDuration.WithLabelValues(w.sourceName, tableKey).Observe(duration)
-	metrics.IcebergFilesWrittenTotal.WithLabelValues(w.sourceName, tableKey).Inc()
-	metrics.IcebergBytesWrittenTotal.WithLabelValues(w.sourceName, tableKey).Add(float64(result.FileSizeInBytes))
+	source := w.sourceName
+	if source == "" {
+		source = "unknown"
+	}
+	metrics.IcebergCommitsTotal.WithLabelValues(source, tableKey).Inc()
+	metrics.IcebergCommitDuration.WithLabelValues(source, tableKey).Observe(duration)
+	metrics.IcebergFilesWrittenTotal.WithLabelValues(source, tableKey).Inc()
+	metrics.IcebergBytesWrittenTotal.WithLabelValues(source, tableKey).Add(float64(result.FileSizeInBytes))
 
 	w.logger.Info("events written to Iceberg",
 		"table", tableKey,

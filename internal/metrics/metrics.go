@@ -270,6 +270,9 @@ func Register() {
 }
 
 // RegisterWith registers all Philotes metrics with the given registry.
+// NOTE: This function should only be called once per registry. Calling it
+// multiple times with the same registry will panic due to duplicate registration.
+// For the default registry, use Register() instead which is safe for multiple calls.
 func RegisterWith(reg prometheus.Registerer) {
 	for _, m := range allMetrics {
 		reg.MustRegister(m)
