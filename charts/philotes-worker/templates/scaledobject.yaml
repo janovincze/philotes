@@ -12,7 +12,7 @@ spec:
   cooldownPeriod: {{ .Values.keda.cooldownPeriod }}
   minReplicaCount: {{ .Values.keda.minReplicaCount | default .Values.keda.minReplicas }}
   maxReplicaCount: {{ .Values.keda.maxReplicas }}
-  {{- if or (eq (toString .Values.keda.idleReplicaCount) "0") (and .Values.keda.idleReplicaCount (ne (toString .Values.keda.idleReplicaCount) "")) }}
+  {{- if not (kindIs "invalid" .Values.keda.idleReplicaCount) }}
   idleReplicaCount: {{ .Values.keda.idleReplicaCount }}
   {{- end }}
   {{- if .Values.keda.advanced }}

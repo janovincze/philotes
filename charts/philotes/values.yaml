@@ -125,8 +125,8 @@ worker:
     maxReplicas: 10
     pollingInterval: 30
     cooldownPeriod: 300
-    # Scale to zero support (set idleReplicaCount to 0 to enable)
-    idleReplicaCount: ""  # Empty = disabled
+    # Scale to zero support (set idleReplicaCount to 0 to enable; null = disabled)
+    idleReplicaCount: null  # null = disabled
     minReplicaCount: 1
     # Prometheus-based scaling (recommended)
     prometheus:

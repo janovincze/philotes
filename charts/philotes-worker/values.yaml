@@ -66,7 +66,7 @@ keda:
   # initial CDC events. Only enable if you understand the trade-offs.
   # Set idleReplicaCount to 0 and minReplicaCount to 0 to enable scale-to-zero.
   # When enabled, activationThreshold determines when to wake up from zero.
-  idleReplicaCount: ""  # Empty = disabled. Set to 0 to enable scale-to-zero.
+  idleReplicaCount: null  # null = disabled. Set to 0 to enable scale-to-zero.
   # Minimum replicas when active (default: 1 to ensure always-on processing)
   minReplicaCount: 1
 
