@@ -8,6 +8,8 @@ import (
 	"math"
 	"math/rand/v2"
 	"time"
+
+	"github.com/janovincze/philotes/internal/metrics"
 )
 
 // RetryPolicy defines the retry behavior.
@@ -89,8 +91,9 @@ func NewNonRetryableError(err error) error {
 
 // Retryer executes operations with retry logic.
 type Retryer struct {
-	policy RetryPolicy
-	logger *slog.Logger
+	policy     RetryPolicy
+	logger     *slog.Logger
+	sourceName string
 }
 
 // NewRetryer creates a new Retryer with the given policy.
@@ -102,6 +105,11 @@ func NewRetryer(policy RetryPolicy, logger *slog.Logger) *Retryer {
 		policy: policy,
 		logger: logger.With("component", "retryer"),
 	}
+}
+
+// SetSourceName sets the source name for metric labels.
+func (r *Retryer) SetSourceName(name string) {
+	r.sourceName = name
 }
 
 // Execute runs the operation with retry logic.
@@ -140,6 +148,11 @@ func (r *Retryer) Execute(ctx context.Context, operation func(ctx context.Contex
 		// Check if this was the last attempt
 		if attempt >= r.policy.MaxAttempts {
 			break
+		}
+
+		// Record retry metric
+		if r.sourceName != "" {
+			metrics.CDCRetriesTotal.WithLabelValues(r.sourceName).Inc()
 		}
 
 		// Calculate backoff

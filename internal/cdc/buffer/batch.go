@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/janovincze/philotes/internal/cdc/deadletter"
+	"github.com/janovincze/philotes/internal/metrics"
 )
 
 // BatchHandler is called when a batch of events is ready for processing.
@@ -174,11 +175,24 @@ func (p *BatchProcessor) processLoop(ctx context.Context) {
 		case <-p.stopCh:
 			return
 		case <-ticker.C:
+			// Update buffer depth metric
+			p.updateBufferDepthMetric(ctx)
+
 			if err := p.processBatchWithRetry(ctx); err != nil {
 				p.logger.Error("failed to process batch", "error", err)
 			}
 		}
 	}
+}
+
+// updateBufferDepthMetric updates the buffer depth gauge metric.
+func (p *BatchProcessor) updateBufferDepthMetric(ctx context.Context) {
+	stats, err := p.manager.Stats(ctx)
+	if err != nil {
+		p.logger.Debug("failed to get buffer stats for metrics", "error", err)
+		return
+	}
+	metrics.BufferDepth.WithLabelValues(p.config.SourceID).Set(float64(stats.UnprocessedEvents))
 }
 
 func (p *BatchProcessor) processBatchWithRetry(ctx context.Context) error {
@@ -213,6 +227,10 @@ func (p *BatchProcessor) processBatchWithRetry(ctx context.Context) error {
 			p.stats.BatchesProcessed++
 			p.stats.EventsProcessed += int64(len(events))
 			p.mu.Unlock()
+
+			// Record batch success metrics
+			metrics.BufferBatchesTotal.WithLabelValues(p.config.SourceID, "success").Inc()
+			metrics.BufferEventsProcessedTotal.WithLabelValues(p.config.SourceID).Add(float64(len(events)))
 
 			p.logger.Debug("batch processed successfully", "count", len(events))
 			return nil
@@ -251,6 +269,9 @@ func (p *BatchProcessor) processBatchWithRetry(ctx context.Context) error {
 	p.mu.Lock()
 	p.stats.EventsFailed += int64(len(events))
 	p.mu.Unlock()
+
+	// Record batch failure metrics
+	metrics.BufferBatchesTotal.WithLabelValues(p.config.SourceID, "failed").Inc()
 
 	// Mark events as processed even though they failed (they're in DLQ now)
 	eventIDs := make([]int64, len(events))
@@ -308,6 +329,10 @@ func (p *BatchProcessor) sendToDLQ(ctx context.Context, events []BufferedEvent, 
 			p.mu.Lock()
 			p.stats.DLQCount++
 			p.mu.Unlock()
+
+			// Record DLQ metric
+			metrics.BufferDLQTotal.WithLabelValues(p.config.SourceID).Inc()
+
 			p.logger.Info("event sent to DLQ",
 				"event_id", bufferedEvent.ID,
 				"table", bufferedEvent.Event.Schema+"."+bufferedEvent.Event.Table,

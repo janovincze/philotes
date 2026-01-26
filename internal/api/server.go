@@ -9,12 +9,14 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/janovincze/philotes/internal/api/handlers"
 	"github.com/janovincze/philotes/internal/api/middleware"
 	"github.com/janovincze/philotes/internal/api/services"
 	"github.com/janovincze/philotes/internal/cdc/health"
 	"github.com/janovincze/philotes/internal/config"
+	"github.com/janovincze/philotes/internal/metrics"
 )
 
 // Server is the HTTP API server.
@@ -78,9 +80,17 @@ func NewServer(serverCfg ServerConfig) *Server {
 	// Create router
 	router := gin.New()
 
+	// Register Prometheus metrics
+	if serverCfg.Config.Metrics.Enabled {
+		metrics.Register()
+	}
+
 	// Apply middleware
 	router.Use(middleware.RequestID())
 	router.Use(middleware.Recovery(logger))
+	if serverCfg.Config.Metrics.Enabled {
+		router.Use(middleware.Metrics())
+	}
 	router.Use(middleware.Logger(logger))
 	router.Use(middleware.CORS(serverCfg.CORSConfig))
 	router.Use(middleware.RateLimiter(serverCfg.RateLimitConfig))
@@ -131,6 +141,11 @@ func (s *Server) registerRoutes() {
 	s.router.GET("/health", healthHandler.GetHealth)
 	s.router.GET("/health/live", healthHandler.GetLiveness)
 	s.router.GET("/health/ready", healthHandler.GetReadiness)
+
+	// Metrics endpoint (no versioning)
+	if s.cfg.Metrics.Enabled {
+		s.router.GET("/metrics", gin.WrapH(promhttp.Handler()))
+	}
 
 	// API v1 routes
 	v1 := s.router.Group("/api/v1")

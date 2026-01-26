@@ -7,12 +7,14 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/janovincze/philotes/internal/cdc"
 	"github.com/janovincze/philotes/internal/cdc/buffer"
 	"github.com/janovincze/philotes/internal/iceberg"
 	"github.com/janovincze/philotes/internal/iceberg/catalog"
 	"github.com/janovincze/philotes/internal/iceberg/schema"
+	"github.com/janovincze/philotes/internal/metrics"
 )
 
 // Writer writes CDC events to Iceberg tables.
@@ -53,6 +55,14 @@ type IcebergWriter struct {
 
 	// tableSchemas caches table schemas to avoid repeated lookups.
 	tableSchemas map[string]iceberg.Schema
+
+	// sourceName is used for metric labels.
+	sourceName string
+}
+
+// SetSourceName sets the source name for metric labels.
+func (w *IcebergWriter) SetSourceName(name string) {
+	w.sourceName = name
 }
 
 // NewIcebergWriter creates a new Iceberg writer.
@@ -118,6 +128,8 @@ func (w *IcebergWriter) writeTableEvents(ctx context.Context, tableKey string, e
 		return nil
 	}
 
+	startTime := time.Now()
+
 	// Parse table identifier
 	namespace, tableName := w.parseTableKey(tableKey)
 
@@ -160,10 +172,18 @@ func (w *IcebergWriter) writeTableEvents(ctx context.Context, tableKey string, e
 		return fmt.Errorf("commit snapshot: %w", err)
 	}
 
+	// Record Iceberg metrics
+	duration := time.Since(startTime).Seconds()
+	metrics.IcebergCommitsTotal.WithLabelValues(w.sourceName, tableKey).Inc()
+	metrics.IcebergCommitDuration.WithLabelValues(w.sourceName, tableKey).Observe(duration)
+	metrics.IcebergFilesWrittenTotal.WithLabelValues(w.sourceName, tableKey).Inc()
+	metrics.IcebergBytesWrittenTotal.WithLabelValues(w.sourceName, tableKey).Add(float64(result.FileSizeInBytes))
+
 	w.logger.Info("events written to Iceberg",
 		"table", tableKey,
 		"records", result.RecordCount,
 		"file_size", result.FileSizeInBytes,
+		"duration_ms", int64(duration*1000),
 	)
 
 	return nil
