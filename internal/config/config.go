@@ -37,6 +37,66 @@ type Config struct {
 
 	// Alerting configuration
 	Alerting AlertingConfig
+
+	// Vault configuration for secrets management
+	Vault VaultConfig
+}
+
+// VaultConfig holds HashiCorp Vault configuration.
+type VaultConfig struct {
+	// Enabled enables Vault integration
+	Enabled bool
+
+	// Address is the Vault server URL
+	Address string
+
+	// Namespace is the Vault namespace (Enterprise feature)
+	Namespace string
+
+	// AuthMethod is the authentication method ("kubernetes" or "token")
+	AuthMethod string
+
+	// Role is the Vault role for Kubernetes authentication
+	Role string
+
+	// TokenPath is the path to the Kubernetes service account token
+	TokenPath string
+
+	// Token is a static Vault token (for development/testing)
+	Token string
+
+	// TLSSkipVerify skips TLS certificate verification
+	TLSSkipVerify bool
+
+	// CACert is the path to a CA certificate file
+	CACert string
+
+	// SecretMountPath is the mount path for the KV secrets engine
+	SecretMountPath string
+
+	// TokenRenewalInterval is how often to renew the Vault token
+	TokenRenewalInterval time.Duration
+
+	// SecretRefreshInterval is how often to refresh cached secrets
+	SecretRefreshInterval time.Duration
+
+	// FallbackToEnv enables fallback to environment variables if Vault is unavailable
+	FallbackToEnv bool
+
+	// SecretPaths contains the Vault paths for each secret type
+	SecretPaths VaultSecretPaths
+}
+
+// VaultSecretPaths defines the Vault paths for different secret types.
+type VaultSecretPaths struct {
+	// DatabaseBuffer is the path to buffer database credentials
+	DatabaseBuffer string
+
+	// DatabaseSource is the path to source database credentials
+	DatabaseSource string
+
+	// StorageMinio is the path to MinIO/S3 credentials
+	StorageMinio string
 }
 
 // APIConfig holds API server configuration.
@@ -409,6 +469,27 @@ func Load() (*Config, error) {
 			NotificationTimeout: getDurationEnv("PHILOTES_ALERTING_NOTIFICATION_TIMEOUT", 10*time.Second),
 			PrometheusURL:       getEnv("PHILOTES_PROMETHEUS_URL", "http://localhost:9090"),
 			RetentionDays:       getIntEnv("PHILOTES_ALERTING_RETENTION_DAYS", 30),
+		},
+
+		Vault: VaultConfig{
+			Enabled:               getBoolEnv("PHILOTES_VAULT_ENABLED", false),
+			Address:               getEnv("PHILOTES_VAULT_ADDRESS", ""),
+			Namespace:             getEnv("PHILOTES_VAULT_NAMESPACE", ""),
+			AuthMethod:            getEnv("PHILOTES_VAULT_AUTH_METHOD", "kubernetes"),
+			Role:                  getEnv("PHILOTES_VAULT_ROLE", "philotes"),
+			TokenPath:             getEnv("PHILOTES_VAULT_TOKEN_PATH", "/var/run/secrets/kubernetes.io/serviceaccount/token"),
+			Token:                 getEnv("PHILOTES_VAULT_TOKEN", ""),
+			TLSSkipVerify:         getBoolEnv("PHILOTES_VAULT_TLS_SKIP_VERIFY", false),
+			CACert:                getEnv("PHILOTES_VAULT_CA_CERT", ""),
+			SecretMountPath:       getEnv("PHILOTES_VAULT_SECRET_MOUNT_PATH", "secret"),
+			TokenRenewalInterval:  getDurationEnv("PHILOTES_VAULT_TOKEN_RENEWAL_INTERVAL", time.Hour),
+			SecretRefreshInterval: getDurationEnv("PHILOTES_VAULT_SECRET_REFRESH_INTERVAL", 5*time.Minute),
+			FallbackToEnv:         getBoolEnv("PHILOTES_VAULT_FALLBACK_TO_ENV", true),
+			SecretPaths: VaultSecretPaths{
+				DatabaseBuffer: getEnv("PHILOTES_VAULT_SECRET_PATH_DATABASE_BUFFER", "philotes/database/buffer"),
+				DatabaseSource: getEnv("PHILOTES_VAULT_SECRET_PATH_DATABASE_SOURCE", "philotes/database/source"),
+				StorageMinio:   getEnv("PHILOTES_VAULT_SECRET_PATH_STORAGE_MINIO", "philotes/storage/minio"),
+			},
 		},
 	}
 

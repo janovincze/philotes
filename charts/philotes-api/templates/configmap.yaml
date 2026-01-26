@@ -39,3 +39,26 @@ data:
   PHILOTES_ALERTING_NOTIFICATION_TIMEOUT: {{ .Values.alerting.notificationTimeout | quote }}
   PHILOTES_PROMETHEUS_URL: {{ .Values.alerting.prometheusUrl | quote }}
   PHILOTES_ALERTING_RETENTION_DAYS: {{ .Values.alerting.retentionDays | quote }}
+
+  # Vault configuration
+  PHILOTES_VAULT_ENABLED: {{ .Values.vault.enabled | quote }}
+  {{- if .Values.vault.enabled }}
+  PHILOTES_VAULT_ADDRESS: {{ .Values.vault.address | quote }}
+  {{- if .Values.vault.namespace }}
+  PHILOTES_VAULT_NAMESPACE: {{ .Values.vault.namespace | quote }}
+  {{- end }}
+  PHILOTES_VAULT_AUTH_METHOD: {{ .Values.vault.authMethod | quote }}
+  PHILOTES_VAULT_ROLE: {{ .Values.vault.role | quote }}
+  PHILOTES_VAULT_TOKEN_PATH: {{ .Values.vault.tokenPath | quote }}
+  PHILOTES_VAULT_TLS_SKIP_VERIFY: {{ .Values.vault.tlsSkipVerify | quote }}
+  {{- if .Values.vault.caCert }}
+  PHILOTES_VAULT_CA_CERT: {{ .Values.vault.caCert | quote }}
+  {{- end }}
+  PHILOTES_VAULT_SECRET_MOUNT_PATH: {{ .Values.vault.secretMountPath | quote }}
+  PHILOTES_VAULT_TOKEN_RENEWAL_INTERVAL: {{ .Values.vault.tokenRenewalInterval | quote }}
+  PHILOTES_VAULT_SECRET_REFRESH_INTERVAL: {{ .Values.vault.secretRefreshInterval | quote }}
+  PHILOTES_VAULT_FALLBACK_TO_ENV: {{ .Values.vault.fallbackToEnv | quote }}
+  PHILOTES_VAULT_SECRET_PATH_DATABASE_BUFFER: {{ .Values.vault.secretPaths.databaseBuffer | quote }}
+  PHILOTES_VAULT_SECRET_PATH_DATABASE_SOURCE: {{ .Values.vault.secretPaths.databaseSource | quote }}
+  PHILOTES_VAULT_SECRET_PATH_STORAGE_MINIO: {{ .Values.vault.secretPaths.storageMinio | quote }}
+  {{- end }}
