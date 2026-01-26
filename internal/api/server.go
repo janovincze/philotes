@@ -26,6 +26,7 @@ type Server struct {
 	healthManager   *health.Manager
 	sourceService   *services.SourceService
 	pipelineService *services.PipelineService
+	alertService    *services.AlertService
 	httpServer      *http.Server
 	router          *gin.Engine
 }
@@ -46,6 +47,9 @@ type ServerConfig struct {
 
 	// PipelineService is the pipeline service for pipeline CRUD operations.
 	PipelineService *services.PipelineService
+
+	// AlertService is the alert service for alerting CRUD operations.
+	AlertService *services.AlertService
 
 	// CORSConfig is the CORS configuration.
 	CORSConfig middleware.CORSConfig
@@ -102,6 +106,7 @@ func NewServer(serverCfg ServerConfig) *Server {
 		healthManager:   serverCfg.HealthManager,
 		sourceService:   serverCfg.SourceService,
 		pipelineService: serverCfg.PipelineService,
+		alertService:    serverCfg.AlertService,
 		router:          router,
 	}
 
@@ -127,14 +132,18 @@ func (s *Server) registerRoutes() {
 	versionHandler := handlers.NewVersionHandler(s.cfg.Version)
 	configHandler := handlers.NewConfigHandler(s.cfg)
 
-	// Create source and pipeline handlers (may be nil if services not provided)
+	// Create source, pipeline, and alert handlers (may be nil if services not provided)
 	var sourceHandler *handlers.SourceHandler
 	var pipelineHandler *handlers.PipelineHandler
+	var alertHandler *handlers.AlertHandler
 	if s.sourceService != nil {
 		sourceHandler = handlers.NewSourceHandler(s.sourceService)
 	}
 	if s.pipelineService != nil {
 		pipelineHandler = handlers.NewPipelineHandler(s.pipelineService)
+	}
+	if s.alertService != nil {
+		alertHandler = handlers.NewAlertHandler(s.alertService)
 	}
 
 	// Health endpoints (no versioning)
@@ -177,6 +186,11 @@ func (s *Server) registerRoutes() {
 			v1.GET("/pipelines/:id/status", pipelineHandler.GetStatus)
 			v1.POST("/pipelines/:id/tables", pipelineHandler.AddTableMapping)
 			v1.DELETE("/pipelines/:id/tables/:mappingId", pipelineHandler.RemoveTableMapping)
+		}
+
+		// Alert endpoints
+		if alertHandler != nil {
+			alertHandler.Register(v1)
 		}
 	}
 }
