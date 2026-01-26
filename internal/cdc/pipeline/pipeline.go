@@ -13,6 +13,7 @@ import (
 	"github.com/janovincze/philotes/internal/cdc/checkpoint"
 	"github.com/janovincze/philotes/internal/cdc/health"
 	"github.com/janovincze/philotes/internal/cdc/source"
+	"github.com/janovincze/philotes/internal/metrics"
 )
 
 // Pipeline orchestrates the CDC flow from source to checkpointing.
@@ -80,6 +81,9 @@ func New(src source.Source, cp checkpoint.Manager, buf buffer.Manager, cfg Confi
 		logger = slog.Default()
 	}
 
+	retryer := NewRetryer(cfg.RetryPolicy, logger)
+	retryer.SetSourceName(src.Name())
+
 	p := &Pipeline{
 		source:       src,
 		checkpoint:   cp,
@@ -87,15 +91,18 @@ func New(src source.Source, cp checkpoint.Manager, buf buffer.Manager, cfg Confi
 		config:       cfg,
 		logger:       logger.With("component", "pipeline", "source", src.Name()),
 		stateMachine: NewStateMachine(),
-		retryer:      NewRetryer(cfg.RetryPolicy, logger),
+		retryer:      retryer,
 	}
 
-	// Add state change listener for logging
+	// Add state change listener for logging and metrics
 	p.stateMachine.AddListener(func(from, to State) {
 		p.logger.Info("pipeline state changed", "from", from, "to", to)
 		p.mu.Lock()
 		p.stats.State = to
 		p.mu.Unlock()
+
+		// Update pipeline state metric
+		metrics.CDCPipelineState.WithLabelValues(src.Name()).Set(float64(to))
 	})
 
 	return p
@@ -170,6 +177,10 @@ func (p *Pipeline) Run(ctx context.Context) error {
 				p.mu.Lock()
 				p.stats.Errors++
 				p.mu.Unlock()
+
+				// Record error metric
+				metrics.CDCErrorsTotal.WithLabelValues(p.source.Name(), "source").Inc()
+
 				p.logger.Error("source error", "error", err)
 
 				// Transition to failed state
@@ -220,14 +231,26 @@ func (p *Pipeline) processEventWithRetry(ctx context.Context, event cdc.Event) e
 }
 
 func (p *Pipeline) processEvent(ctx context.Context, event cdc.Event) error {
+	now := time.Now()
+
 	p.mu.Lock()
 	p.lastLSN = event.LSN
 	p.stats.EventsProcessed++
-	p.stats.LastEventTime = time.Now()
+	p.stats.LastEventTime = now
 	p.mu.Unlock()
 
+	// Record CDC event metric
+	tableName := event.FullyQualifiedTable()
+	metrics.CDCEventsTotal.WithLabelValues(p.source.Name(), tableName, string(event.Operation)).Inc()
+
+	// Calculate and record lag if event has a timestamp
+	if !event.Timestamp.IsZero() {
+		lag := now.Sub(event.Timestamp).Seconds()
+		metrics.CDCLagSeconds.WithLabelValues(p.source.Name(), tableName).Set(lag)
+	}
+
 	p.logger.Debug("processed event",
-		"table", event.FullyQualifiedTable(),
+		"table", tableName,
 		"operation", event.Operation,
 		"lsn", event.LSN,
 	)
@@ -235,6 +258,9 @@ func (p *Pipeline) processEvent(ctx context.Context, event cdc.Event) error {
 	// Write event to buffer if enabled
 	if p.config.BufferEnabled && p.buffer != nil {
 		if err := p.buffer.Write(ctx, []cdc.Event{event}); err != nil {
+			// Record buffer error metric
+			metrics.CDCErrorsTotal.WithLabelValues(p.source.Name(), "buffer").Inc()
+
 			p.logger.Error("failed to write event to buffer",
 				"error", err,
 				"lsn", event.LSN,
