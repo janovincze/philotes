@@ -118,8 +118,68 @@ worker:
       cpu: 200m
       memory: 256Mi
 
+  # KEDA autoscaling configuration
   keda:
     enabled: false
+    minReplicas: 1
+    maxReplicas: 10
+    pollingInterval: 30
+    cooldownPeriod: 300
+    # Scale to zero support (set idleReplicaCount to 0 to enable; null = disabled)
+    idleReplicaCount: null  # null = disabled
+    minReplicaCount: 1
+    # Prometheus-based scaling (recommended)
+    prometheus:
+      enabled: true
+      serverAddress: "http://prometheus:9090"
+      lagTrigger:
+        enabled: true
+        metricName: philotes_cdc_lag_seconds
+        query: "max(philotes_cdc_lag_seconds)"
+        threshold: "300"
+        activationThreshold: "60"
+      bufferTrigger:
+        enabled: true
+        metricName: philotes_buffer_depth
+        query: "max(philotes_buffer_depth)"
+        threshold: "8000"
+        activationThreshold: "1000"
+      throughputTrigger:
+        enabled: false
+        metricName: philotes_buffer_events_processed_total
+        query: "sum(rate(philotes_buffer_events_processed_total[5m]))"
+        threshold: "1000"
+    # PostgreSQL-based scaling (alternative)
+    postgresql:
+      enabled: false
+      host: ""
+      port: "5432"
+      database: ""
+      user: ""
+      password: ""
+      existingSecret: ""
+      passwordKey: "password"
+      sslMode: "disable"
+      query: "SELECT COALESCE(pg_wal_lsn_diff(pg_current_wal_lsn(), confirmed_flush_lsn), 0) FROM pg_replication_slots WHERE slot_name = 'philotes_cdc'"
+      targetQueryValue: "1000000"
+      activationTargetQueryValue: "100000"
+    # CPU/Memory fallback
+    cpu:
+      enabled: false
+      metricType: "Utilization"
+      value: "80"
+    memory:
+      enabled: false
+      metricType: "Utilization"
+      value: "80"
+
+  # Standard HPA autoscaling (fallback for non-KEDA environments)
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 80
+    targetMemoryUtilizationPercentage: 80
 
   pdb:
     enabled: true
