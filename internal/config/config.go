@@ -34,6 +34,9 @@ type Config struct {
 
 	// Metrics configuration
 	Metrics MetricsConfig
+
+	// Alerting configuration
+	Alerting AlertingConfig
 }
 
 // APIConfig holds API server configuration.
@@ -288,6 +291,24 @@ type MetricsConfig struct {
 	ListenAddr string
 }
 
+// AlertingConfig holds alerting framework configuration.
+type AlertingConfig struct {
+	// Enabled enables the alerting framework
+	Enabled bool
+
+	// EvaluationInterval is the interval between rule evaluations
+	EvaluationInterval time.Duration
+
+	// NotificationTimeout is the timeout for sending notifications
+	NotificationTimeout time.Duration
+
+	// PrometheusURL is the URL of the Prometheus server to query metrics from
+	PrometheusURL string
+
+	// RetentionDays is the number of days to retain alert history
+	RetentionDays int
+}
+
 // Load loads configuration from environment variables.
 func Load() (*Config, error) {
 	cfg := &Config{
@@ -380,6 +401,14 @@ func Load() (*Config, error) {
 		Metrics: MetricsConfig{
 			Enabled:    getBoolEnv("PHILOTES_METRICS_ENABLED", true),
 			ListenAddr: getEnv("PHILOTES_METRICS_LISTEN_ADDR", ":9090"),
+		},
+
+		Alerting: AlertingConfig{
+			Enabled:             getBoolEnv("PHILOTES_ALERTING_ENABLED", true),
+			EvaluationInterval:  getDurationEnv("PHILOTES_ALERTING_EVALUATION_INTERVAL", 30*time.Second),
+			NotificationTimeout: getDurationEnv("PHILOTES_ALERTING_NOTIFICATION_TIMEOUT", 10*time.Second),
+			PrometheusURL:       getEnv("PHILOTES_PROMETHEUS_URL", "http://localhost:9090"),
+			RetentionDays:       getIntEnv("PHILOTES_ALERTING_RETENTION_DAYS", 30),
 		},
 	}
 
