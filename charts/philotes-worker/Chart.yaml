@@ -1,0 +1,19 @@
+apiVersion: v2
+name: philotes-worker
+description: Philotes CDC Worker - Change Data Capture pipeline processor
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - philotes
+  - cdc
+  - worker
+  - postgresql
+  - iceberg
+  - pgstream
+home: https://github.com/janovincze/philotes
+sources:
+  - https://github.com/janovincze/philotes
+maintainers:
+  - name: Janos Vincze
+    url: https://github.com/janovincze

@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "philotes-api.fullname" . }}
+  labels:
+    {{- include "philotes-api.labels" . | nindent 4 }}
+data:
+  # Environment
+  PHILOTES_ENV: {{ .Values.api.env | default "production" | quote }}
+
+  # API configuration
+  PHILOTES_API_LISTEN_ADDR: {{ .Values.api.listenAddr | quote }}
+  PHILOTES_API_BASE_URL: {{ .Values.api.baseUrl | quote }}
+  PHILOTES_API_READ_TIMEOUT: {{ .Values.api.readTimeout | quote }}
+  PHILOTES_API_WRITE_TIMEOUT: {{ .Values.api.writeTimeout | quote }}
+  PHILOTES_API_CORS_ORIGINS: {{ .Values.api.corsOrigins | quote }}
+  PHILOTES_API_RATE_LIMIT_RPS: {{ .Values.api.rateLimitRPS | quote }}
+  PHILOTES_API_RATE_LIMIT_BURST: {{ .Values.api.rateLimitBurst | quote }}
+
+  # Database configuration
+  PHILOTES_DB_HOST: {{ .Values.database.host | quote }}
+  PHILOTES_DB_PORT: {{ .Values.database.port | quote }}
+  PHILOTES_DB_NAME: {{ .Values.database.name | quote }}
+  PHILOTES_DB_USER: {{ .Values.database.user | quote }}
+  PHILOTES_DB_SSLMODE: {{ .Values.database.sslMode | quote }}
+  PHILOTES_DB_MAX_OPEN_CONNS: {{ .Values.database.maxOpenConns | quote }}
+  PHILOTES_DB_MAX_IDLE_CONNS: {{ .Values.database.maxIdleConns | quote }}
+
+  # Metrics configuration
+  PHILOTES_METRICS_ENABLED: {{ .Values.metrics.enabled | quote }}
+  PHILOTES_METRICS_LISTEN_ADDR: {{ printf ":%d" (int .Values.metrics.port) | quote }}
+
+  # Health configuration
+  PHILOTES_HEALTH_ENABLED: {{ .Values.health.enabled | quote }}
+
+  # Alerting configuration
+  PHILOTES_ALERTING_ENABLED: {{ .Values.alerting.enabled | quote }}
+  PHILOTES_ALERTING_EVALUATION_INTERVAL: {{ .Values.alerting.evaluationInterval | quote }}
+  PHILOTES_ALERTING_NOTIFICATION_TIMEOUT: {{ .Values.alerting.notificationTimeout | quote }}
+  PHILOTES_PROMETHEUS_URL: {{ .Values.alerting.prometheusUrl | quote }}
+  PHILOTES_ALERTING_RETENTION_DAYS: {{ .Values.alerting.retentionDays | quote }}

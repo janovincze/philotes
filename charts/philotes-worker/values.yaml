@@ -1,0 +1,227 @@
+# Default values for philotes-worker
+
+# Number of replicas (only used when KEDA is disabled)
+replicaCount: 1
+
+image:
+  repository: ghcr.io/janovincze/philotes-worker
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext:
+  fsGroup: 1000
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+
+# Service for health check endpoints
+service:
+  type: ClusterIP
+  port: 8081
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 200m
+    memory: 256Mi
+
+# KEDA autoscaling (preferred over HPA for CDC workers)
+keda:
+  enabled: false
+  # Minimum replicas
+  minReplicas: 1
+  # Maximum replicas
+  maxReplicas: 5
+  # Polling interval in seconds
+  pollingInterval: 30
+  # Cooldown period in seconds
+  cooldownPeriod: 300
+  # PostgreSQL connection string for metrics (use secretTargetRef for password)
+  postgresql:
+    # Host for metrics query
+    host: ""
+    # Database for metrics query
+    database: ""
+    # User for metrics query
+    user: ""
+    # Password for metrics query (if not using existingSecret)
+    password: ""
+    # Existing secret containing password
+    existingSecret: ""
+    # Key in secret containing password
+    passwordKey: "password"
+  # Scale based on replication lag
+  triggers:
+    - type: postgresql
+      metadata:
+        # Query to get lag in bytes
+        query: "SELECT COALESCE(pg_wal_lsn_diff(pg_current_wal_lsn(), confirmed_flush_lsn), 0) FROM pg_replication_slots WHERE slot_name = 'philotes_cdc'"
+        targetQueryValue: "1000000"  # 1MB lag threshold
+
+# Pod Disruption Budget
+pdb:
+  enabled: true
+  minAvailable: 1
+
+# Network Policy
+networkPolicy:
+  enabled: false
+  # Additional ingress rules
+  additionalIngress: []
+  # Additional egress rules
+  additionalEgress: []
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# CDC Pipeline configuration
+cdc:
+  # Event buffer size
+  bufferSize: "10000"
+  # Batch size for flushing
+  batchSize: "1000"
+  # Flush interval
+  flushInterval: "5s"
+
+  # Replication settings
+  replication:
+    slotName: "philotes_cdc"
+    publicationName: "philotes_pub"
+    # Comma-separated list of tables (empty = all in publication)
+    tables: ""
+
+  # Checkpoint settings
+  checkpoint:
+    enabled: true
+    interval: "10s"
+
+  # Buffer database settings
+  buffer:
+    enabled: true
+    retention: "168h"
+    cleanupInterval: "1h"
+
+  # Retry settings
+  retry:
+    maxAttempts: "3"
+    initialInterval: "1s"
+    maxInterval: "30s"
+    multiplier: "2.0"
+
+  # Dead letter queue
+  deadLetter:
+    enabled: true
+    retention: "168h"
+
+  # Backpressure settings
+  backpressure:
+    enabled: true
+    highWatermark: "8000"
+    lowWatermark: "5000"
+    checkInterval: "1s"
+
+# Source PostgreSQL database (the one being replicated FROM)
+source:
+  host: ""
+  port: "5432"
+  database: ""
+  user: ""
+  # Password (if not using existingSecret)
+  password: ""
+  sslMode: "disable"
+  # Use existing secret for password
+  # Secret must have key: password
+  existingSecret: ""
+
+# Buffer/Metadata database configuration
+database:
+  host: "postgresql"
+  port: "5432"
+  name: "philotes"
+  user: "philotes"
+  sslMode: "disable"
+  maxOpenConns: "25"
+  maxIdleConns: "5"
+  # Use existing secret for password
+  existingSecret: ""
+
+# Object storage configuration (MinIO/S3)
+storage:
+  endpoint: ""
+  bucket: "philotes"
+  useSSL: "false"
+  # Use existing secret for access key and secret key
+  # Secret must have keys: access-key, secret-key
+  existingSecret: ""
+  accessKey: ""
+  secretKey: ""
+
+# Iceberg configuration
+iceberg:
+  catalogUrl: ""
+  warehouse: "philotes"
+
+# Metrics configuration
+metrics:
+  enabled: true
+  port: 9090
+  # ServiceMonitor for Prometheus Operator
+  serviceMonitor:
+    enabled: false
+    namespace: ""
+    interval: "30s"
+    scrapeTimeout: "10s"
+    labels: {}
+
+# Health check configuration
+health:
+  enabled: true
+  listenAddr: ":8081"
+  readinessTimeout: "5s"
+  # Liveness probe
+  liveness:
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  # Readiness probe
+  readiness:
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+# Environment variables
+env: []
+#  - name: EXTRA_VAR
+#    value: "value"
+
+# Extra environment variables from secrets/configmaps
+envFrom: []

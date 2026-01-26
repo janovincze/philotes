@@ -1,0 +1,86 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "philotes-worker.fullname" . }}
+  labels:
+    {{- include "philotes-worker.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "philotes-worker.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow health check traffic from within namespace
+    - from:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 8081
+    # Allow metrics scraping from Prometheus
+    {{- if .Values.metrics.enabled }}
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - protocol: TCP
+          port: {{ .Values.metrics.port }}
+    {{- end }}
+    {{- with .Values.networkPolicy.additionalIngress }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  egress:
+    # Allow DNS
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Allow buffer PostgreSQL
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: postgresql
+      ports:
+        - protocol: TCP
+          port: 5432
+    # Allow source PostgreSQL (external - allow all on 5432/5433)
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 5433
+    # Allow MinIO/S3
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: minio
+      ports:
+        - protocol: TCP
+          port: 9000
+    # Allow external S3 (HTTPS)
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+    # Allow Lakekeeper
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: lakekeeper
+      ports:
+        - protocol: TCP
+          port: 8181
+    {{- with .Values.networkPolicy.additionalEgress }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+{{- end }}

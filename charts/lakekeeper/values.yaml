@@ -1,0 +1,91 @@
+# Default values for lakekeeper
+
+replicaCount: 1
+
+image:
+  repository: lakekeeper/catalog
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext:
+  fsGroup: 1000
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+
+service:
+  type: ClusterIP
+  port: 8181
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 256Mi
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Lakekeeper configuration
+config:
+  # Base URI for the catalog (used in responses)
+  baseUri: ""
+
+  # Authorization settings
+  authz:
+    enabled: false
+
+  # OpenID Connect settings
+  openid:
+    enabled: false
+    # issuerUrl: ""
+    # clientId: ""
+
+# PostgreSQL database for catalog metadata
+database:
+  host: "postgresql"
+  port: "5432"
+  name: "philotes"
+  schema: "lakekeeper"
+  user: "philotes"
+  # Use existing secret for password
+  existingSecret: ""
+  # Password (if not using existingSecret)
+  password: ""
+
+# Health check configuration
+health:
+  enabled: true
+  liveness:
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readiness:
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3

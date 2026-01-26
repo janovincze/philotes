@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "lakekeeper.fullname" . }}
+  labels:
+    {{- include "lakekeeper.labels" . | nindent 4 }}
+data:
+  LAKEKEEPER__BASE_URI: {{ .Values.config.baseUri | default (printf "http://%s:%d" (include "lakekeeper.fullname" .) (int .Values.service.port)) | quote }}
+  LAKEKEEPER__PG__SCHEMA: {{ .Values.database.schema | quote }}
+  LAKEKEEPER__AUTHZ__ENABLED: {{ .Values.config.authz.enabled | quote }}
+  LAKEKEEPER__OPENID__ENABLED: {{ .Values.config.openid.enabled | quote }}

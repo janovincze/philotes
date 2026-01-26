@@ -1,0 +1,111 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "philotes-worker.fullname" . }}
+  labels:
+    {{- include "philotes-worker.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.keda.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "philotes-worker.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "philotes-worker.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "philotes-worker.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: health
+              containerPort: 8081
+              protocol: TCP
+            {{- if .Values.metrics.enabled }}
+            - name: metrics
+              containerPort: {{ .Values.metrics.port }}
+              protocol: TCP
+            {{- end }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "philotes-worker.fullname" . }}
+            {{- with .Values.envFrom }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          env:
+            # Database password
+            - name: PHILOTES_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "philotes-worker.databaseSecretName" . }}
+                  key: password
+            # Source database password
+            - name: PHILOTES_CDC_SOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "philotes-worker.sourceSecretName" . }}
+                  key: password
+            # Storage credentials
+            - name: PHILOTES_STORAGE_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "philotes-worker.storageSecretName" . }}
+                  key: access-key
+            - name: PHILOTES_STORAGE_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "philotes-worker.storageSecretName" . }}
+                  key: secret-key
+            {{- with .Values.env }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- if .Values.health.enabled }}
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: health
+            initialDelaySeconds: {{ .Values.health.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.health.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.health.liveness.timeoutSeconds }}
+            failureThreshold: {{ .Values.health.liveness.failureThreshold }}
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: health
+            initialDelaySeconds: {{ .Values.health.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.health.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.health.readiness.timeoutSeconds }}
+            failureThreshold: {{ .Values.health.readiness.failureThreshold }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

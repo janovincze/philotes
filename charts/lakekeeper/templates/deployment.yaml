@@ -1,0 +1,98 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "lakekeeper.fullname" . }}
+  labels:
+    {{- include "lakekeeper.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "lakekeeper.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "lakekeeper.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "lakekeeper.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8181
+              protocol: TCP
+          env:
+            - name: LAKEKEEPER_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "lakekeeper.databaseSecretName" . }}
+                  key: password
+            - name: LAKEKEEPER__BASE_URI
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "lakekeeper.fullname" . }}
+                  key: LAKEKEEPER__BASE_URI
+            - name: LAKEKEEPER__PG__DATABASE_URL
+              value: "postgresql://{{ .Values.database.user }}:$(LAKEKEEPER_DB_PASSWORD)@{{ .Values.database.host }}:{{ .Values.database.port }}/{{ .Values.database.name }}"
+            - name: LAKEKEEPER__PG__SCHEMA
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "lakekeeper.fullname" . }}
+                  key: LAKEKEEPER__PG__SCHEMA
+            - name: LAKEKEEPER__AUTHZ__ENABLED
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "lakekeeper.fullname" . }}
+                  key: LAKEKEEPER__AUTHZ__ENABLED
+            - name: LAKEKEEPER__OPENID__ENABLED
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "lakekeeper.fullname" . }}
+                  key: LAKEKEEPER__OPENID__ENABLED
+          {{- if .Values.health.enabled }}
+          livenessProbe:
+            httpGet:
+              path: /catalog/v1/config
+              port: http
+            initialDelaySeconds: {{ .Values.health.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.health.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.health.liveness.timeoutSeconds }}
+            failureThreshold: {{ .Values.health.liveness.failureThreshold }}
+          readinessProbe:
+            httpGet:
+              path: /catalog/v1/config
+              port: http
+            initialDelaySeconds: {{ .Values.health.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.health.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.health.readiness.timeoutSeconds }}
+            failureThreshold: {{ .Values.health.readiness.failureThreshold }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

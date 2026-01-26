@@ -1,0 +1,51 @@
+apiVersion: v2
+name: philotes
+description: Philotes - Open-source CDC platform for PostgreSQL to Iceberg replication
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - philotes
+  - cdc
+  - change-data-capture
+  - postgresql
+  - iceberg
+  - data-lake
+  - etl
+home: https://github.com/janovincze/philotes
+sources:
+  - https://github.com/janovincze/philotes
+maintainers:
+  - name: Janos Vincze
+    url: https://github.com/janovincze
+icon: https://raw.githubusercontent.com/janovincze/philotes/main/docs/assets/logo.png
+
+dependencies:
+  # Philotes components
+  - name: philotes-api
+    version: "0.1.0"
+    repository: "file://../philotes-api"
+    condition: api.enabled
+    alias: api
+
+  - name: philotes-worker
+    version: "0.1.0"
+    repository: "file://../philotes-worker"
+    condition: worker.enabled
+    alias: worker
+
+  - name: lakekeeper
+    version: "0.1.0"
+    repository: "file://../lakekeeper"
+    condition: lakekeeper.enabled
+
+  # External dependencies (optional)
+  - name: postgresql
+    version: "15.5.38"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: postgresql.enabled
+
+  - name: minio
+    version: "5.3.0"
+    repository: "https://charts.min.io/"
+    condition: minio.enabled
