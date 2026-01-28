@@ -1,0 +1,8 @@
+config:
+  philotes:provider: hetzner
+  philotes:region: nbg1
+  philotes:environment: production
+  philotes:controlPlaneType: cx32
+  philotes:workerType: cx42
+  philotes:workerCount: "3"
+  philotes:storageSizeGB: "200"

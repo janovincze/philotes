@@ -1,0 +1,8 @@
+config:
+  philotes:provider: hetzner
+  philotes:region: nbg1
+  philotes:environment: staging
+  philotes:controlPlaneType: cx22
+  philotes:workerType: cx42
+  philotes:workerCount: "3"
+  philotes:storageSizeGB: "100"

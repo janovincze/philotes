@@ -1,0 +1,25 @@
+name: philotes-infra
+runtime: go
+description: Philotes Infrastructure as Code - Multi-Provider Deployment
+config:
+  philotes:provider:
+    description: Cloud provider (hetzner, scaleway)
+    default: hetzner
+  philotes:region:
+    description: Region to deploy to
+  philotes:environment:
+    description: Environment (dev, staging, production)
+    default: dev
+  philotes:controlPlaneType:
+    description: Control plane server type
+  philotes:workerType:
+    description: Worker server type
+  philotes:workerCount:
+    description: Number of worker nodes
+    default: "2"
+  philotes:storageSizeGB:
+    description: Block storage size in GB
+    default: "50"
+  philotes:sshPublicKeyPath:
+    description: Path to SSH public key
+    default: ~/.ssh/id_rsa.pub
