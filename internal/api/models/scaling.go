@@ -140,8 +140,8 @@ func (r *CreateScalingPolicyRequest) ApplyDefaults() {
 }
 
 // ToScalingPolicy converts the request to a scaling policy.
-func (r *CreateScalingPolicyRequest) ToScalingPolicy() *scaling.ScalingPolicy {
-	policy := &scaling.ScalingPolicy{
+func (r *CreateScalingPolicyRequest) ToScalingPolicy() *scaling.Policy {
+	policy := &scaling.Policy{
 		Name:            r.Name,
 		TargetType:      r.TargetType,
 		TargetID:        r.TargetID,
@@ -154,7 +154,7 @@ func (r *CreateScalingPolicyRequest) ToScalingPolicy() *scaling.ScalingPolicy {
 	}
 
 	for _, rule := range r.ScaleUpRules {
-		policy.ScaleUpRules = append(policy.ScaleUpRules, scaling.ScalingRule{
+		policy.ScaleUpRules = append(policy.ScaleUpRules, scaling.Rule{
 			RuleType:        scaling.RuleTypeScaleUp,
 			Metric:          rule.Metric,
 			Operator:        rule.Operator,
@@ -165,7 +165,7 @@ func (r *CreateScalingPolicyRequest) ToScalingPolicy() *scaling.ScalingPolicy {
 	}
 
 	for _, rule := range r.ScaleDownRules {
-		policy.ScaleDownRules = append(policy.ScaleDownRules, scaling.ScalingRule{
+		policy.ScaleDownRules = append(policy.ScaleDownRules, scaling.Rule{
 			RuleType:        scaling.RuleTypeScaleDown,
 			Metric:          rule.Metric,
 			Operator:        rule.Operator,
@@ -180,7 +180,7 @@ func (r *CreateScalingPolicyRequest) ToScalingPolicy() *scaling.ScalingPolicy {
 		if schedule.Enabled != nil {
 			enabled = *schedule.Enabled
 		}
-		policy.Schedules = append(policy.Schedules, scaling.ScalingSchedule{
+		policy.Schedules = append(policy.Schedules, scaling.Schedule{
 			CronExpression:  schedule.CronExpression,
 			DesiredReplicas: schedule.DesiredReplicas,
 			Timezone:        schedule.Timezone,
@@ -229,7 +229,7 @@ func (r *UpdateScalingPolicyRequest) Validate() []FieldError {
 }
 
 // ApplyToPolicy applies the update to an existing policy.
-func (r *UpdateScalingPolicyRequest) ApplyToPolicy(policy *scaling.ScalingPolicy) {
+func (r *UpdateScalingPolicyRequest) ApplyToPolicy(policy *scaling.Policy) {
 	if r.Name != nil {
 		policy.Name = *r.Name
 	}
@@ -254,9 +254,9 @@ func (r *UpdateScalingPolicyRequest) ApplyToPolicy(policy *scaling.ScalingPolicy
 
 	// Replace rules if provided
 	if r.ScaleUpRules != nil {
-		policy.ScaleUpRules = make([]scaling.ScalingRule, 0, len(r.ScaleUpRules))
+		policy.ScaleUpRules = make([]scaling.Rule, 0, len(r.ScaleUpRules))
 		for _, rule := range r.ScaleUpRules {
-			policy.ScaleUpRules = append(policy.ScaleUpRules, scaling.ScalingRule{
+			policy.ScaleUpRules = append(policy.ScaleUpRules, scaling.Rule{
 				RuleType:        scaling.RuleTypeScaleUp,
 				Metric:          rule.Metric,
 				Operator:        rule.Operator,
@@ -268,9 +268,9 @@ func (r *UpdateScalingPolicyRequest) ApplyToPolicy(policy *scaling.ScalingPolicy
 	}
 
 	if r.ScaleDownRules != nil {
-		policy.ScaleDownRules = make([]scaling.ScalingRule, 0, len(r.ScaleDownRules))
+		policy.ScaleDownRules = make([]scaling.Rule, 0, len(r.ScaleDownRules))
 		for _, rule := range r.ScaleDownRules {
-			policy.ScaleDownRules = append(policy.ScaleDownRules, scaling.ScalingRule{
+			policy.ScaleDownRules = append(policy.ScaleDownRules, scaling.Rule{
 				RuleType:        scaling.RuleTypeScaleDown,
 				Metric:          rule.Metric,
 				Operator:        rule.Operator,
@@ -283,7 +283,7 @@ func (r *UpdateScalingPolicyRequest) ApplyToPolicy(policy *scaling.ScalingPolicy
 
 	// Replace schedules if provided
 	if r.Schedules != nil {
-		policy.Schedules = make([]scaling.ScalingSchedule, 0, len(r.Schedules))
+		policy.Schedules = make([]scaling.Schedule, 0, len(r.Schedules))
 		for _, schedule := range r.Schedules {
 			timezone := schedule.Timezone
 			if timezone == "" {
@@ -293,7 +293,7 @@ func (r *UpdateScalingPolicyRequest) ApplyToPolicy(policy *scaling.ScalingPolicy
 			if schedule.Enabled != nil {
 				enabled = *schedule.Enabled
 			}
-			policy.Schedules = append(policy.Schedules, scaling.ScalingSchedule{
+			policy.Schedules = append(policy.Schedules, scaling.Schedule{
 				CronExpression:  schedule.CronExpression,
 				DesiredReplicas: schedule.DesiredReplicas,
 				Timezone:        timezone,
@@ -305,19 +305,19 @@ func (r *UpdateScalingPolicyRequest) ApplyToPolicy(policy *scaling.ScalingPolicy
 
 // ScalingPolicyResponse wraps a scaling policy for API responses.
 type ScalingPolicyResponse struct {
-	Policy *scaling.ScalingPolicy `json:"policy"`
+	Policy *scaling.Policy `json:"policy"`
 }
 
 // ScalingPolicyListResponse wraps a list of scaling policies for API responses.
 type ScalingPolicyListResponse struct {
-	Policies   []scaling.ScalingPolicy `json:"policies"`
-	TotalCount int                     `json:"total_count"`
+	Policies   []scaling.Policy `json:"policies"`
+	TotalCount int              `json:"total_count"`
 }
 
 // ScalingHistoryResponse wraps scaling history for API responses.
 type ScalingHistoryResponse struct {
-	History    []scaling.ScalingHistory `json:"history"`
-	TotalCount int                      `json:"total_count"`
+	History    []scaling.History `json:"history"`
+	TotalCount int               `json:"total_count"`
 }
 
 // EvaluatePolicyRequest represents a request to evaluate a scaling policy.
@@ -327,29 +327,29 @@ type EvaluatePolicyRequest struct {
 
 // EvaluatePolicyResponse represents the result of evaluating a scaling policy.
 type EvaluatePolicyResponse struct {
-	Decision        *scaling.ScalingDecision `json:"decision"`
-	CurrentReplicas int                      `json:"current_replicas"`
-	WouldScale      bool                     `json:"would_scale"`
-	Action          string                   `json:"action,omitempty"`
-	DesiredReplicas int                      `json:"desired_replicas,omitempty"`
-	Reason          string                   `json:"reason"`
-	DryRun          bool                     `json:"dry_run"`
+	Decision        *scaling.Decision `json:"decision"`
+	CurrentReplicas int               `json:"current_replicas"`
+	WouldScale      bool              `json:"would_scale"`
+	Action          string            `json:"action,omitempty"`
+	DesiredReplicas int               `json:"desired_replicas,omitempty"`
+	Reason          string            `json:"reason"`
+	DryRun          bool              `json:"dry_run"`
 }
 
 // ScalingStateResponse wraps scaling state for API responses.
 type ScalingStateResponse struct {
-	State         *scaling.ScalingState `json:"state"`
-	PolicyID      uuid.UUID             `json:"policy_id"`
-	PolicyName    string                `json:"policy_name"`
-	InCooldown    bool                  `json:"in_cooldown"`
-	CooldownEnds  *time.Time            `json:"cooldown_ends,omitempty"`
+	State        *scaling.State `json:"state"`
+	PolicyID     uuid.UUID      `json:"policy_id"`
+	PolicyName   string         `json:"policy_name"`
+	InCooldown   bool           `json:"in_cooldown"`
+	CooldownEnds *time.Time     `json:"cooldown_ends,omitempty"`
 }
 
 // ScalingSummaryResponse provides a summary of scaling statistics.
 type ScalingSummaryResponse struct {
-	TotalPolicies       int `json:"total_policies"`
-	EnabledPolicies     int `json:"enabled_policies"`
-	TotalScaleUpEvents  int `json:"total_scale_up_events"`
+	TotalPolicies        int `json:"total_policies"`
+	EnabledPolicies      int `json:"enabled_policies"`
+	TotalScaleUpEvents   int `json:"total_scale_up_events"`
 	TotalScaleDownEvents int `json:"total_scale_down_events"`
-	RecentScalingEvents int `json:"recent_scaling_events"`
+	RecentScalingEvents  int `json:"recent_scaling_events"`
 }

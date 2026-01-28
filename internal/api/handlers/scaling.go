@@ -110,10 +110,10 @@ func (h *ScalingHandler) UpdatePolicy(c *gin.Context) {
 	}
 
 	var req models.UpdateScalingPolicyRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if bindErr := c.ShouldBindJSON(&req); bindErr != nil {
 		models.RespondWithError(c, models.NewBadRequestError(
 			c.Request.URL.Path,
-			"invalid request body: "+err.Error(),
+			"invalid request body: "+bindErr.Error(),
 		))
 		return
 	}
@@ -200,7 +200,7 @@ func (h *ScalingHandler) EvaluatePolicy(c *gin.Context) {
 	}
 
 	var req models.EvaluatePolicyRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if bindErr := c.ShouldBindJSON(&req); bindErr != nil {
 		// Default to dry-run if no body provided
 		req.DryRun = true
 	}
@@ -268,7 +268,7 @@ func (h *ScalingHandler) GetPolicyHistory(c *gin.Context) {
 
 	limit := 100
 	if limitStr := c.Query("limit"); limitStr != "" {
-		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+		if l, parseErr := strconv.Atoi(limitStr); parseErr == nil && l > 0 {
 			limit = l
 		}
 	}

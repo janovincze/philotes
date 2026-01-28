@@ -30,7 +30,7 @@ func NewService(repo *Repository, logger *slog.Logger) *Service {
 }
 
 // CreatePolicy creates a new scaling policy with its rules and schedules.
-func (s *Service) CreatePolicy(ctx context.Context, policy *ScalingPolicy) (*ScalingPolicy, error) {
+func (s *Service) CreatePolicy(ctx context.Context, policy *Policy) (*Policy, error) {
 	// Validate the policy
 	if err := policy.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid policy: %w", err)
@@ -75,7 +75,7 @@ func (s *Service) CreatePolicy(ctx context.Context, policy *ScalingPolicy) (*Sca
 	}
 
 	// Initialize scaling state
-	state := &ScalingState{
+	state := &State{
 		PolicyID:        created.ID,
 		CurrentReplicas: policy.MinReplicas,
 	}
@@ -94,7 +94,7 @@ func (s *Service) CreatePolicy(ctx context.Context, policy *ScalingPolicy) (*Sca
 }
 
 // GetPolicy retrieves a policy by ID with all its rules and schedules.
-func (s *Service) GetPolicy(ctx context.Context, id uuid.UUID) (*ScalingPolicy, error) {
+func (s *Service) GetPolicy(ctx context.Context, id uuid.UUID) (*Policy, error) {
 	policy, err := s.repo.GetPolicy(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get policy: %w", err)
@@ -126,7 +126,7 @@ func (s *Service) GetPolicy(ctx context.Context, id uuid.UUID) (*ScalingPolicy, 
 }
 
 // ListPolicies lists all scaling policies with optional filtering.
-func (s *Service) ListPolicies(ctx context.Context, enabledOnly bool) ([]ScalingPolicy, error) {
+func (s *Service) ListPolicies(ctx context.Context, enabledOnly bool) ([]Policy, error) {
 	policies, err := s.repo.ListPolicies(ctx, enabledOnly)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list policies: %w", err)
@@ -166,7 +166,7 @@ func (s *Service) ListPolicies(ctx context.Context, enabledOnly bool) ([]Scaling
 }
 
 // UpdatePolicy updates a scaling policy.
-func (s *Service) UpdatePolicy(ctx context.Context, policy *ScalingPolicy) (*ScalingPolicy, error) {
+func (s *Service) UpdatePolicy(ctx context.Context, policy *Policy) (*Policy, error) {
 	// Validate the policy
 	if err := policy.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid policy: %w", err)
@@ -306,21 +306,21 @@ func (s *Service) DisablePolicy(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
-// GetScalingHistory retrieves scaling history for a policy.
-func (s *Service) GetScalingHistory(ctx context.Context, policyID *uuid.UUID, limit int) ([]ScalingHistory, error) {
+// GetHistory retrieves scaling history for a policy.
+func (s *Service) GetHistory(ctx context.Context, policyID *uuid.UUID, limit int) ([]History, error) {
 	if policyID != nil {
 		return s.repo.GetHistoryForPolicy(ctx, *policyID, limit)
 	}
 	return s.repo.ListRecentHistory(ctx, limit)
 }
 
-// GetScalingState retrieves the current scaling state for a policy.
-func (s *Service) GetScalingState(ctx context.Context, policyID uuid.UUID) (*ScalingState, error) {
+// GetState retrieves the current scaling state for a policy.
+func (s *Service) GetState(ctx context.Context, policyID uuid.UUID) (*State, error) {
 	return s.repo.GetState(ctx, policyID)
 }
 
 // RecordHistory records a scaling action in the history.
-func (s *Service) RecordHistory(ctx context.Context, history *ScalingHistory) (*ScalingHistory, error) {
+func (s *Service) RecordHistory(ctx context.Context, history *History) (*History, error) {
 	return s.repo.CreateHistory(ctx, history)
 }
 

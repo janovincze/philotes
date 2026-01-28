@@ -31,7 +31,7 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 // ============================================================================
 
 // CreatePolicy creates a new scaling policy.
-func (r *Repository) CreatePolicy(ctx context.Context, policy *ScalingPolicy) (*ScalingPolicy, error) {
+func (r *Repository) CreatePolicy(ctx context.Context, policy *Policy) (*Policy, error) {
 	query := `
 		INSERT INTO scaling_policies (
 			name, target_type, target_id, min_replicas, max_replicas,
@@ -59,7 +59,7 @@ func (r *Repository) CreatePolicy(ctx context.Context, policy *ScalingPolicy) (*
 }
 
 // GetPolicy retrieves a scaling policy by ID.
-func (r *Repository) GetPolicy(ctx context.Context, id uuid.UUID) (*ScalingPolicy, error) {
+func (r *Repository) GetPolicy(ctx context.Context, id uuid.UUID) (*Policy, error) {
 	query := `
 		SELECT id, name, target_type, target_id, min_replicas, max_replicas,
 			   cooldown_seconds, max_hourly_cost, scale_to_zero, enabled,
@@ -67,7 +67,7 @@ func (r *Repository) GetPolicy(ctx context.Context, id uuid.UUID) (*ScalingPolic
 		FROM scaling_policies
 		WHERE id = $1`
 
-	policy := &ScalingPolicy{}
+	policy := &Policy{}
 	err := r.db.QueryRow(ctx, query, id).Scan(
 		&policy.ID,
 		&policy.Name,
@@ -94,7 +94,7 @@ func (r *Repository) GetPolicy(ctx context.Context, id uuid.UUID) (*ScalingPolic
 }
 
 // GetPolicyByName retrieves a scaling policy by name.
-func (r *Repository) GetPolicyByName(ctx context.Context, name string) (*ScalingPolicy, error) {
+func (r *Repository) GetPolicyByName(ctx context.Context, name string) (*Policy, error) {
 	query := `
 		SELECT id, name, target_type, target_id, min_replicas, max_replicas,
 			   cooldown_seconds, max_hourly_cost, scale_to_zero, enabled,
@@ -102,7 +102,7 @@ func (r *Repository) GetPolicyByName(ctx context.Context, name string) (*Scaling
 		FROM scaling_policies
 		WHERE name = $1`
 
-	policy := &ScalingPolicy{}
+	policy := &Policy{}
 	err := r.db.QueryRow(ctx, query, name).Scan(
 		&policy.ID,
 		&policy.Name,
@@ -129,7 +129,7 @@ func (r *Repository) GetPolicyByName(ctx context.Context, name string) (*Scaling
 }
 
 // ListPolicies lists all scaling policies, optionally filtered by enabled status.
-func (r *Repository) ListPolicies(ctx context.Context, enabledOnly bool) ([]ScalingPolicy, error) {
+func (r *Repository) ListPolicies(ctx context.Context, enabledOnly bool) ([]Policy, error) {
 	query := `
 		SELECT id, name, target_type, target_id, min_replicas, max_replicas,
 			   cooldown_seconds, max_hourly_cost, scale_to_zero, enabled,
@@ -147,9 +147,9 @@ func (r *Repository) ListPolicies(ctx context.Context, enabledOnly bool) ([]Scal
 	}
 	defer rows.Close()
 
-	var policies []ScalingPolicy
+	var policies []Policy
 	for rows.Next() {
-		var policy ScalingPolicy
+		var policy Policy
 		err := rows.Scan(
 			&policy.ID,
 			&policy.Name,
@@ -174,7 +174,7 @@ func (r *Repository) ListPolicies(ctx context.Context, enabledOnly bool) ([]Scal
 }
 
 // UpdatePolicy updates a scaling policy.
-func (r *Repository) UpdatePolicy(ctx context.Context, policy *ScalingPolicy) error {
+func (r *Repository) UpdatePolicy(ctx context.Context, policy *Policy) error {
 	query := `
 		UPDATE scaling_policies
 		SET name = $2, target_type = $3, target_id = $4, min_replicas = $5,
@@ -225,7 +225,7 @@ func (r *Repository) DeletePolicy(ctx context.Context, id uuid.UUID) error {
 // ============================================================================
 
 // CreateRule creates a new scaling rule.
-func (r *Repository) CreateRule(ctx context.Context, rule *ScalingRule) (*ScalingRule, error) {
+func (r *Repository) CreateRule(ctx context.Context, rule *Rule) (*Rule, error) {
 	query := `
 		INSERT INTO scaling_rules (
 			policy_id, rule_type, metric, operator, threshold, duration_seconds, scale_by
@@ -250,7 +250,7 @@ func (r *Repository) CreateRule(ctx context.Context, rule *ScalingRule) (*Scalin
 }
 
 // GetRulesForPolicy retrieves all rules for a policy.
-func (r *Repository) GetRulesForPolicy(ctx context.Context, policyID uuid.UUID) ([]ScalingRule, error) {
+func (r *Repository) GetRulesForPolicy(ctx context.Context, policyID uuid.UUID) ([]Rule, error) {
 	query := `
 		SELECT id, policy_id, rule_type, metric, operator, threshold,
 			   duration_seconds, scale_by, created_at
@@ -264,9 +264,9 @@ func (r *Repository) GetRulesForPolicy(ctx context.Context, policyID uuid.UUID) 
 	}
 	defer rows.Close()
 
-	var rules []ScalingRule
+	var rules []Rule
 	for rows.Next() {
-		var rule ScalingRule
+		var rule Rule
 		err := rows.Scan(
 			&rule.ID,
 			&rule.PolicyID,
@@ -315,7 +315,7 @@ func (r *Repository) DeleteRulesForPolicy(ctx context.Context, policyID uuid.UUI
 // ============================================================================
 
 // CreateSchedule creates a new scaling schedule.
-func (r *Repository) CreateSchedule(ctx context.Context, schedule *ScalingSchedule) (*ScalingSchedule, error) {
+func (r *Repository) CreateSchedule(ctx context.Context, schedule *Schedule) (*Schedule, error) {
 	query := `
 		INSERT INTO scaling_schedules (
 			policy_id, cron_expression, desired_replicas, timezone, enabled
@@ -338,7 +338,7 @@ func (r *Repository) CreateSchedule(ctx context.Context, schedule *ScalingSchedu
 }
 
 // GetSchedulesForPolicy retrieves all schedules for a policy.
-func (r *Repository) GetSchedulesForPolicy(ctx context.Context, policyID uuid.UUID) ([]ScalingSchedule, error) {
+func (r *Repository) GetSchedulesForPolicy(ctx context.Context, policyID uuid.UUID) ([]Schedule, error) {
 	query := `
 		SELECT id, policy_id, cron_expression, desired_replicas, timezone, enabled, created_at
 		FROM scaling_schedules
@@ -351,9 +351,9 @@ func (r *Repository) GetSchedulesForPolicy(ctx context.Context, policyID uuid.UU
 	}
 	defer rows.Close()
 
-	var schedules []ScalingSchedule
+	var schedules []Schedule
 	for rows.Next() {
-		var schedule ScalingSchedule
+		var schedule Schedule
 		err := rows.Scan(
 			&schedule.ID,
 			&schedule.PolicyID,
@@ -400,7 +400,7 @@ func (r *Repository) DeleteSchedulesForPolicy(ctx context.Context, policyID uuid
 // ============================================================================
 
 // CreateHistory creates a new scaling history entry.
-func (r *Repository) CreateHistory(ctx context.Context, history *ScalingHistory) (*ScalingHistory, error) {
+func (r *Repository) CreateHistory(ctx context.Context, history *History) (*History, error) {
 	query := `
 		INSERT INTO scaling_history (
 			policy_id, policy_name, action, target_type, target_id,
@@ -429,7 +429,7 @@ func (r *Repository) CreateHistory(ctx context.Context, history *ScalingHistory)
 }
 
 // ListHistory lists scaling history with optional filters.
-func (r *Repository) ListHistory(ctx context.Context, policyID *uuid.UUID, limit int) ([]ScalingHistory, error) {
+func (r *Repository) ListHistory(ctx context.Context, policyID *uuid.UUID, limit int) ([]History, error) {
 	query := `
 		SELECT id, policy_id, policy_name, action, target_type, target_id,
 			   previous_replicas, new_replicas, reason, triggered_by, dry_run, executed_at
@@ -458,9 +458,9 @@ func (r *Repository) ListHistory(ctx context.Context, policyID *uuid.UUID, limit
 	}
 	defer rows.Close()
 
-	var history []ScalingHistory
+	var history []History
 	for rows.Next() {
-		var h ScalingHistory
+		var h History
 		err := rows.Scan(
 			&h.ID,
 			&h.PolicyID,
@@ -489,14 +489,14 @@ func (r *Repository) ListHistory(ctx context.Context, policyID *uuid.UUID, limit
 // ============================================================================
 
 // GetState retrieves the scaling state for a policy.
-func (r *Repository) GetState(ctx context.Context, policyID uuid.UUID) (*ScalingState, error) {
+func (r *Repository) GetState(ctx context.Context, policyID uuid.UUID) (*State, error) {
 	query := `
 		SELECT id, policy_id, current_replicas, last_scale_time, last_scale_action,
 			   pending_conditions, updated_at
 		FROM scaling_state
 		WHERE policy_id = $1`
 
-	state := &ScalingState{}
+	state := &State{}
 	var pendingConditionsJSON sql.NullString
 
 	err := r.db.QueryRow(ctx, query, policyID).Scan(
@@ -526,7 +526,7 @@ func (r *Repository) GetState(ctx context.Context, policyID uuid.UUID) (*Scaling
 }
 
 // UpsertState creates or updates the scaling state for a policy.
-func (r *Repository) UpsertState(ctx context.Context, state *ScalingState) error {
+func (r *Repository) UpsertState(ctx context.Context, state *State) error {
 	var pendingConditionsJSON []byte
 	var err error
 	if state.PendingConditions != nil {
@@ -563,7 +563,7 @@ func (r *Repository) UpsertState(ctx context.Context, state *ScalingState) error
 }
 
 // CreateState creates a new scaling state (alias for UpsertState).
-func (r *Repository) CreateState(ctx context.Context, state *ScalingState) (*ScalingState, error) {
+func (r *Repository) CreateState(ctx context.Context, state *State) (*State, error) {
 	if err := r.UpsertState(ctx, state); err != nil {
 		return nil, err
 	}
@@ -571,17 +571,17 @@ func (r *Repository) CreateState(ctx context.Context, state *ScalingState) (*Sca
 }
 
 // UpdateState updates an existing scaling state (alias for UpsertState).
-func (r *Repository) UpdateState(ctx context.Context, state *ScalingState) error {
+func (r *Repository) UpdateState(ctx context.Context, state *State) error {
 	return r.UpsertState(ctx, state)
 }
 
 // GetHistoryForPolicy retrieves scaling history for a specific policy.
-func (r *Repository) GetHistoryForPolicy(ctx context.Context, policyID uuid.UUID, limit int) ([]ScalingHistory, error) {
+func (r *Repository) GetHistoryForPolicy(ctx context.Context, policyID uuid.UUID, limit int) ([]History, error) {
 	return r.ListHistory(ctx, &policyID, limit)
 }
 
 // ListRecentHistory retrieves recent scaling history across all policies.
-func (r *Repository) ListRecentHistory(ctx context.Context, limit int) ([]ScalingHistory, error) {
+func (r *Repository) ListRecentHistory(ctx context.Context, limit int) ([]History, error) {
 	return r.ListHistory(ctx, nil, limit)
 }
 
@@ -590,7 +590,7 @@ func (r *Repository) ListRecentHistory(ctx context.Context, limit int) ([]Scalin
 // ============================================================================
 
 // GetPolicyWithDetails retrieves a policy with all its rules and schedules.
-func (r *Repository) GetPolicyWithDetails(ctx context.Context, id uuid.UUID) (*ScalingPolicy, error) {
+func (r *Repository) GetPolicyWithDetails(ctx context.Context, id uuid.UUID) (*Policy, error) {
 	policy, err := r.GetPolicy(ctx, id)
 	if err != nil {
 		return nil, err
@@ -619,7 +619,7 @@ func (r *Repository) GetPolicyWithDetails(ctx context.Context, id uuid.UUID) (*S
 }
 
 // ListPoliciesWithDetails lists all policies with their rules and schedules.
-func (r *Repository) ListPoliciesWithDetails(ctx context.Context, enabledOnly bool) ([]ScalingPolicy, error) {
+func (r *Repository) ListPoliciesWithDetails(ctx context.Context, enabledOnly bool) ([]Policy, error) {
 	policies, err := r.ListPolicies(ctx, enabledOnly)
 	if err != nil {
 		return nil, err

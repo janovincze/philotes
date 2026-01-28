@@ -29,7 +29,7 @@ func NewScalingService(coreService *scaling.Service, manager *scaling.Manager, l
 }
 
 // CreatePolicy creates a new scaling policy.
-func (s *ScalingService) CreatePolicy(ctx context.Context, req *models.CreateScalingPolicyRequest) (*scaling.ScalingPolicy, error) {
+func (s *ScalingService) CreatePolicy(ctx context.Context, req *models.CreateScalingPolicyRequest) (*scaling.Policy, error) {
 	// Validate request
 	if errs := req.Validate(); len(errs) > 0 {
 		return nil, &ValidationError{Errors: errs}
@@ -53,7 +53,7 @@ func (s *ScalingService) CreatePolicy(ctx context.Context, req *models.CreateSca
 }
 
 // GetPolicy retrieves a scaling policy by ID.
-func (s *ScalingService) GetPolicy(ctx context.Context, id uuid.UUID) (*scaling.ScalingPolicy, error) {
+func (s *ScalingService) GetPolicy(ctx context.Context, id uuid.UUID) (*scaling.Policy, error) {
 	policy, err := s.coreService.GetPolicy(ctx, id)
 	if err != nil {
 		return nil, &NotFoundError{Resource: "scaling policy", ID: id.String()}
@@ -69,7 +69,7 @@ func (s *ScalingService) ListPolicies(ctx context.Context, enabledOnly bool) (*m
 	}
 
 	if policies == nil {
-		policies = []scaling.ScalingPolicy{}
+		policies = []scaling.Policy{}
 	}
 
 	return &models.ScalingPolicyListResponse{
@@ -79,7 +79,7 @@ func (s *ScalingService) ListPolicies(ctx context.Context, enabledOnly bool) (*m
 }
 
 // UpdatePolicy updates a scaling policy.
-func (s *ScalingService) UpdatePolicy(ctx context.Context, id uuid.UUID, req *models.UpdateScalingPolicyRequest) (*scaling.ScalingPolicy, error) {
+func (s *ScalingService) UpdatePolicy(ctx context.Context, id uuid.UUID, req *models.UpdateScalingPolicyRequest) (*scaling.Policy, error) {
 	// Validate request
 	if errs := req.Validate(); len(errs) > 0 {
 		return nil, &ValidationError{Errors: errs}
@@ -168,7 +168,7 @@ func (s *ScalingService) GetPolicyState(ctx context.Context, id uuid.UUID) (*mod
 	}
 
 	// Get state
-	state, err := s.coreService.GetScalingState(ctx, id)
+	state, err := s.coreService.GetState(ctx, id)
 	if err != nil {
 		// Return empty state if not found
 		return &models.ScalingStateResponse{
@@ -195,13 +195,13 @@ func (s *ScalingService) GetPolicyState(ctx context.Context, id uuid.UUID) (*mod
 
 // ListHistory retrieves scaling history.
 func (s *ScalingService) ListHistory(ctx context.Context, policyID *uuid.UUID, limit int) (*models.ScalingHistoryResponse, error) {
-	history, err := s.coreService.GetScalingHistory(ctx, policyID, limit)
+	history, err := s.coreService.GetHistory(ctx, policyID, limit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get scaling history: %w", err)
 	}
 
 	if history == nil {
-		history = []scaling.ScalingHistory{}
+		history = []scaling.History{}
 	}
 
 	return &models.ScalingHistoryResponse{

@@ -53,7 +53,7 @@ func NewEvaluator(prometheusURL string, logger *slog.Logger) *Evaluator {
 }
 
 // EvaluateRule queries Prometheus and checks if the rule condition is met.
-func (e *Evaluator) EvaluateRule(ctx context.Context, rule *ScalingRule) (*EvaluationResult, error) {
+func (e *Evaluator) EvaluateRule(ctx context.Context, rule *Rule) (*EvaluationResult, error) {
 	value, err := e.queryMetric(ctx, rule.Metric)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query metric: %w", err)
@@ -80,8 +80,8 @@ func (e *Evaluator) EvaluateRule(ctx context.Context, rule *ScalingRule) (*Evalu
 }
 
 // EvaluatePolicy evaluates all rules for a policy and returns a scaling decision.
-func (e *Evaluator) EvaluatePolicy(ctx context.Context, policy *ScalingPolicy, state *ScalingState) (*ScalingDecision, error) {
-	decision := &ScalingDecision{
+func (e *Evaluator) EvaluatePolicy(ctx context.Context, policy *Policy, state *State) (*Decision, error) {
+	decision := &Decision{
 		Policy:          policy,
 		CurrentReplicas: state.CurrentReplicas,
 		DesiredReplicas: state.CurrentReplicas,
@@ -178,7 +178,7 @@ func (e *Evaluator) EvaluatePolicy(ctx context.Context, policy *ScalingPolicy, s
 }
 
 // checkDurationCondition checks if a condition has been true for the required duration.
-func (e *Evaluator) checkDurationCondition(state *ScalingState, conditionKey string, requiredDuration time.Duration) (bool, time.Duration) {
+func (e *Evaluator) checkDurationCondition(state *State, conditionKey string, requiredDuration time.Duration) (bool, time.Duration) {
 	if requiredDuration == 0 {
 		return true, 0
 	}
@@ -197,7 +197,7 @@ func (e *Evaluator) checkDurationCondition(state *ScalingState, conditionKey str
 }
 
 // updatePendingCondition updates the pending condition tracking.
-func (e *Evaluator) updatePendingCondition(state *ScalingState, conditionKey string) {
+func (e *Evaluator) updatePendingCondition(state *State, conditionKey string) {
 	if state.PendingConditions == nil {
 		state.PendingConditions = make(map[string]time.Time)
 	}
@@ -208,7 +208,7 @@ func (e *Evaluator) updatePendingCondition(state *ScalingState, conditionKey str
 }
 
 // clearPendingCondition clears a pending condition.
-func (e *Evaluator) clearPendingCondition(state *ScalingState, conditionKey string) {
+func (e *Evaluator) clearPendingCondition(state *State, conditionKey string) {
 	if state.PendingConditions != nil {
 		delete(state.PendingConditions, conditionKey)
 	}

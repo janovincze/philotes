@@ -114,22 +114,22 @@ func (o Operator) String() string {
 	return string(o)
 }
 
-// ScalingAction represents the type of scaling action.
-type ScalingAction string
+// Action represents the type of scaling action.
+type Action string
 
 const (
 	// ActionScaleUp indicates a scale-up action.
-	ActionScaleUp ScalingAction = "scale_up"
+	ActionScaleUp Action = "scale_up"
 	// ActionScaleDown indicates a scale-down action.
-	ActionScaleDown ScalingAction = "scale_down"
+	ActionScaleDown Action = "scale_down"
 	// ActionScheduled indicates a scheduled scaling action.
-	ActionScheduled ScalingAction = "scheduled"
+	ActionScheduled Action = "scheduled"
 	// ActionManual indicates a manual scaling action.
-	ActionManual ScalingAction = "manual"
+	ActionManual Action = "manual"
 )
 
 // IsValid checks if the action is valid.
-func (a ScalingAction) IsValid() bool {
+func (a Action) IsValid() bool {
 	switch a {
 	case ActionScaleUp, ActionScaleDown, ActionScheduled, ActionManual:
 		return true
@@ -137,27 +137,27 @@ func (a ScalingAction) IsValid() bool {
 	return false
 }
 
-// ScalingPolicy represents a scaling policy configuration.
-type ScalingPolicy struct {
-	ID              uuid.UUID         `json:"id"`
-	Name            string            `json:"name"`
-	TargetType      TargetType        `json:"target_type"`
-	TargetID        *uuid.UUID        `json:"target_id,omitempty"`
-	MinReplicas     int               `json:"min_replicas"`
-	MaxReplicas     int               `json:"max_replicas"`
-	CooldownSeconds int               `json:"cooldown_seconds"`
-	MaxHourlyCost   *float64          `json:"max_hourly_cost,omitempty"`
-	ScaleToZero     bool              `json:"scale_to_zero"`
-	Enabled         bool              `json:"enabled"`
-	ScaleUpRules    []ScalingRule     `json:"scale_up_rules,omitempty"`
-	ScaleDownRules  []ScalingRule     `json:"scale_down_rules,omitempty"`
-	Schedules       []ScalingSchedule `json:"schedules,omitempty"`
-	CreatedAt       time.Time         `json:"created_at"`
-	UpdatedAt       time.Time         `json:"updated_at"`
+// Policy represents a scaling policy configuration.
+type Policy struct {
+	ID              uuid.UUID  `json:"id"`
+	Name            string     `json:"name"`
+	TargetType      TargetType `json:"target_type"`
+	TargetID        *uuid.UUID `json:"target_id,omitempty"`
+	MinReplicas     int        `json:"min_replicas"`
+	MaxReplicas     int        `json:"max_replicas"`
+	CooldownSeconds int        `json:"cooldown_seconds"`
+	MaxHourlyCost   *float64   `json:"max_hourly_cost,omitempty"`
+	ScaleToZero     bool       `json:"scale_to_zero"`
+	Enabled         bool       `json:"enabled"`
+	ScaleUpRules    []Rule     `json:"scale_up_rules,omitempty"`
+	ScaleDownRules  []Rule     `json:"scale_down_rules,omitempty"`
+	Schedules       []Schedule `json:"schedules,omitempty"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
 }
 
 // Validate validates the scaling policy.
-func (p *ScalingPolicy) Validate() error {
+func (p *Policy) Validate() error {
 	if p.Name == "" {
 		return fmt.Errorf("name is required")
 	}
@@ -208,12 +208,12 @@ func (p *ScalingPolicy) Validate() error {
 }
 
 // CooldownDuration returns the cooldown as a time.Duration.
-func (p *ScalingPolicy) CooldownDuration() time.Duration {
+func (p *Policy) CooldownDuration() time.Duration {
 	return time.Duration(p.CooldownSeconds) * time.Second
 }
 
 // ClampReplicas clamps the given replica count to policy limits.
-func (p *ScalingPolicy) ClampReplicas(replicas int) int {
+func (p *Policy) ClampReplicas(replicas int) int {
 	if replicas < p.MinReplicas {
 		return p.MinReplicas
 	}
@@ -223,8 +223,8 @@ func (p *ScalingPolicy) ClampReplicas(replicas int) int {
 	return replicas
 }
 
-// ScalingRule represents a scaling rule definition.
-type ScalingRule struct {
+// Rule represents a scaling rule definition.
+type Rule struct {
 	ID              uuid.UUID `json:"id"`
 	PolicyID        uuid.UUID `json:"policy_id"`
 	RuleType        RuleType  `json:"rule_type"`
@@ -237,7 +237,7 @@ type ScalingRule struct {
 }
 
 // Validate validates the scaling rule.
-func (r *ScalingRule) Validate() error {
+func (r *Rule) Validate() error {
 	if r.Metric == "" {
 		return fmt.Errorf("metric is required")
 	}
@@ -254,17 +254,17 @@ func (r *ScalingRule) Validate() error {
 }
 
 // Duration returns the duration as a time.Duration.
-func (r *ScalingRule) Duration() time.Duration {
+func (r *Rule) Duration() time.Duration {
 	return time.Duration(r.DurationSeconds) * time.Second
 }
 
 // Evaluate checks if the rule condition is met.
-func (r *ScalingRule) Evaluate(value float64) bool {
+func (r *Rule) Evaluate(value float64) bool {
 	return r.Operator.Evaluate(value, r.Threshold)
 }
 
-// ScalingSchedule represents a scheduled scaling configuration.
-type ScalingSchedule struct {
+// Schedule represents a scheduled scaling configuration.
+type Schedule struct {
 	ID              uuid.UUID `json:"id"`
 	PolicyID        uuid.UUID `json:"policy_id"`
 	CronExpression  string    `json:"cron_expression"`
@@ -275,7 +275,7 @@ type ScalingSchedule struct {
 }
 
 // Validate validates the scaling schedule.
-func (s *ScalingSchedule) Validate() error {
+func (s *Schedule) Validate() error {
 	if s.CronExpression == "" {
 		return fmt.Errorf("cron_expression is required")
 	}
@@ -289,24 +289,24 @@ func (s *ScalingSchedule) Validate() error {
 	return nil
 }
 
-// ScalingHistory represents a scaling action audit log entry.
-type ScalingHistory struct {
-	ID               uuid.UUID     `json:"id"`
-	PolicyID         *uuid.UUID    `json:"policy_id,omitempty"`
-	PolicyName       string        `json:"policy_name"`
-	Action           ScalingAction `json:"action"`
-	TargetType       TargetType    `json:"target_type"`
-	TargetID         *uuid.UUID    `json:"target_id,omitempty"`
-	PreviousReplicas int           `json:"previous_replicas"`
-	NewReplicas      int           `json:"new_replicas"`
-	Reason           string        `json:"reason,omitempty"`
-	TriggeredBy      string        `json:"triggered_by,omitempty"`
-	DryRun           bool          `json:"dry_run"`
-	ExecutedAt       time.Time     `json:"executed_at"`
+// History represents a scaling action audit log entry.
+type History struct {
+	ID               uuid.UUID  `json:"id"`
+	PolicyID         *uuid.UUID `json:"policy_id,omitempty"`
+	PolicyName       string     `json:"policy_name"`
+	Action           Action     `json:"action"`
+	TargetType       TargetType `json:"target_type"`
+	TargetID         *uuid.UUID `json:"target_id,omitempty"`
+	PreviousReplicas int        `json:"previous_replicas"`
+	NewReplicas      int        `json:"new_replicas"`
+	Reason           string     `json:"reason,omitempty"`
+	TriggeredBy      string     `json:"triggered_by,omitempty"`
+	DryRun           bool       `json:"dry_run"`
+	ExecutedAt       time.Time  `json:"executed_at"`
 }
 
-// ScalingState represents the current scaling state for a policy.
-type ScalingState struct {
+// State represents the current scaling state for a policy.
+type State struct {
 	ID                uuid.UUID            `json:"id"`
 	PolicyID          uuid.UUID            `json:"policy_id"`
 	CurrentReplicas   int                  `json:"current_replicas"`
@@ -317,17 +317,17 @@ type ScalingState struct {
 }
 
 // IsInCooldown checks if the policy is currently in cooldown.
-func (s *ScalingState) IsInCooldown(cooldownDuration time.Duration) bool {
+func (s *State) IsInCooldown(cooldownDuration time.Duration) bool {
 	if s.LastScaleTime == nil {
 		return false
 	}
 	return time.Since(*s.LastScaleTime) < cooldownDuration
 }
 
-// ScalingDecision represents a scaling decision made by the evaluator.
-type ScalingDecision struct {
-	Policy            *ScalingPolicy
-	Action            ScalingAction
+// Decision represents a scaling decision made by the evaluator.
+type Decision struct {
+	Policy            *Policy
+	Action            Action
 	CurrentReplicas   int
 	DesiredReplicas   int
 	Reason            string
@@ -337,13 +337,13 @@ type ScalingDecision struct {
 }
 
 // Delta returns the change in replicas.
-func (d *ScalingDecision) Delta() int {
+func (d *Decision) Delta() int {
 	return d.DesiredReplicas - d.CurrentReplicas
 }
 
 // EvaluationResult represents the result of evaluating a single rule.
 type EvaluationResult struct {
-	Rule        *ScalingRule
+	Rule        *Rule
 	MetricValue float64
 	Triggered   bool
 	Duration    time.Duration // How long the condition has been true

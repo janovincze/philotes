@@ -175,7 +175,7 @@ func (m *Manager) evaluatePolicies(ctx context.Context) error {
 }
 
 // evaluatePolicy evaluates a single scaling policy.
-func (m *Manager) evaluatePolicy(ctx context.Context, policy *ScalingPolicy) error {
+func (m *Manager) evaluatePolicy(ctx context.Context, policy *Policy) error {
 	// Load rules for the policy
 	rules, err := m.repo.GetRulesForPolicy(ctx, policy.ID)
 	if err != nil {
@@ -195,7 +195,7 @@ func (m *Manager) evaluatePolicy(ctx context.Context, policy *ScalingPolicy) err
 	state, err := m.repo.GetState(ctx, policy.ID)
 	if err != nil {
 		// Create initial state if not found
-		state = &ScalingState{
+		state = &State{
 			PolicyID:        policy.ID,
 			CurrentReplicas: policy.MinReplicas,
 		}
@@ -243,7 +243,7 @@ func (m *Manager) evaluatePolicy(ctx context.Context, policy *ScalingPolicy) err
 }
 
 // executeDecision executes a scaling decision.
-func (m *Manager) executeDecision(ctx context.Context, decision *ScalingDecision, state *ScalingState) error {
+func (m *Manager) executeDecision(ctx context.Context, decision *Decision, state *State) error {
 	policy := decision.Policy
 
 	m.logger.Info("executing scaling decision",
@@ -261,7 +261,7 @@ func (m *Manager) executeDecision(ctx context.Context, decision *ScalingDecision
 	}
 
 	// Record history
-	history := &ScalingHistory{
+	history := &History{
 		PolicyID:         &policy.ID,
 		PolicyName:       policy.Name,
 		Action:           decision.Action,
@@ -306,7 +306,7 @@ func (m *Manager) EvaluateNow(ctx context.Context) error {
 
 // EvaluatePolicyNow triggers an immediate evaluation of a specific policy.
 // If dryRun is true, the scaling action is not executed.
-func (m *Manager) EvaluatePolicyNow(ctx context.Context, policyID string, dryRun bool) (*ScalingDecision, error) {
+func (m *Manager) EvaluatePolicyNow(ctx context.Context, policyID string, dryRun bool) (*Decision, error) {
 	// Parse the policy ID
 	policy, err := m.repo.GetPolicyByName(ctx, policyID)
 	if err != nil {
@@ -330,7 +330,7 @@ func (m *Manager) EvaluatePolicyNow(ctx context.Context, policyID string, dryRun
 	// Get current state
 	state, err := m.repo.GetState(ctx, policy.ID)
 	if err != nil {
-		state = &ScalingState{
+		state = &State{
 			PolicyID:        policy.ID,
 			CurrentReplicas: policy.MinReplicas,
 		}
@@ -355,7 +355,7 @@ func (m *Manager) EvaluatePolicyNow(ctx context.Context, policyID string, dryRun
 		}
 	} else if decision.ShouldExecute && dryRun {
 		// Record dry-run history
-		history := &ScalingHistory{
+		history := &History{
 			PolicyID:         &policy.ID,
 			PolicyName:       policy.Name,
 			Action:           decision.Action,
