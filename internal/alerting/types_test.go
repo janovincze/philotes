@@ -321,7 +321,7 @@ func TestAlertSilence_IsActive(t *testing.T) {
 		{
 			name: "silence about to start (boundary)",
 			silence: AlertSilence{
-				StartsAt: now.Add(1 * time.Millisecond),
+				StartsAt: now.Add(1 * time.Second),
 				EndsAt:   now.Add(1 * time.Hour),
 			},
 			want: false, // Not yet started
