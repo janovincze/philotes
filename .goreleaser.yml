@@ -1,0 +1,131 @@
+# GoReleaser configuration for Philotes
+# https://goreleaser.com/customization/
+
+version: 2
+
+project_name: philotes
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: philotes-api
+    main: ./cmd/philotes-api
+    binary: philotes-api
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.buildTime={{.Date}}
+
+  - id: philotes-worker
+    main: ./cmd/philotes-worker
+    binary: philotes-worker
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.buildTime={{.Date}}
+
+  - id: philotes-cli
+    main: ./cmd/philotes-cli
+    binary: philotes
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.buildTime={{.Date}}
+
+archives:
+  - id: default
+    format: tar.gz
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- .Arch }}
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: 'checksums.txt'
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  use: github
+  sort: asc
+  groups:
+    - title: 'Features'
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
+      order: 0
+    - title: 'Bug Fixes'
+      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
+      order: 1
+    - title: 'Documentation'
+      regexp: '^.*?docs(\([[:word:]]+\))??!?:.+$'
+      order: 2
+    - title: 'Other'
+      order: 999
+  filters:
+    exclude:
+      - '^chore:'
+      - '^ci:'
+      - '^test:'
+      - Merge pull request
+      - Merge branch
+
+release:
+  github:
+    owner: janovincze
+    name: philotes
+  draft: false
+  prerelease: auto
+  mode: append
+  header: |
+    ## Philotes {{ .Tag }}
+
+    CDC Pipeline Platform - PostgreSQL to Apache Iceberg
+  footer: |
+    ---
+
+    **Full Changelog**: https://github.com/janovincze/philotes/compare/{{ .PreviousTag }}...{{ .Tag }}
+
+    ### Docker Images
+
+    ```bash
+    docker pull ghcr.io/janovincze/philotes-api:{{ .Version }}
+    docker pull ghcr.io/janovincze/philotes-worker:{{ .Version }}
+    docker pull ghcr.io/janovincze/philotes-cli:{{ .Version }}
+    ```

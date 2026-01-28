@@ -1,0 +1,66 @@
+# Codecov configuration for Philotes
+# https://docs.codecov.com/docs/codecov-yaml
+
+coverage:
+  status:
+    project:
+      default:
+        # Allow coverage to drop by 1% from base
+        target: auto
+        threshold: 1%
+        # Only fail if coverage is significantly lower
+        informational: false
+    patch:
+      default:
+        # Require 80% coverage on new/changed code
+        target: 80%
+        threshold: 0%
+        informational: false
+
+# Ignore certain paths from coverage
+ignore:
+  - "cmd/**/*"           # Entry points, minimal logic
+  - "**/*_test.go"       # Test files
+  - "**/mock_*.go"       # Generated mocks
+  - "**/mocks/**"        # Mock directories
+  - "test/**"            # Test utilities
+
+# Comment configuration
+comment:
+  layout: "header, diff, flags, components, files"
+  behavior: default
+  require_changes: true
+  require_base: false
+  require_head: true
+
+# Flag management
+flags:
+  unittests:
+    paths:
+      - internal/
+    carryforward: true
+
+# Component management (organize coverage by component)
+component_management:
+  default_rules:
+    statuses:
+      - type: project
+        target: auto
+        threshold: 1%
+  individual_components:
+    - component_id: api
+      name: API
+      paths:
+        - internal/api/**
+    - component_id: cdc
+      name: CDC Pipeline
+      paths:
+        - internal/cdc/**
+    - component_id: iceberg
+      name: Iceberg
+      paths:
+        - internal/iceberg/**
+
+# GitHub checks configuration
+github_checks:
+  annotations: true
