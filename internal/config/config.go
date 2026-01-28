@@ -38,6 +38,9 @@ type Config struct {
 	// Alerting configuration
 	Alerting AlertingConfig
 
+	// Scaling configuration
+	Scaling ScalingConfig
+
 	// Vault configuration for secrets management
 	Vault VaultConfig
 }
@@ -369,6 +372,24 @@ type AlertingConfig struct {
 	RetentionDays int
 }
 
+// ScalingConfig holds scaling engine configuration.
+type ScalingConfig struct {
+	// Enabled enables the scaling engine
+	Enabled bool
+
+	// EvaluationInterval is the interval between policy evaluations
+	EvaluationInterval time.Duration
+
+	// PrometheusURL is the URL of the Prometheus server to query metrics from
+	PrometheusURL string
+
+	// DefaultCooldownSeconds is the default cooldown period between scaling actions
+	DefaultCooldownSeconds int
+
+	// DryRun enables dry-run mode where scaling actions are logged but not executed
+	DryRun bool
+}
+
 // Load loads configuration from environment variables.
 func Load() (*Config, error) {
 	cfg := &Config{
@@ -469,6 +490,14 @@ func Load() (*Config, error) {
 			NotificationTimeout: getDurationEnv("PHILOTES_ALERTING_NOTIFICATION_TIMEOUT", 10*time.Second),
 			PrometheusURL:       getEnv("PHILOTES_PROMETHEUS_URL", "http://localhost:9090"),
 			RetentionDays:       getIntEnv("PHILOTES_ALERTING_RETENTION_DAYS", 30),
+		},
+
+		Scaling: ScalingConfig{
+			Enabled:                getBoolEnv("PHILOTES_SCALING_ENABLED", true),
+			EvaluationInterval:     getDurationEnv("PHILOTES_SCALING_EVALUATION_INTERVAL", 30*time.Second),
+			PrometheusURL:          getEnv("PHILOTES_PROMETHEUS_URL", "http://localhost:9090"),
+			DefaultCooldownSeconds: getIntEnv("PHILOTES_SCALING_DEFAULT_COOLDOWN", 300),
+			DryRun:                 getBoolEnv("PHILOTES_SCALING_DRY_RUN", false),
 		},
 
 		Vault: VaultConfig{
