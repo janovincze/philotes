@@ -156,7 +156,7 @@ func TestLoadTable(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(response) //nolint:errcheck
+		_ = json.NewEncoder(w).Encode(response) //nolint:errcheck // test helper, error handling not needed
 	}))
 	defer server.Close()
 

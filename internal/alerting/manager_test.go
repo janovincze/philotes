@@ -300,7 +300,7 @@ func TestManager_StartTwice(t *testing.T) {
 	if err := m.Start(ctx); err != nil {
 		t.Fatalf("First Start() error = %v", err)
 	}
-	defer func() { _ = m.Stop() }() //nolint:errcheck
+	defer func() { _ = m.Stop() }() //nolint:errcheck // test cleanup, error handling not needed
 
 	// Second start should return error
 	if err := m.Start(ctx); err == nil {

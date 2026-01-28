@@ -203,8 +203,8 @@ func GenerateFingerprint(ruleID uuid.UUID, labels map[string]string) string {
 	}
 
 	// Convert to JSON for consistent serialization
-	// Error is intentionally ignored as this map structure is always marshalable
-	jsonData, _ := json.Marshal(data) //nolint:errcheck
+	// json.Marshal cannot fail for this simple map[string]any structure
+	jsonData, _ := json.Marshal(data) //nolint:errcheck // marshal of simple map always succeeds
 
 	// Generate SHA256 hash
 	hash := sha256.Sum256(jsonData)
