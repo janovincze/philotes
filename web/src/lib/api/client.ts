@@ -65,9 +65,10 @@ async function request<T>(
     )
   }
 
-  // Handle empty responses
+  // Handle 204 No Content (common for DELETE operations)
+  // Returns undefined cast as T - callers expecting void will work correctly
   if (response.status === 204) {
-    return undefined as T
+    return undefined as unknown as T
   }
 
   return response.json()
@@ -99,7 +100,10 @@ export const apiClient = {
     })
   },
 
-  delete<T>(endpoint: string): Promise<T> {
-    return request<T>(endpoint, { method: "DELETE" })
+  /**
+   * DELETE request - returns void for 204 No Content responses
+   */
+  delete(endpoint: string): Promise<void> {
+    return request<void>(endpoint, { method: "DELETE" })
   },
 }

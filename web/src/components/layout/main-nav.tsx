@@ -58,6 +58,8 @@ export function MainNav({ collapsed = false }: MainNavProps) {
   return (
     <nav className="flex flex-col gap-1 px-2">
       {navItems.map((item) => {
+        // Use startsWith for nested route highlighting (e.g., /sources/new highlights "Sources")
+        // Exact match for root path to avoid always being active
         const isActive = pathname === item.href ||
           (item.href !== "/" && pathname.startsWith(item.href))
 
