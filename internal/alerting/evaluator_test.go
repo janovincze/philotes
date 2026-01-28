@@ -338,7 +338,7 @@ func TestEvaluator_Evaluate(t *testing.T) {
 					t.Errorf("unexpected path: %s", r.URL.Path)
 				}
 				w.Header().Set("Content-Type", "application/json")
-				json.NewEncoder(w).Encode(tt.response)
+				_ = json.NewEncoder(w).Encode(tt.response) //nolint:errcheck
 			}))
 			defer server.Close()
 
@@ -368,7 +368,7 @@ func TestEvaluator_Evaluate(t *testing.T) {
 func TestEvaluator_Evaluate_HTTPError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("internal server error"))
+		_, _ = w.Write([]byte("internal server error")) //nolint:errcheck
 	}))
 	defer server.Close()
 
@@ -390,7 +390,7 @@ func TestEvaluator_Evaluate_HTTPError(t *testing.T) {
 func TestEvaluator_Evaluate_InvalidJSON(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte("not valid json"))
+		_, _ = w.Write([]byte("not valid json")) //nolint:errcheck
 	}))
 	defer server.Close()
 
@@ -428,7 +428,7 @@ func TestEvaluator_Evaluate_LabelMerging(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response) //nolint:errcheck
 	}))
 	defer server.Close()
 

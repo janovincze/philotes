@@ -34,7 +34,7 @@ jobs:
 
       - name: Run golangci-lint (full)
         if: github.event_name == 'push'
-        run: golangci-lint run --timeout=5m || true
+        run: golangci-lint run --timeout=5m
 
   test:
     name: Test
