@@ -250,7 +250,10 @@ func (c *RESTCatalog) doRequest(ctx context.Context, method, url string, body an
 
 // parseError parses an error response from the REST API.
 func (c *RESTCatalog) parseError(resp *http.Response) error {
-	body, _ := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("catalog error (status %d): failed to read response body", resp.StatusCode)
+	}
 	return fmt.Errorf("catalog error (status %d): %s", resp.StatusCode, strings.TrimSpace(string(body)))
 }
 
