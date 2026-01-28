@@ -23,7 +23,7 @@ linters:
     - bodyclose      # Check HTTP response body is closed
     - noctx          # Check context usage
     - prealloc       # Find slice preallocation opportunities
-    - exportloopref  # Check for loop variable references
+    - copyloopvar    # Detect loop variable copies (replaced exportloopref)
 
 linters-settings:
   errcheck:
