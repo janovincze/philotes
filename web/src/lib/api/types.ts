@@ -294,7 +294,7 @@ export type DeploymentStatus =
   | "verifying"
   | "completed"
   | "failed"
-  | "cancelled"
+  | "canceled"
 
 export type DeploymentSize = "small" | "medium" | "large"
 

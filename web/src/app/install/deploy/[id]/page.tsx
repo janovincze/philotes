@@ -54,7 +54,7 @@ function StatusIcon({
       return <CheckCircle className={`${className} text-green-500`} />
     case "failed":
       return <XCircle className={`${className} text-red-500`} />
-    case "cancelled":
+    case "canceled":
       return <AlertCircle className={`${className} text-yellow-500`} />
     default:
       return <Loader2 className={`${className} text-primary animate-spin`} />
@@ -63,7 +63,7 @@ function StatusIcon({
 
 function DeploymentProgress({ status }: { status: DeploymentStatus }) {
   const currentIndex = getStepIndex(status)
-  const isTerminal = ["completed", "failed", "cancelled"].includes(status)
+  const isTerminal = ["completed", "failed", "canceled"].includes(status)
 
   return (
     <div className="space-y-4">
@@ -183,7 +183,7 @@ export default function DeploymentPage() {
 
   const isComplete = deployment.status === "completed"
   const isFailed = deployment.status === "failed"
-  const isCancelled = deployment.status === "cancelled"
+  const isCancelled = deployment.status === "canceled"
   const isTerminal = isComplete || isFailed || isCancelled
 
   return (

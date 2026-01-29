@@ -165,12 +165,12 @@ func (s *InstallerService) CancelDeployment(ctx context.Context, id uuid.UUID) e
 		return fmt.Errorf("failed to get deployment: %w", err)
 	}
 
-	// Check if can be cancelled
+	// Check if can be canceled
 	if deployment.Status == models.DeploymentStatusCompleted {
 		return &ConflictError{Message: "cannot cancel a completed deployment"}
 	}
 	if deployment.Status == models.DeploymentStatusCancelled {
-		return &ConflictError{Message: "deployment is already cancelled"}
+		return &ConflictError{Message: "deployment is already canceled"}
 	}
 	if deployment.Status == models.DeploymentStatusFailed {
 		return &ConflictError{Message: "deployment has already failed"}
@@ -182,11 +182,11 @@ func (s *InstallerService) CancelDeployment(ctx context.Context, id uuid.UUID) e
 	}
 
 	// Add cancellation log
-	if err := s.repo.AddLog(ctx, id, "info", "cancelled", "Deployment cancelled by user"); err != nil {
+	if err := s.repo.AddLog(ctx, id, "info", "canceled", "Deployment canceled by user"); err != nil {
 		s.logger.Warn("failed to add cancellation log", "deployment_id", id, "error", err)
 	}
 
-	s.logger.Info("deployment cancelled", "id", id)
+	s.logger.Info("deployment canceled", "id", id)
 	return nil
 }
 
@@ -267,10 +267,10 @@ func (s *InstallerService) GetCostEstimate(_ context.Context, providerID string,
 
 	// Calculate component costs (simplified - actual breakdown may vary)
 	// These are rough estimates based on typical distributions
-	estimate.ControlPlane = sizeConfig.MonthlyCostEUR * 0.2  // ~20% for control plane
-	estimate.Workers = sizeConfig.MonthlyCostEUR * 0.6       // ~60% for workers
-	estimate.Storage = sizeConfig.MonthlyCostEUR * 0.1       // ~10% for storage
-	estimate.LoadBalancer = sizeConfig.MonthlyCostEUR * 0.1  // ~10% for LB
+	estimate.ControlPlane = sizeConfig.MonthlyCostEUR * 0.2 // ~20% for control plane
+	estimate.Workers = sizeConfig.MonthlyCostEUR * 0.6      // ~60% for workers
+	estimate.Storage = sizeConfig.MonthlyCostEUR * 0.1      // ~10% for storage
+	estimate.LoadBalancer = sizeConfig.MonthlyCostEUR * 0.1 // ~10% for LB
 
 	return estimate, nil
 }

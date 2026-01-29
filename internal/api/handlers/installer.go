@@ -167,7 +167,7 @@ func (h *InstallerHandler) CancelDeployment(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "deployment cancelled"})
+	c.JSON(http.StatusOK, gin.H{"message": "deployment canceled"})
 }
 
 // DeleteDeployment deletes a deployment.

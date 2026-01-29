@@ -25,8 +25,8 @@ const (
 	DeploymentStatusCompleted DeploymentStatus = "completed"
 	// DeploymentStatusFailed indicates the deployment failed.
 	DeploymentStatusFailed DeploymentStatus = "failed"
-	// DeploymentStatusCancelled indicates the deployment was cancelled.
-	DeploymentStatusCancelled DeploymentStatus = "cancelled"
+	// DeploymentStatusCancelled indicates the deployment was canceled.
+	DeploymentStatusCancelled DeploymentStatus = "canceled"
 )
 
 // DeploymentSize represents the size preset for a deployment.
