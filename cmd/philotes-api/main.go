@@ -110,10 +110,26 @@ func main() {
 	// Create repositories
 	sourceRepo := repositories.NewSourceRepository(db)
 	pipelineRepo := repositories.NewPipelineRepository(db)
+	userRepo := repositories.NewUserRepository(db)
+	apiKeyRepo := repositories.NewAPIKeyRepository(db)
+	auditRepo := repositories.NewAuditRepository(db)
 
 	// Create services
 	sourceService := services.NewSourceService(sourceRepo, logger)
 	pipelineService := services.NewPipelineService(pipelineRepo, sourceRepo, logger)
+
+	// Create auth services (only if auth is enabled or admin credentials are provided)
+	var authService *services.AuthService
+	var apiKeyService *services.APIKeyService
+	if cfg.Auth.Enabled || cfg.Auth.AdminEmail != "" {
+		authService = services.NewAuthService(userRepo, auditRepo, &cfg.Auth, logger)
+		apiKeyService = services.NewAPIKeyService(apiKeyRepo, userRepo, auditRepo, &cfg.Auth, logger)
+
+		// Bootstrap admin user if configured
+		if err := authService.BootstrapAdmin(context.Background()); err != nil {
+			logger.Warn("failed to bootstrap admin user", "error", err)
+		}
+	}
 
 	// Create health manager
 	healthManager := health.NewManager(health.DefaultManagerConfig(), logger)
@@ -146,6 +162,8 @@ func main() {
 		HealthManager:   healthManager,
 		SourceService:   sourceService,
 		PipelineService: pipelineService,
+		AuthService:     authService,
+		APIKeyService:   apiKeyService,
 		CORSConfig: middleware.CORSConfig{
 			AllowedOrigins:   cfg.API.CORSOrigins,
 			AllowCredentials: false,

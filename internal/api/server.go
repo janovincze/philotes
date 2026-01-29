@@ -28,6 +28,8 @@ type Server struct {
 	pipelineService *services.PipelineService
 	alertService    *services.AlertService
 	metricsService  *services.MetricsService
+	authService     *services.AuthService
+	apiKeyService   *services.APIKeyService
 	httpServer      *http.Server
 	router          *gin.Engine
 }
@@ -54,6 +56,12 @@ type ServerConfig struct {
 
 	// MetricsService is the metrics service for pipeline metrics queries.
 	MetricsService *services.MetricsService
+
+	// AuthService is the auth service for authentication.
+	AuthService *services.AuthService
+
+	// APIKeyService is the API key service for API key management.
+	APIKeyService *services.APIKeyService
 
 	// CORSConfig is the CORS configuration.
 	CORSConfig middleware.CORSConfig
@@ -112,6 +120,8 @@ func NewServer(serverCfg ServerConfig) *Server {
 		pipelineService: serverCfg.PipelineService,
 		alertService:    serverCfg.AlertService,
 		metricsService:  serverCfg.MetricsService,
+		authService:     serverCfg.AuthService,
+		apiKeyService:   serverCfg.APIKeyService,
 		router:          router,
 	}
 
@@ -151,58 +161,103 @@ func (s *Server) registerRoutes() {
 		alertHandler = handlers.NewAlertHandler(s.alertService)
 	}
 
-	// Health endpoints (no versioning)
+	// Create auth handlers
+	var authHandler *handlers.AuthHandler
+	var apiKeyHandler *handlers.APIKeyHandler
+	if s.authService != nil {
+		authHandler = handlers.NewAuthHandler(s.authService)
+	}
+	if s.apiKeyService != nil {
+		apiKeyHandler = handlers.NewAPIKeyHandler(s.apiKeyService)
+	}
+
+	// Configure auth middleware
+	authConfig := middleware.AuthConfig{
+		Enabled:       s.cfg.Auth.Enabled,
+		AuthService:   s.authService,
+		APIKeyService: s.apiKeyService,
+	}
+
+	// Auth middleware: extracts credentials but doesn't require auth
+	authMiddleware := middleware.Authenticate(authConfig)
+
+	// RequireAuth middleware: requires authentication
+	requireAuth := middleware.RequireAuth(authConfig)
+
+	// Health endpoints (no versioning, no auth)
 	s.router.GET("/health", healthHandler.GetHealth)
 	s.router.GET("/health/live", healthHandler.GetLiveness)
 	s.router.GET("/health/ready", healthHandler.GetReadiness)
 
-	// Metrics endpoint (no versioning)
+	// Metrics endpoint (no versioning, no auth)
 	if s.cfg.Metrics.Enabled {
 		s.router.GET("/metrics", gin.WrapH(promhttp.Handler()))
 	}
 
 	// API v1 routes
 	v1 := s.router.Group("/api/v1")
+	v1.Use(authMiddleware) // Apply auth middleware to extract credentials
 	{
-		// System endpoints
+		// System endpoints (public)
 		v1.GET("/version", versionHandler.GetVersion)
 		v1.GET("/config", configHandler.GetConfig)
 
-		// Source endpoints
+		// Auth endpoints (registered by handler)
+		if authHandler != nil {
+			authHandler.Register(v1, requireAuth)
+		}
+
+		// API key endpoints (registered by handler)
+		if apiKeyHandler != nil {
+			apiKeyHandler.Register(v1, requireAuth)
+		}
+
+		// Source endpoints (protected when auth is enabled)
 		if sourceHandler != nil {
-			v1.POST("/sources", sourceHandler.Create)
-			v1.GET("/sources", sourceHandler.List)
-			v1.GET("/sources/:id", sourceHandler.Get)
-			v1.PUT("/sources/:id", sourceHandler.Update)
-			v1.DELETE("/sources/:id", sourceHandler.Delete)
-			v1.POST("/sources/:id/test", sourceHandler.TestConnection)
-			v1.GET("/sources/:id/tables", sourceHandler.DiscoverTables)
+			sources := v1.Group("/sources")
+			sources.Use(requireAuth)
+			{
+				sources.POST("", sourceHandler.Create)
+				sources.GET("", sourceHandler.List)
+				sources.GET("/:id", sourceHandler.Get)
+				sources.PUT("/:id", sourceHandler.Update)
+				sources.DELETE("/:id", sourceHandler.Delete)
+				sources.POST("/:id/test", sourceHandler.TestConnection)
+				sources.GET("/:id/tables", sourceHandler.DiscoverTables)
+			}
 		}
 
-		// Pipeline endpoints
+		// Pipeline endpoints (protected when auth is enabled)
 		if pipelineHandler != nil {
-			v1.POST("/pipelines", pipelineHandler.Create)
-			v1.GET("/pipelines", pipelineHandler.List)
-			v1.GET("/pipelines/:id", pipelineHandler.Get)
-			v1.PUT("/pipelines/:id", pipelineHandler.Update)
-			v1.DELETE("/pipelines/:id", pipelineHandler.Delete)
-			v1.POST("/pipelines/:id/start", pipelineHandler.Start)
-			v1.POST("/pipelines/:id/stop", pipelineHandler.Stop)
-			v1.GET("/pipelines/:id/status", pipelineHandler.GetStatus)
-			v1.POST("/pipelines/:id/tables", pipelineHandler.AddTableMapping)
-			v1.DELETE("/pipelines/:id/tables/:mappingId", pipelineHandler.RemoveTableMapping)
+			pipelines := v1.Group("/pipelines")
+			pipelines.Use(requireAuth)
+			{
+				pipelines.POST("", pipelineHandler.Create)
+				pipelines.GET("", pipelineHandler.List)
+				pipelines.GET("/:id", pipelineHandler.Get)
+				pipelines.PUT("/:id", pipelineHandler.Update)
+				pipelines.DELETE("/:id", pipelineHandler.Delete)
+				pipelines.POST("/:id/start", pipelineHandler.Start)
+				pipelines.POST("/:id/stop", pipelineHandler.Stop)
+				pipelines.GET("/:id/status", pipelineHandler.GetStatus)
+				pipelines.POST("/:id/tables", pipelineHandler.AddTableMapping)
+				pipelines.DELETE("/:id/tables/:mappingId", pipelineHandler.RemoveTableMapping)
+
+				// Pipeline metrics endpoints
+				if s.metricsService != nil {
+					metricsHandler := handlers.NewMetricsHandler(s.metricsService)
+					pipelines.GET("/:id/metrics", metricsHandler.GetPipelineMetrics)
+					pipelines.GET("/:id/metrics/history", metricsHandler.GetPipelineMetricsHistory)
+				}
+			}
 		}
 
-		// Pipeline metrics endpoints
-		if s.metricsService != nil {
-			metricsHandler := handlers.NewMetricsHandler(s.metricsService)
-			v1.GET("/pipelines/:id/metrics", metricsHandler.GetPipelineMetrics)
-			v1.GET("/pipelines/:id/metrics/history", metricsHandler.GetPipelineMetricsHistory)
-		}
-
-		// Alert endpoints
+		// Alert endpoints (protected when auth is enabled)
+		// Note: alertHandler.Register adds /alerts/* routes to the passed group
 		if alertHandler != nil {
-			alertHandler.Register(v1)
+			protected := v1.Group("")
+			protected.Use(requireAuth)
+			alertHandler.Register(protected)
 		}
 	}
 }

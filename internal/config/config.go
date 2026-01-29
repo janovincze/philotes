@@ -41,6 +41,9 @@ type Config struct {
 	// Scaling configuration
 	Scaling ScalingConfig
 
+	// Auth configuration
+	Auth AuthConfig
+
 	// Vault configuration for secrets management
 	Vault VaultConfig
 }
@@ -390,6 +393,30 @@ type ScalingConfig struct {
 	DryRun bool
 }
 
+// AuthConfig holds authentication configuration.
+type AuthConfig struct {
+	// Enabled enables authentication (disabled by default for development)
+	Enabled bool
+
+	// JWTSecret is the secret key for signing JWT tokens (min 32 chars)
+	JWTSecret string
+
+	// JWTExpiration is the JWT token expiration duration
+	JWTExpiration time.Duration
+
+	// APIKeyPrefix is the prefix for generated API keys
+	APIKeyPrefix string
+
+	// BCryptCost is the cost factor for bcrypt password hashing
+	BCryptCost int
+
+	// AdminEmail is the bootstrap admin user email (created on startup)
+	AdminEmail string
+
+	// AdminPassword is the bootstrap admin user password
+	AdminPassword string
+}
+
 // Load loads configuration from environment variables.
 func Load() (*Config, error) {
 	cfg := &Config{
@@ -498,6 +525,16 @@ func Load() (*Config, error) {
 			PrometheusURL:          getEnv("PHILOTES_PROMETHEUS_URL", "http://localhost:9090"),
 			DefaultCooldownSeconds: getIntEnv("PHILOTES_SCALING_DEFAULT_COOLDOWN", 300),
 			DryRun:                 getBoolEnv("PHILOTES_SCALING_DRY_RUN", false),
+		},
+
+		Auth: AuthConfig{
+			Enabled:       getBoolEnv("PHILOTES_AUTH_ENABLED", false),
+			JWTSecret:     getEnv("PHILOTES_AUTH_JWT_SECRET", ""),
+			JWTExpiration: getDurationEnv("PHILOTES_AUTH_JWT_EXPIRATION", 24*time.Hour),
+			APIKeyPrefix:  getEnv("PHILOTES_AUTH_API_KEY_PREFIX", "pk_"),
+			BCryptCost:    getIntEnv("PHILOTES_AUTH_BCRYPT_COST", 12),
+			AdminEmail:    getEnv("PHILOTES_AUTH_ADMIN_EMAIL", ""),
+			AdminPassword: getEnv("PHILOTES_AUTH_ADMIN_PASSWORD", ""),
 		},
 
 		Vault: VaultConfig{
