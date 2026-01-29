@@ -9,6 +9,8 @@ import (
 
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	pulumiconfig "github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
+
+	"github.com/janovincze/philotes/deployments/pulumi/pkg/sshkeys"
 )
 
 // Config holds all configuration for a Philotes deployment.
@@ -29,7 +31,15 @@ type Config struct {
 	StorageSizeGB int
 	// SSHPublicKey is the contents of the SSH public key.
 	SSHPublicKey string
+	// SSHPrivateKey is the SSH private key as a Pulumi StringOutput.
+	// Loaded from the configured source (pulumi secrets, vault, or file).
+	SSHPrivateKey pulumi.StringOutput
+	// SSHKeySource indicates where the SSH private key is loaded from.
+	SSHKeySource sshkeys.SSHKeySource
+
 	// SSHPrivateKeyPath is the path to the SSH private key file.
+	// Deprecated: Use SSHPrivateKey instead. Kept for backward compatibility
+	// when SSHKeySource is "file".
 	SSHPrivateKeyPath string
 }
 
@@ -169,6 +179,39 @@ func LoadConfig(ctx *pulumi.Context) (*Config, error) {
 		}
 	}
 
+	// Load SSH private key from configured source
+	sshKeySourceStr := cfg.Get("sshKeySource")
+	if sshKeySourceStr == "" {
+		sshKeySourceStr = "file" // Default to file for backward compatibility
+	}
+
+	sshKeySource, err := sshkeys.ParseSSHKeySource(sshKeySourceStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid sshKeySource: %w", err)
+	}
+
+	// Build options for the SSH key provider
+	sshKeyOpts := sshkeys.Options{
+		FilePath:        sshPrivateKeyPath,
+		VaultAddress:    cfg.Get("vaultAddress"),
+		VaultSecretPath: cfg.Get("vaultSecretPath"),
+		VaultAuthMethod: cfg.Get("vaultAuthMethod"),
+		VaultToken:      cfg.Get("vaultToken"),
+		VaultRole:       cfg.Get("vaultRole"),
+	}
+
+	// Create SSH key provider
+	sshKeyProvider, err := sshkeys.NewSSHKeyProvider(sshKeySource, sshKeyOpts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create SSH key provider: %w", err)
+	}
+
+	// Get the SSH private key
+	sshPrivateKey, err := sshKeyProvider.GetPrivateKey(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load SSH private key: %w", err)
+	}
+
 	return &Config{
 		Provider:          provider,
 		Region:            region,
@@ -178,7 +221,9 @@ func LoadConfig(ctx *pulumi.Context) (*Config, error) {
 		WorkerCount:       workerCount,
 		StorageSizeGB:     storageSizeGB,
 		SSHPublicKey:      string(sshPublicKey),
-		SSHPrivateKeyPath: sshPrivateKeyPath,
+		SSHPrivateKey:     sshPrivateKey,
+		SSHKeySource:      sshKeySource,
+		SSHPrivateKeyPath: sshPrivateKeyPath, // Kept for backward compatibility
 	}, nil
 }
 
