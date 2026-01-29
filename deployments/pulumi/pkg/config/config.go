@@ -41,6 +41,15 @@ type Config struct {
 	// Deprecated: Use SSHPrivateKey instead. Kept for backward compatibility
 	// when SSHKeySource is "file".
 	SSHPrivateKeyPath string
+
+	// ChartRegistry is the OCI registry URL for Helm charts.
+	// Example: oci://ghcr.io/janovincze/philotes/charts
+	ChartRegistry string
+	// ChartVersion is the version of the Philotes Helm chart to deploy.
+	ChartVersion string
+	// UseLocalCharts enables local chart paths for development.
+	// When true, uses ../charts/philotes instead of the OCI registry.
+	UseLocalCharts bool
 }
 
 // HetznerDefaults returns default values for Hetzner Cloud.
@@ -212,6 +221,23 @@ func LoadConfig(ctx *pulumi.Context) (*Config, error) {
 		return nil, fmt.Errorf("failed to load SSH private key: %w", err)
 	}
 
+	// Helm chart configuration
+	chartRegistry := cfg.Get("chartRegistry")
+	if chartRegistry == "" {
+		chartRegistry = "oci://ghcr.io/janovincze/philotes/charts"
+	}
+
+	chartVersion := cfg.Get("chartVersion")
+	if chartVersion == "" {
+		chartVersion = "0.1.0"
+	}
+
+	useLocalChartsStr := cfg.Get("useLocalCharts")
+	useLocalCharts := false
+	if useLocalChartsStr == "true" {
+		useLocalCharts = true
+	}
+
 	return &Config{
 		Provider:          provider,
 		Region:            region,
@@ -224,6 +250,9 @@ func LoadConfig(ctx *pulumi.Context) (*Config, error) {
 		SSHPrivateKey:     sshPrivateKey,
 		SSHKeySource:      sshKeySource,
 		SSHPrivateKeyPath: sshPrivateKeyPath, // Kept for backward compatibility
+		ChartRegistry:     chartRegistry,
+		ChartVersion:      chartVersion,
+		UseLocalCharts:    useLocalCharts,
 	}, nil
 }
 

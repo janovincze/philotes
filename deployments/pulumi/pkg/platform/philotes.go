@@ -1,6 +1,8 @@
 package platform
 
 import (
+	"fmt"
+
 	"github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes"
 	helmv4 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/helm/v4"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
@@ -71,21 +73,30 @@ func DeployPhilotes(ctx *pulumi.Context, cfg *config.Config, k8s *kubernetes.Pro
 		},
 	}
 
-	// Deploy from local chart or OCI registry depending on environment
-	// For local development, use the charts directory relative to repo root
-	// For production, this would use an OCI registry URL
-	chartPath := "../charts/philotes"
-	if cfg.Environment == "production" || cfg.Environment == "staging" {
-		// In production/staging, use versioned chart from registry
-		// TODO: Configure OCI registry URL when available
-		chartPath = "../charts/philotes"
+	// Deploy from local chart or OCI registry depending on configuration
+	var chartArgs helmv4.ChartArgs
+
+	if cfg.UseLocalCharts {
+		// Development: use local chart path
+		ctx.Log.Info("Using local Helm chart for development", nil)
+		chartArgs = helmv4.ChartArgs{
+			Chart:     pulumi.String("../charts/philotes"),
+			Values:    values,
+			Namespace: pulumi.String("philotes"),
+		}
+	} else {
+		// Production: use OCI registry with versioned chart
+		chartURL := fmt.Sprintf("%s/philotes", cfg.ChartRegistry)
+		ctx.Log.Info(fmt.Sprintf("Using Helm chart from OCI registry: %s:%s", chartURL, cfg.ChartVersion), nil)
+		chartArgs = helmv4.ChartArgs{
+			Chart:     pulumi.String(chartURL),
+			Version:   pulumi.String(cfg.ChartVersion),
+			Values:    values,
+			Namespace: pulumi.String("philotes"),
+		}
 	}
 
-	chart, err := helmv4.NewChart(ctx, cfg.ResourceName("philotes"), &helmv4.ChartArgs{
-		Chart:     pulumi.String(chartPath),
-		Values:    values,
-		Namespace: pulumi.String("philotes"),
-	}, pulumi.Provider(k8s))
+	chart, err := helmv4.NewChart(ctx, cfg.ResourceName("philotes"), &chartArgs, pulumi.Provider(k8s))
 	if err != nil {
 		return nil, err
 	}
