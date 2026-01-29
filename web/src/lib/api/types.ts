@@ -29,6 +29,35 @@ export interface CreateSourceInput {
   ssl_mode?: string
 }
 
+// Table Discovery Types
+
+export interface ColumnInfo {
+  name: string
+  type: string
+  nullable: boolean
+  primary_key: boolean
+  default?: string
+}
+
+export interface TableInfo {
+  schema: string
+  name: string
+  columns: ColumnInfo[]
+}
+
+export interface TableDiscoveryResponse {
+  tables: TableInfo[]
+  count: number
+}
+
+export interface ConnectionTestResult {
+  success: boolean
+  message: string
+  latency_ms?: number
+  server_info?: string
+  error_detail?: string
+}
+
 export interface TableMapping {
   id: string
   source_table: string
@@ -51,9 +80,17 @@ export interface Pipeline {
   stopped_at?: string
 }
 
+export interface CreateTableMappingInput {
+  schema?: string
+  table: string
+  enabled?: boolean
+  config?: Record<string, unknown>
+}
+
 export interface CreatePipelineInput {
   name: string
   source_id: string
+  tables?: CreateTableMappingInput[]
   config?: Record<string, unknown>
 }
 

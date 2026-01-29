@@ -1,5 +1,5 @@
 import { apiClient } from "./client"
-import type { Source, CreateSourceInput } from "./types"
+import type { Source, CreateSourceInput, TableDiscoveryResponse, ConnectionTestResult } from "./types"
 
 export const sourcesApi = {
   /**
@@ -40,8 +40,8 @@ export const sourcesApi = {
   /**
    * Test source connection
    */
-  testConnection(id: string): Promise<{ success: boolean; message: string }> {
-    return apiClient.post<{ success: boolean; message: string }>(
+  testConnection(id: string): Promise<ConnectionTestResult> {
+    return apiClient.post<ConnectionTestResult>(
       `/api/v1/sources/${id}/test`
     )
   },
@@ -49,7 +49,8 @@ export const sourcesApi = {
   /**
    * Discover tables from source
    */
-  discoverTables(id: string): Promise<string[]> {
-    return apiClient.get<string[]>(`/api/v1/sources/${id}/tables`)
+  discoverTables(id: string, schema?: string): Promise<TableDiscoveryResponse> {
+    const params = schema ? `?schema=${encodeURIComponent(schema)}` : ""
+    return apiClient.get<TableDiscoveryResponse>(`/api/v1/sources/${id}/tables${params}`)
   },
 }
