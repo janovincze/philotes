@@ -16,22 +16,25 @@ import (
 	"github.com/janovincze/philotes/internal/api/services"
 	"github.com/janovincze/philotes/internal/cdc/health"
 	"github.com/janovincze/philotes/internal/config"
+	"github.com/janovincze/philotes/internal/installer"
 	"github.com/janovincze/philotes/internal/metrics"
 )
 
 // Server is the HTTP API server.
 type Server struct {
-	cfg             *config.Config
-	logger          *slog.Logger
-	healthManager   *health.Manager
-	sourceService   *services.SourceService
-	pipelineService *services.PipelineService
-	alertService    *services.AlertService
-	metricsService  *services.MetricsService
-	authService     *services.AuthService
-	apiKeyService   *services.APIKeyService
-	httpServer      *http.Server
-	router          *gin.Engine
+	cfg              *config.Config
+	logger           *slog.Logger
+	healthManager    *health.Manager
+	sourceService    *services.SourceService
+	pipelineService  *services.PipelineService
+	alertService     *services.AlertService
+	metricsService   *services.MetricsService
+	installerService *services.InstallerService
+	installerLogHub  *installer.LogHub
+	authService      *services.AuthService
+	apiKeyService    *services.APIKeyService
+	httpServer       *http.Server
+	router           *gin.Engine
 }
 
 // ServerConfig holds server configuration options.
@@ -56,6 +59,12 @@ type ServerConfig struct {
 
 	// MetricsService is the metrics service for pipeline metrics queries.
 	MetricsService *services.MetricsService
+
+	// InstallerService is the installer service for deployment operations.
+	InstallerService *services.InstallerService
+
+	// InstallerLogHub is the WebSocket log hub for deployment streaming.
+	InstallerLogHub *installer.LogHub
 
 	// AuthService is the auth service for authentication.
 	AuthService *services.AuthService
@@ -113,16 +122,18 @@ func NewServer(serverCfg ServerConfig) *Server {
 
 	// Create server
 	s := &Server{
-		cfg:             serverCfg.Config,
-		logger:          logger.With("component", "api-server"),
-		healthManager:   serverCfg.HealthManager,
-		sourceService:   serverCfg.SourceService,
-		pipelineService: serverCfg.PipelineService,
-		alertService:    serverCfg.AlertService,
-		metricsService:  serverCfg.MetricsService,
-		authService:     serverCfg.AuthService,
-		apiKeyService:   serverCfg.APIKeyService,
-		router:          router,
+		cfg:              serverCfg.Config,
+		logger:           logger.With("component", "api-server"),
+		healthManager:    serverCfg.HealthManager,
+		sourceService:    serverCfg.SourceService,
+		pipelineService:  serverCfg.PipelineService,
+		alertService:     serverCfg.AlertService,
+		metricsService:   serverCfg.MetricsService,
+		installerService: serverCfg.InstallerService,
+		installerLogHub:  serverCfg.InstallerLogHub,
+		authService:      serverCfg.AuthService,
+		apiKeyService:    serverCfg.APIKeyService,
+		router:           router,
 	}
 
 	// Register routes
@@ -255,6 +266,29 @@ func (s *Server) registerRoutes() {
 			protected := v1.Group("")
 			protected.Use(requireAuth)
 			alertHandler.Register(protected)
+		}
+
+		// Installer endpoints
+		if s.installerService != nil {
+			installerHandler := handlers.NewInstallerHandler(s.installerService, s.installerLogHub)
+
+			// Provider endpoints (public - no auth required for browsing)
+			installerGroup := v1.Group("/installer")
+			installerGroup.GET("/providers", installerHandler.ListProviders)
+			installerGroup.GET("/providers/:id", installerHandler.GetProvider)
+			installerGroup.GET("/providers/:id/estimate", installerHandler.GetCostEstimate)
+
+			// Deployment endpoints (protected when auth is enabled)
+			deployments := installerGroup.Group("/deployments")
+			deployments.Use(requireAuth)
+			deployments.POST("", installerHandler.CreateDeployment)
+			deployments.GET("", installerHandler.ListDeployments)
+			deployments.GET("/:id", installerHandler.GetDeployment)
+			deployments.POST("/:id/cancel", installerHandler.CancelDeployment)
+			deployments.DELETE("/:id", installerHandler.DeleteDeployment)
+			deployments.GET("/:id/logs", installerHandler.GetDeploymentLogs)
+			// WebSocket endpoint for real-time log streaming
+			deployments.GET("/:id/logs/stream", installerHandler.StreamDeploymentLogs)
 		}
 	}
 }

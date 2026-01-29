@@ -283,3 +283,167 @@ export interface ScalingHistoryResponse {
 export interface ScalingEvaluationResponse {
   result: ScalingEvaluationResult
 }
+
+// Installer Types
+
+export type DeploymentStatus =
+  | "pending"
+  | "provisioning"
+  | "configuring"
+  | "deploying"
+  | "verifying"
+  | "completed"
+  | "failed"
+  | "cancelled"
+
+export type DeploymentSize = "small" | "medium" | "large"
+
+export interface ProviderRegion {
+  id: string
+  name: string
+  location: string
+  is_default?: boolean
+  is_available: boolean
+}
+
+export interface ProviderSize {
+  id: DeploymentSize
+  name: string
+  description: string
+  monthly_cost_eur: number
+  control_plane_type: string
+  worker_type: string
+  worker_count: number
+  storage_size_gb: number
+  vcpu: number
+  memory_gb: number
+}
+
+export interface Provider {
+  id: string
+  name: string
+  description: string
+  logo_url?: string
+  regions: ProviderRegion[]
+  sizes: ProviderSize[]
+}
+
+export interface DeploymentConfig {
+  domain?: string
+  ssh_public_key?: string
+  chart_version?: string
+  worker_count?: number
+  storage_size_gb?: number
+}
+
+export interface DeploymentOutput {
+  control_plane_ip?: string
+  load_balancer_ip?: string
+  kubeconfig?: string
+  dashboard_url?: string
+  api_url?: string
+}
+
+export interface Deployment {
+  id: string
+  user_id?: string
+  name: string
+  provider: string
+  region: string
+  size: DeploymentSize
+  status: DeploymentStatus
+  environment: string
+  config?: DeploymentConfig
+  outputs?: DeploymentOutput
+  pulumi_stack_name?: string
+  error_message?: string
+  started_at?: string
+  completed_at?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface DeploymentLog {
+  id: number
+  deployment_id: string
+  level: string
+  step?: string
+  message: string
+  timestamp: string
+}
+
+export interface CostEstimate {
+  provider: string
+  size: string
+  control_plane: number
+  workers: number
+  storage: number
+  load_balancer: number
+  total: number
+  currency: string
+}
+
+export interface ProviderCredentials {
+  // Hetzner
+  hetzner_token?: string
+  // Scaleway
+  scaleway_access_key?: string
+  scaleway_secret_key?: string
+  scaleway_project_id?: string
+  // OVH
+  ovh_endpoint?: string
+  ovh_application_key?: string
+  ovh_application_secret?: string
+  ovh_consumer_key?: string
+  ovh_service_name?: string
+  // Exoscale
+  exoscale_api_key?: string
+  exoscale_api_secret?: string
+  // Contabo
+  contabo_client_id?: string
+  contabo_client_secret?: string
+  contabo_api_user?: string
+  contabo_api_password?: string
+}
+
+export interface CreateDeploymentInput {
+  name: string
+  provider: string
+  region: string
+  size: DeploymentSize
+  environment?: string
+  domain?: string
+  ssh_public_key?: string
+  chart_version?: string
+  worker_count?: number
+  storage_size_gb?: number
+  credentials?: ProviderCredentials
+}
+
+// Installer API Responses
+
+export interface ProvidersResponse {
+  providers: Provider[]
+}
+
+export interface ProviderResponse {
+  provider: Provider
+}
+
+export interface DeploymentsResponse {
+  deployments: Deployment[]
+  total_count: number
+}
+
+export interface DeploymentResponse {
+  deployment: Deployment
+}
+
+export interface DeploymentLogsResponse {
+  logs: DeploymentLog[]
+  total_count: number
+}
+
+export interface CostEstimateResponse {
+  estimate: CostEstimate
+}
