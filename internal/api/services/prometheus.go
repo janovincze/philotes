@@ -63,7 +63,7 @@ func (c *PrometheusClient) QueryInstant(ctx context.Context, query string) ([]Pr
 	q.Set("query", query)
 	u.RawQuery = q.Encode()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -112,7 +112,7 @@ func (c *PrometheusClient) QueryRange(ctx context.Context, query string, start, 
 	q.Set("step", step.String())
 	u.RawQuery = q.Encode()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -181,7 +181,7 @@ func ParseTimeSeriesValues(results []PrometheusResult) []TimeSeriesPoint {
 		return nil
 	}
 
-	var points []TimeSeriesPoint
+	points := make([]TimeSeriesPoint, 0, len(results[0].Values))
 	for _, val := range results[0].Values {
 		if len(val) < 2 {
 			continue
@@ -227,7 +227,7 @@ func (c *PrometheusClient) IsAvailable(ctx context.Context) bool {
 	}
 	u.Path = "/-/healthy"
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), http.NoBody)
 	if err != nil {
 		return false
 	}

@@ -65,51 +65,58 @@ func (s *MetricsService) GetPipelineMetrics(ctx context.Context, pipelineID uuid
 
 	// Events total
 	go func() {
+		//nolint:gocritic // PromQL requires literal double quotes, not escaped quotes from %q
 		query := fmt.Sprintf(`sum(philotes_cdc_events_total{source="%s"})`, sourceName)
-		r, err := s.promClient.QueryInstant(ctx, query)
-		results <- metricResult{"events_total", GetScalarInt(r), err}
+		r, qErr := s.promClient.QueryInstant(ctx, query)
+		results <- metricResult{"events_total", GetScalarInt(r), qErr}
 	}()
 
 	// Events per second (rate over 1 minute)
 	go func() {
+		//nolint:gocritic // PromQL requires literal double quotes, not escaped quotes from %q
 		query := fmt.Sprintf(`sum(rate(philotes_cdc_events_total{source="%s"}[1m]))`, sourceName)
-		r, err := s.promClient.QueryInstant(ctx, query)
-		results <- metricResult{"events_per_sec", GetScalarValue(r), err}
+		r, qErr := s.promClient.QueryInstant(ctx, query)
+		results <- metricResult{"events_per_sec", GetScalarValue(r), qErr}
 	}()
 
 	// Current lag
 	go func() {
+		//nolint:gocritic // PromQL requires literal double quotes, not escaped quotes from %q
 		query := fmt.Sprintf(`max(philotes_cdc_lag_seconds{source="%s"})`, sourceName)
-		r, err := s.promClient.QueryInstant(ctx, query)
-		results <- metricResult{"lag_seconds", GetScalarValue(r), err}
+		r, qErr := s.promClient.QueryInstant(ctx, query)
+		results <- metricResult{"lag_seconds", GetScalarValue(r), qErr}
 	}()
 
 	// Buffer depth
 	go func() {
+		//nolint:gocritic // PromQL requires literal double quotes, not escaped quotes from %q
 		query := fmt.Sprintf(`sum(philotes_buffer_depth{source="%s"})`, sourceName)
-		r, err := s.promClient.QueryInstant(ctx, query)
-		results <- metricResult{"buffer_depth", GetScalarInt(r), err}
+		r, qErr := s.promClient.QueryInstant(ctx, query)
+		results <- metricResult{"buffer_depth", GetScalarInt(r), qErr}
 	}()
 
 	// Error count
 	go func() {
+		//nolint:gocritic // PromQL requires literal double quotes, not escaped quotes from %q
 		query := fmt.Sprintf(`sum(philotes_cdc_errors_total{source="%s"})`, sourceName)
-		r, err := s.promClient.QueryInstant(ctx, query)
-		results <- metricResult{"error_count", GetScalarInt(r), err}
+		r, qErr := s.promClient.QueryInstant(ctx, query)
+		results <- metricResult{"error_count", GetScalarInt(r), qErr}
 	}()
 
 	// Iceberg commits
 	go func() {
+		//nolint:gocritic // PromQL requires literal double quotes, not escaped quotes from %q
 		query := fmt.Sprintf(`sum(philotes_iceberg_commits_total{source="%s"})`, sourceName)
-		r, err := s.promClient.QueryInstant(ctx, query)
-		results <- metricResult{"iceberg_commits", GetScalarInt(r), err}
+		r, qErr := s.promClient.QueryInstant(ctx, query)
+		results <- metricResult{"iceberg_commits", GetScalarInt(r), qErr}
 	}()
 
 	// Iceberg bytes written
 	go func() {
+		//nolint:gocritic // PromQL requires literal double quotes, not escaped quotes from %q
 		query := fmt.Sprintf(`sum(philotes_iceberg_bytes_written_total{source="%s"})`, sourceName)
-		r, err := s.promClient.QueryInstant(ctx, query)
-		results <- metricResult{"iceberg_bytes", GetScalarInt(r), err}
+		r, qErr := s.promClient.QueryInstant(ctx, query)
+		results <- metricResult{"iceberg_bytes", GetScalarInt(r), qErr}
 	}()
 
 	// Collect results
@@ -169,7 +176,7 @@ func (s *MetricsService) GetPipelineMetrics(ctx context.Context, pipelineID uuid
 
 // getTableMetrics retrieves metrics for each table in the pipeline.
 func (s *MetricsService) getTableMetrics(ctx context.Context, sourceName string, tables []models.TableMapping) ([]models.TableMetrics, error) {
-	var result []models.TableMetrics
+	result := make([]models.TableMetrics, 0, len(tables))
 
 	for _, table := range tables {
 		tableName := fmt.Sprintf("%s.%s", table.SourceSchema, table.SourceTable)
@@ -180,16 +187,18 @@ func (s *MetricsService) getTableMetrics(ctx context.Context, sourceName string,
 		}
 
 		// Events for this table
+		//nolint:gocritic // PromQL requires literal double quotes, not escaped quotes from %q
 		query := fmt.Sprintf(`sum(philotes_cdc_events_total{source="%s",table="%s"})`, sourceName, tableName)
-		r, err := s.promClient.QueryInstant(ctx, query)
-		if err == nil {
+		r, qErr := s.promClient.QueryInstant(ctx, query)
+		if qErr == nil {
 			tm.EventsProcessed = GetScalarInt(r)
 		}
 
 		// Lag for this table
+		//nolint:gocritic // PromQL requires literal double quotes, not escaped quotes from %q
 		query = fmt.Sprintf(`philotes_cdc_lag_seconds{source="%s",table="%s"}`, sourceName, tableName)
-		r, err = s.promClient.QueryInstant(ctx, query)
-		if err == nil {
+		r, qErr = s.promClient.QueryInstant(ctx, query)
+		if qErr == nil {
 			tm.LagSeconds = GetScalarValue(r)
 		}
 
@@ -269,34 +278,38 @@ func (s *MetricsService) GetPipelineMetricsHistory(ctx context.Context, pipeline
 	}
 
 	// Get events rate history
+	//nolint:gocritic // PromQL requires literal double quotes, not escaped quotes from %q
 	eventsRateQuery := fmt.Sprintf(`sum(rate(philotes_cdc_events_total{source="%s"}[1m]))`, sourceName)
-	eventsResults, err := s.promClient.QueryRange(ctx, eventsRateQuery, tr.Start, tr.End, tr.Step)
-	if err != nil {
-		s.logger.Debug("failed to query events rate history", "error", err)
+	eventsResults, qErr := s.promClient.QueryRange(ctx, eventsRateQuery, tr.Start, tr.End, tr.Step)
+	if qErr != nil {
+		s.logger.Debug("failed to query events rate history", "error", qErr)
 	}
 	eventsPoints := ParseTimeSeriesValues(eventsResults)
 
 	// Get lag history
+	//nolint:gocritic // PromQL requires literal double quotes, not escaped quotes from %q
 	lagQuery := fmt.Sprintf(`max(philotes_cdc_lag_seconds{source="%s"})`, sourceName)
-	lagResults, err := s.promClient.QueryRange(ctx, lagQuery, tr.Start, tr.End, tr.Step)
-	if err != nil {
-		s.logger.Debug("failed to query lag history", "error", err)
+	lagResults, qErr := s.promClient.QueryRange(ctx, lagQuery, tr.Start, tr.End, tr.Step)
+	if qErr != nil {
+		s.logger.Debug("failed to query lag history", "error", qErr)
 	}
 	lagPoints := ParseTimeSeriesValues(lagResults)
 
 	// Get buffer depth history
+	//nolint:gocritic // PromQL requires literal double quotes, not escaped quotes from %q
 	bufferQuery := fmt.Sprintf(`sum(philotes_buffer_depth{source="%s"})`, sourceName)
-	bufferResults, err := s.promClient.QueryRange(ctx, bufferQuery, tr.Start, tr.End, tr.Step)
-	if err != nil {
-		s.logger.Debug("failed to query buffer depth history", "error", err)
+	bufferResults, qErr := s.promClient.QueryRange(ctx, bufferQuery, tr.Start, tr.End, tr.Step)
+	if qErr != nil {
+		s.logger.Debug("failed to query buffer depth history", "error", qErr)
 	}
 	bufferPoints := ParseTimeSeriesValues(bufferResults)
 
 	// Get error count history
+	//nolint:gocritic // PromQL requires literal double quotes, not escaped quotes from %q
 	errorQuery := fmt.Sprintf(`sum(philotes_cdc_errors_total{source="%s"})`, sourceName)
-	errorResults, err := s.promClient.QueryRange(ctx, errorQuery, tr.Start, tr.End, tr.Step)
-	if err != nil {
-		s.logger.Debug("failed to query error history", "error", err)
+	errorResults, qErr := s.promClient.QueryRange(ctx, errorQuery, tr.Start, tr.End, tr.Step)
+	if qErr != nil {
+		s.logger.Debug("failed to query error history", "error", qErr)
 	}
 	errorPoints := ParseTimeSeriesValues(errorResults)
 
@@ -349,7 +362,7 @@ func (s *MetricsService) GetPipelineMetricsHistory(ctx context.Context, pipeline
 	}
 
 	// Convert map to sorted slice
-	var dataPoints []models.MetricsDataPoint
+	dataPoints := make([]models.MetricsDataPoint, 0, len(dataPointsMap))
 	for _, dp := range dataPointsMap {
 		dataPoints = append(dataPoints, *dp)
 	}
