@@ -205,17 +205,9 @@ func (h *InstallerHandler) GetDeploymentLogs(c *gin.Context) {
 	// Parse optional limit parameter
 	limit := 100
 	if limitStr := c.Query("limit"); limitStr != "" {
-		var parsedLimit int
-		if _, err := uuid.Parse(limitStr); err == nil {
-			// Invalid format, use default
-		} else {
-			// Try to parse as int
-			if n, err := parsePositiveInt(limitStr); err == nil {
-				parsedLimit = n
-			}
-		}
-		if parsedLimit > 0 && parsedLimit <= 1000 {
-			limit = parsedLimit
+		// Try to parse as positive integer
+		if n, parseErr := parsePositiveInt(limitStr); parseErr == nil && n > 0 && n <= 1000 {
+			limit = n
 		}
 	}
 

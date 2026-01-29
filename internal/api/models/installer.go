@@ -124,16 +124,16 @@ type ProviderSize struct {
 
 // CreateDeploymentRequest represents a request to create a new deployment.
 type CreateDeploymentRequest struct {
-	Name          string            `json:"name" binding:"required,min=1,max=255"`
-	Provider      string            `json:"provider" binding:"required"`
-	Region        string            `json:"region" binding:"required"`
-	Size          DeploymentSize    `json:"size" binding:"required"`
-	Environment   string            `json:"environment,omitempty"`
-	Domain        string            `json:"domain,omitempty"`
-	SSHPublicKey  string            `json:"ssh_public_key,omitempty"`
-	ChartVersion  string            `json:"chart_version,omitempty"`
-	WorkerCount   int               `json:"worker_count,omitempty"`
-	StorageSizeGB int               `json:"storage_size_gb,omitempty"`
+	Name          string               `json:"name" binding:"required,min=1,max=255"`
+	Provider      string               `json:"provider" binding:"required"`
+	Region        string               `json:"region" binding:"required"`
+	Size          DeploymentSize       `json:"size" binding:"required"`
+	Environment   string               `json:"environment,omitempty"`
+	Domain        string               `json:"domain,omitempty"`
+	SSHPublicKey  string               `json:"ssh_public_key,omitempty"`
+	ChartVersion  string               `json:"chart_version,omitempty"`
+	WorkerCount   int                  `json:"worker_count,omitempty"`
+	StorageSizeGB int                  `json:"storage_size_gb,omitempty"`
 	Credentials   *ProviderCredentials `json:"credentials,omitempty"`
 }
 

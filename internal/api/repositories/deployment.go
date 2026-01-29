@@ -18,7 +18,7 @@ import (
 
 // Deployment repository errors.
 var (
-	ErrDeploymentNotFound  = errors.New("deployment not found")
+	ErrDeploymentNotFound   = errors.New("deployment not found")
 	ErrDeploymentNameExists = errors.New("deployment with this name already exists")
 )
 

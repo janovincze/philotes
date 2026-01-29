@@ -22,10 +22,10 @@ import (
 
 // DeploymentRunner manages Pulumi stack deployments using the Automation API.
 type DeploymentRunner struct {
-	workDir     string
-	pulumiOrg   string
-	logger      *slog.Logger
-	mu          sync.RWMutex
+	workDir      string
+	pulumiOrg    string
+	logger       *slog.Logger
+	mu           sync.RWMutex
 	activeStacks map[uuid.UUID]*auto.Stack
 }
 
@@ -133,8 +133,8 @@ func (r *DeploymentRunner) Deploy(ctx context.Context, cfg *DeploymentConfig, lo
 	// Clean up temp files when function exits
 	defer func() {
 		for _, f := range tempFiles {
-			if err := os.Remove(f); err != nil {
-				r.logger.Debug("failed to remove temp file", "path", f, "error", err)
+			if removeErr := os.Remove(f); removeErr != nil {
+				r.logger.Debug("failed to remove temp file", "path", f, "error", removeErr)
 			}
 		}
 	}()
@@ -266,7 +266,7 @@ func (r *DeploymentRunner) Cancel(deploymentID uuid.UUID) error {
 		return fmt.Errorf("failed to cancel deployment: %w", err)
 	}
 
-	r.logger.Info("deployment cancelled", "deployment_id", deploymentID)
+	r.logger.Info("deployment canceled", "deployment_id", deploymentID)
 	return nil
 }
 
@@ -321,9 +321,9 @@ func (r *DeploymentRunner) configureStack(ctx context.Context, stack auto.Stack,
 			configs["philotes:chartVersion"] = cfg.Config.ChartVersion
 		}
 		if cfg.Config.SSHPublicKey != "" {
-			// Write SSH public key to a temp file
-			sshKeyPath := filepath.Join(os.TempDir(), fmt.Sprintf("philotes-%s.pub", cfg.DeploymentID.String()[:8]))
-			if err := os.WriteFile(sshKeyPath, []byte(cfg.Config.SSHPublicKey), 0600); err != nil {
+			// Write SSH public key to a temp file (0o644 permissions for public key)
+			sshKeyPath := filepath.Join(os.TempDir(), fmt.Sprintf("philotes-%s.pub", cfg.DeploymentID.String()))
+			if err := os.WriteFile(sshKeyPath, []byte(cfg.Config.SSHPublicKey), 0o644); err != nil {
 				return nil, fmt.Errorf("failed to write SSH public key: %w", err)
 			}
 			configs["philotes:sshPublicKeyPath"] = sshKeyPath

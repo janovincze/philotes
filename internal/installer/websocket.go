@@ -174,7 +174,9 @@ func (h *LogHub) HandleWebSocket(w http.ResponseWriter, r *http.Request, deploym
 		Message:      "Connected to deployment log stream",
 	}
 	if data, err := json.Marshal(msg); err == nil {
-		conn.WriteMessage(websocket.TextMessage, data)
+		if err := conn.WriteMessage(websocket.TextMessage, data); err != nil {
+			h.logger.Debug("failed to send connection confirmation", "error", err)
+		}
 	}
 
 	// Handle connection lifecycle in a goroutine
@@ -192,8 +194,7 @@ func (h *LogHub) handleConnection(deploymentID uuid.UUID, conn *websocket.Conn) 
 
 	// Set up ping/pong to detect dead connections
 	conn.SetPongHandler(func(string) error {
-		conn.SetReadDeadline(time.Now().Add(60 * time.Second))
-		return nil
+		return conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 	})
 
 	// Start ping ticker
@@ -211,12 +212,9 @@ func (h *LogHub) handleConnection(deploymentID uuid.UUID, conn *websocket.Conn) 
 	}()
 
 	// Send pings periodically
-	for {
-		select {
-		case <-ticker.C:
-			if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-				return
-			}
+	for range ticker.C {
+		if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+			return
 		}
 	}
 }
@@ -292,8 +290,8 @@ func (o *DeploymentOrchestrator) StartDeployment(ctx context.Context, cfg *Deplo
 func (o *DeploymentOrchestrator) CancelDeployment(deploymentID uuid.UUID) error {
 	err := o.runner.Cancel(deploymentID)
 	if err == nil {
-		o.hub.BroadcastStatus(deploymentID, "cancelled")
-		o.hub.BroadcastLog(deploymentID, "warn", "cancelled", "Deployment was cancelled by user")
+		o.hub.BroadcastStatus(deploymentID, "canceled")
+		o.hub.BroadcastLog(deploymentID, "warn", "canceled", "Deployment was canceled by user")
 	}
 	return err
 }

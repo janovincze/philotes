@@ -135,8 +135,8 @@ export function useDeploymentLogsStream(deploymentId: string) {
           setConnected(true)
         }
       },
-      () => {
-        setError("WebSocket connection error")
+      (event: Event) => {
+        setError(`WebSocket connection error: ${event.type}`)
         setConnected(false)
       },
       () => {
