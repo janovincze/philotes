@@ -137,3 +137,112 @@ export interface PipelineMetricsResponse {
 export interface MetricsHistoryResponse {
   history: MetricsHistory
 }
+
+// Scaling Types
+
+export type ScalingTargetType = "cdc-worker" | "trino" | "risingwave" | "nodes"
+export type ScalingAction = "scale_up" | "scale_down" | "scheduled" | "manual"
+export type RuleOperator = "gt" | "lt" | "gte" | "lte" | "eq"
+
+export interface ScalingRule {
+  metric: string
+  operator: RuleOperator
+  threshold: number
+  duration_seconds: number
+  scale_by: number
+}
+
+export interface ScalingSchedule {
+  cron_expression: string
+  desired_replicas: number
+  timezone: string
+  enabled: boolean
+}
+
+export interface ScalingPolicy {
+  id: string
+  name: string
+  target_type: ScalingTargetType
+  target_id?: string
+  min_replicas: number
+  max_replicas: number
+  cooldown_seconds: number
+  max_hourly_cost?: number
+  scale_to_zero: boolean
+  enabled: boolean
+  scale_up_rules: ScalingRule[]
+  scale_down_rules: ScalingRule[]
+  schedules: ScalingSchedule[]
+  created_at: string
+  updated_at: string
+}
+
+export interface ScalingState {
+  policy_id: string
+  current_replicas: number
+  last_scale_time?: string
+  last_scale_action?: string
+  pending_conditions?: Record<string, string>
+  updated_at: string
+}
+
+export interface ScalingHistory {
+  id: string
+  policy_id?: string
+  policy_name: string
+  action: ScalingAction
+  target_type: ScalingTargetType
+  target_id?: string
+  previous_replicas: number
+  new_replicas: number
+  reason: string
+  triggered_by: string
+  dry_run: boolean
+  executed_at: string
+}
+
+export interface ScalingEvaluationResult {
+  policy_id: string
+  should_scale: boolean
+  recommended_action?: ScalingAction
+  recommended_replicas?: number
+  current_replicas: number
+  reason: string
+  triggered_rules: string[]
+  dry_run: boolean
+}
+
+export interface CreateScalingPolicyInput {
+  name: string
+  target_type: ScalingTargetType
+  target_id?: string
+  min_replicas: number
+  max_replicas: number
+  cooldown_seconds?: number
+  max_hourly_cost?: number
+  scale_to_zero?: boolean
+  enabled?: boolean
+  scale_up_rules?: ScalingRule[]
+  scale_down_rules?: ScalingRule[]
+  schedules?: ScalingSchedule[]
+}
+
+export interface ScalingPolicyResponse {
+  policy: ScalingPolicy
+}
+
+export interface ScalingPoliciesResponse {
+  policies: ScalingPolicy[]
+}
+
+export interface ScalingStateResponse {
+  state: ScalingState
+}
+
+export interface ScalingHistoryResponse {
+  history: ScalingHistory[]
+}
+
+export interface ScalingEvaluationResponse {
+  result: ScalingEvaluationResult
+}

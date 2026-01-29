@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   Database,
   GitBranch,
+  Scale,
   Bell,
   Settings,
   type LucideIcon,
@@ -35,6 +36,11 @@ const navItems: NavItem[] = [
     title: "Pipelines",
     href: "/pipelines",
     icon: GitBranch,
+  },
+  {
+    title: "Scaling",
+    href: "/scaling",
+    icon: Scale,
   },
   {
     title: "Alerts",
