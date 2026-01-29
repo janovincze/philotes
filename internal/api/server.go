@@ -27,6 +27,7 @@ type Server struct {
 	sourceService   *services.SourceService
 	pipelineService *services.PipelineService
 	alertService    *services.AlertService
+	metricsService  *services.MetricsService
 	httpServer      *http.Server
 	router          *gin.Engine
 }
@@ -50,6 +51,9 @@ type ServerConfig struct {
 
 	// AlertService is the alert service for alerting CRUD operations.
 	AlertService *services.AlertService
+
+	// MetricsService is the metrics service for pipeline metrics queries.
+	MetricsService *services.MetricsService
 
 	// CORSConfig is the CORS configuration.
 	CORSConfig middleware.CORSConfig
@@ -107,6 +111,7 @@ func NewServer(serverCfg ServerConfig) *Server {
 		sourceService:   serverCfg.SourceService,
 		pipelineService: serverCfg.PipelineService,
 		alertService:    serverCfg.AlertService,
+		metricsService:  serverCfg.MetricsService,
 		router:          router,
 	}
 
@@ -186,6 +191,13 @@ func (s *Server) registerRoutes() {
 			v1.GET("/pipelines/:id/status", pipelineHandler.GetStatus)
 			v1.POST("/pipelines/:id/tables", pipelineHandler.AddTableMapping)
 			v1.DELETE("/pipelines/:id/tables/:mappingId", pipelineHandler.RemoveTableMapping)
+		}
+
+		// Pipeline metrics endpoints
+		if s.metricsService != nil {
+			metricsHandler := handlers.NewMetricsHandler(s.metricsService)
+			v1.GET("/pipelines/:id/metrics", metricsHandler.GetPipelineMetrics)
+			v1.GET("/pipelines/:id/metrics/history", metricsHandler.GetPipelineMetricsHistory)
 		}
 
 		// Alert endpoints
