@@ -127,8 +127,8 @@ func Deploy(ctx *pulumi.Context, cp provider.CloudProvider, cfg *config.Config) 
 
 	// Retrieve kubeconfig from control plane
 	kubeconfig, err := cluster.GetKubeconfig(ctx, cfg.ResourceName("cluster"), cluster.KubeconfigOptions{
-		ControlPlaneIP:    controlPlane.PublicIP,
-		SSHPrivateKeyPath: cfg.SSHPrivateKeyPath,
+		ControlPlaneIP: controlPlane.PublicIP,
+		SSHPrivateKey:  cfg.SSHPrivateKey,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("kubeconfig retrieval failed: %w", err)

@@ -2,7 +2,6 @@ package cluster
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/pulumi/pulumi-command/sdk/go/command/remote"
@@ -13,8 +12,9 @@ import (
 type KubeconfigOptions struct {
 	// ControlPlaneIP is the public IP of the control plane node.
 	ControlPlaneIP pulumi.StringOutput
-	// SSHPrivateKeyPath is the path to the SSH private key file (on the machine running Pulumi).
-	SSHPrivateKeyPath string
+	// SSHPrivateKey is the SSH private key content as a Pulumi StringOutput.
+	// The key is loaded securely from Pulumi secrets, Vault, or a local file.
+	SSHPrivateKey pulumi.StringOutput
 	// DependsOn is a list of resources that must be created first.
 	DependsOn []pulumi.Resource
 }
@@ -22,10 +22,9 @@ type KubeconfigOptions struct {
 // GetKubeconfig retrieves the kubeconfig from the K3s control plane node.
 // It replaces the internal cluster address with the public IP for external access.
 func GetKubeconfig(ctx *pulumi.Context, name string, opts KubeconfigOptions) (pulumi.StringOutput, error) {
-	// Read the SSH private key content
-	privateKeyContent, err := os.ReadFile(opts.SSHPrivateKeyPath)
-	if err != nil {
-		return pulumi.StringOutput{}, fmt.Errorf("failed to read SSH private key from %s: %w", opts.SSHPrivateKeyPath, err)
+	// Validate SSH key is provided
+	if opts.SSHPrivateKey == (pulumi.StringOutput{}) {
+		return pulumi.StringOutput{}, fmt.Errorf("SSH private key is required")
 	}
 
 	// Use remote command to fetch kubeconfig from the control plane
@@ -33,7 +32,7 @@ func GetKubeconfig(ctx *pulumi.Context, name string, opts KubeconfigOptions) (pu
 		Connection: &remote.ConnectionArgs{
 			Host:       opts.ControlPlaneIP,
 			User:       pulumi.String("root"),
-			PrivateKey: pulumi.String(string(privateKeyContent)),
+			PrivateKey: opts.SSHPrivateKey,
 		},
 		Create: pulumi.String("cat /etc/rancher/k3s/k3s.yaml"),
 		// Triggers re-read if the control plane IP changes
