@@ -255,7 +255,8 @@ func (s *OAuthService) HandleCallback(
 	}
 	defer func() {
 		if err != nil {
-			_ = tx.Rollback()
+			//nolint:errcheck // Rollback error is intentionally ignored in defer; already returning original error
+			tx.Rollback()
 		}
 	}()
 
