@@ -111,6 +111,7 @@ const (
 	AuditActionLogout        = "logout"
 	AuditActionAPIKeyCreated = "api_key_created"
 	AuditActionAPIKeyRevoked = "api_key_revoked"
+	AuditActionAPIKeyDeleted = "api_key_deleted"
 	AuditActionAPIKeyUsed    = "api_key_used"
 	AuditActionUserCreated   = "user_created"
 	AuditActionUserUpdated   = "user_updated"

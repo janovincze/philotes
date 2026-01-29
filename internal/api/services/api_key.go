@@ -153,12 +153,14 @@ func (s *APIKeyService) Validate(ctx context.Context, plaintextKey string) (*mod
 		return nil, nil, ErrUserInactive
 	}
 
-	// Update last used timestamp asynchronously
-	go func() {
-		if err := s.apiKeyRepo.UpdateLastUsed(context.Background(), apiKey.ID); err != nil {
-			s.logger.Warn("failed to update api key last used", "api_key_id", apiKey.ID, "error", err)
+	// Update last used timestamp asynchronously with timeout to prevent goroutine leaks
+	go func(apiKeyID uuid.UUID) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := s.apiKeyRepo.UpdateLastUsed(ctx, apiKeyID); err != nil {
+			s.logger.Warn("failed to update api key last used", "api_key_id", apiKeyID, "error", err)
 		}
-	}()
+	}(apiKey.ID)
 
 	return user, apiKey, nil
 }
@@ -246,9 +248,8 @@ func (s *APIKeyService) Delete(ctx context.Context, id, userID uuid.UUID, userRo
 	}
 
 	// Log audit event
-	s.logAuditEvent(ctx, &userID, &id, models.AuditActionAPIKeyRevoked, ipAddress, userAgent, map[string]interface{}{
+	s.logAuditEvent(ctx, &userID, &id, models.AuditActionAPIKeyDeleted, ipAddress, userAgent, map[string]interface{}{
 		"key_name": apiKey.Name,
-		"deleted":  true,
 	})
 
 	s.logger.Info("api key deleted", "api_key_id", id, "user_id", userID)

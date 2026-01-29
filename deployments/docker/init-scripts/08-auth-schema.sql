@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS philotes.api_keys (
     user_id UUID REFERENCES philotes.users(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
     key_prefix VARCHAR(16) NOT NULL,
-    key_hash VARCHAR(64) NOT NULL,
+    key_hash CHAR(64) NOT NULL,
     permissions TEXT[] NOT NULL DEFAULT '{}',
     last_used_at TIMESTAMPTZ,
     expires_at TIMESTAMPTZ,
