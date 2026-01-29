@@ -89,6 +89,9 @@ export function formatEventsPerSecond(eventsPerSec: number): string {
  */
 export function formatChartTime(timestamp: string): string {
   const date = new Date(timestamp)
+  if (isNaN(date.getTime())) {
+    return "--:--"
+  }
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
 }
 
@@ -97,6 +100,9 @@ export function formatChartTime(timestamp: string): string {
  */
 export function formatRelativeTime(timestamp: string): string {
   const date = new Date(timestamp)
+  if (isNaN(date.getTime())) {
+    return "—"
+  }
   const now = new Date()
   const diffMs = now.getTime() - date.getTime()
   const diffSecs = Math.floor(diffMs / 1000)

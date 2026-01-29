@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sort"
 	"time"
 
 	"github.com/google/uuid"
@@ -374,15 +375,11 @@ func (s *MetricsService) GetPipelineMetricsHistory(ctx context.Context, pipeline
 	return history, nil
 }
 
-// sortDataPoints sorts data points by timestamp.
+// sortDataPoints sorts data points by timestamp using Go's optimized sort.
 func sortDataPoints(points []models.MetricsDataPoint) {
-	for i := 0; i < len(points)-1; i++ {
-		for j := i + 1; j < len(points); j++ {
-			if points[j].Timestamp.Before(points[i].Timestamp) {
-				points[i], points[j] = points[j], points[i]
-			}
-		}
-	}
+	sort.Slice(points, func(i, j int) bool {
+		return points[i].Timestamp.Before(points[j].Timestamp)
+	})
 }
 
 // formatDurationMetrics formats a duration as a human-readable string.

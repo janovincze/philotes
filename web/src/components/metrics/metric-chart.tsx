@@ -13,6 +13,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { formatChartTime } from "@/lib/utils/format-metrics"
 
+// Using a flexible type for chart data - recharts requires dynamic property access
+// and TypeScript's index signature requirements prevent using stricter types here
 interface MetricChartProps {
   title?: string
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
