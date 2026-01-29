@@ -125,6 +125,13 @@ After initial implementation, the following issues from the code review were add
 11. **uuid.Parse error handling** - Added proper error handling for uuid.Parse calls in repositories
 12. **RowsAffected error handling** - Added proper error handling for result.RowsAffected() calls
 
+### CI Lint Fixes (Round 3)
+13. **uuid.Parse in scan functions** - Added error handling with parseErr pattern in scanCredential/scanCredentialFromRows
+14. **tx.Rollback handling** - Added nolint:errcheck directive for defer rollback (intentional ignore)
+15. **rangeValCopy** - Changed to index-based loop access in ListCredentials to avoid copying large struct
+16. **paramTypeCombine** - Combined int64 return types in CleanupExpired signature
+17. **gofmt formatting** - Fixed struct field alignment in oauth.go models
+
 ## Configuration Required
 
 To enable OAuth, set these environment variables:
