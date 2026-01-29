@@ -296,9 +296,11 @@ func (s *AuthService) logAuditEvent(ctx context.Context, userID, apiKeyID *uuid.
 		Details:   details,
 	}
 
-	// Log asynchronously to not block the main flow
+	// Log asynchronously with timeout to prevent goroutine leaks
 	go func() {
-		if err := s.auditRepo.Create(context.Background(), log); err != nil {
+		auditCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := s.auditRepo.Create(auditCtx, log); err != nil {
 			s.logger.Warn("failed to create audit log", "action", action, "error", err)
 		}
 	}()

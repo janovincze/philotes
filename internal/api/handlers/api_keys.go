@@ -149,7 +149,7 @@ func (h *APIKeyHandler) Delete(c *gin.Context) {
 	ipAddress := middleware.GetClientIP(c)
 	userAgent := middleware.GetUserAgent(c)
 
-	if err := h.apiKeyService.Delete(c.Request.Context(), id, authContext.User.ID, ipAddress, userAgent); err != nil {
+	if err := h.apiKeyService.Delete(c.Request.Context(), id, authContext.User.ID, authContext.User.Role, ipAddress, userAgent); err != nil {
 		h.respondWithError(c, err)
 		return
 	}
@@ -181,7 +181,7 @@ func (h *APIKeyHandler) Revoke(c *gin.Context) {
 	ipAddress := middleware.GetClientIP(c)
 	userAgent := middleware.GetUserAgent(c)
 
-	if err := h.apiKeyService.Revoke(c.Request.Context(), id, authContext.User.ID, ipAddress, userAgent); err != nil {
+	if err := h.apiKeyService.Revoke(c.Request.Context(), id, authContext.User.ID, authContext.User.Role, ipAddress, userAgent); err != nil {
 		h.respondWithError(c, err)
 		return
 	}

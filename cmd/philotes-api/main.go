@@ -122,6 +122,12 @@ func main() {
 	var authService *services.AuthService
 	var apiKeyService *services.APIKeyService
 	if cfg.Auth.Enabled || cfg.Auth.AdminEmail != "" {
+		// Validate JWT secret when auth is enabled
+		if cfg.Auth.Enabled && len(cfg.Auth.JWTSecret) < 32 {
+			logger.Error("JWT secret must be at least 32 characters when auth is enabled")
+			os.Exit(1)
+		}
+
 		authService = services.NewAuthService(userRepo, auditRepo, &cfg.Auth, logger)
 		apiKeyService = services.NewAPIKeyService(apiKeyRepo, userRepo, auditRepo, &cfg.Auth, logger)
 

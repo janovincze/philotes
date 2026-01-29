@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -65,14 +66,37 @@ func (s *APIKeyService) Create(ctx context.Context, userID uuid.UUID, req *model
 		return nil, fmt.Errorf("failed to get user: %w", err)
 	}
 
-	// Generate API key
-	plaintextKey, keyPrefix, keyHash := s.generateAPIKey()
+	// Get user's allowed permissions based on role
+	userPermissions := models.RolePermissions[user.Role]
+	userPermSet := make(map[string]bool)
+	for _, p := range userPermissions {
+		userPermSet[p] = true
+	}
 
-	// Determine permissions
+	// Determine and validate permissions
 	permissions := req.Permissions
 	if len(permissions) == 0 {
 		// Default to user's role permissions
-		permissions = models.RolePermissions[user.Role]
+		permissions = userPermissions
+	} else {
+		// Validate requested permissions are subset of user's permissions
+		var invalidPerms []string
+		for _, p := range permissions {
+			if !userPermSet[p] {
+				invalidPerms = append(invalidPerms, p)
+			}
+		}
+		if len(invalidPerms) > 0 {
+			return nil, &ValidationError{Errors: []models.FieldError{
+				{Field: "permissions", Message: fmt.Sprintf("cannot grant permissions you don't have: %v", invalidPerms)},
+			}}
+		}
+	}
+
+	// Generate API key
+	plaintextKey, keyPrefix, keyHash, err := s.generateAPIKey()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate api key: %w", err)
 	}
 
 	// Create API key in database
@@ -164,7 +188,7 @@ func (s *APIKeyService) Get(ctx context.Context, id uuid.UUID) (*models.APIKey, 
 }
 
 // Revoke deactivates an API key.
-func (s *APIKeyService) Revoke(ctx context.Context, id uuid.UUID, userID uuid.UUID, ipAddress, userAgent string) error {
+func (s *APIKeyService) Revoke(ctx context.Context, id uuid.UUID, userID uuid.UUID, userRole models.UserRole, ipAddress, userAgent string) error {
 	// Get the API key first to verify ownership
 	apiKey, err := s.apiKeyRepo.GetByID(ctx, id)
 	if err != nil {
@@ -174,9 +198,8 @@ func (s *APIKeyService) Revoke(ctx context.Context, id uuid.UUID, userID uuid.UU
 		return fmt.Errorf("failed to get api key: %w", err)
 	}
 
-	// Verify ownership (unless admin)
-	if apiKey.UserID != userID {
-		// TODO: Check if user is admin
+	// Verify ownership (admins can revoke any key)
+	if apiKey.UserID != userID && userRole != models.RoleAdmin {
 		return &NotFoundError{Resource: "api_key", ID: id.String()}
 	}
 
@@ -199,7 +222,7 @@ func (s *APIKeyService) Revoke(ctx context.Context, id uuid.UUID, userID uuid.UU
 }
 
 // Delete permanently deletes an API key.
-func (s *APIKeyService) Delete(ctx context.Context, id uuid.UUID, userID uuid.UUID, ipAddress, userAgent string) error {
+func (s *APIKeyService) Delete(ctx context.Context, id uuid.UUID, userID uuid.UUID, userRole models.UserRole, ipAddress, userAgent string) error {
 	// Get the API key first to verify ownership
 	apiKey, err := s.apiKeyRepo.GetByID(ctx, id)
 	if err != nil {
@@ -209,8 +232,8 @@ func (s *APIKeyService) Delete(ctx context.Context, id uuid.UUID, userID uuid.UU
 		return fmt.Errorf("failed to get api key: %w", err)
 	}
 
-	// Verify ownership (unless admin)
-	if apiKey.UserID != userID {
+	// Verify ownership (admins can delete any key)
+	if apiKey.UserID != userID && userRole != models.RoleAdmin {
 		return &NotFoundError{Resource: "api_key", ID: id.String()}
 	}
 
@@ -234,12 +257,12 @@ func (s *APIKeyService) Delete(ctx context.Context, id uuid.UUID, userID uuid.UU
 }
 
 // generateAPIKey generates a new API key.
-// Returns: plaintext key, key prefix (first 8 chars), key hash
-func (s *APIKeyService) generateAPIKey() (string, string, string) {
+// Returns: plaintext key, key prefix (first 8 chars), key hash, error
+func (s *APIKeyService) generateAPIKey() (string, string, string, error) {
 	// Generate 32 random bytes
 	randomBytes := make([]byte, 32)
 	if _, err := rand.Read(randomBytes); err != nil {
-		panic(fmt.Sprintf("failed to generate random bytes: %v", err))
+		return "", "", "", fmt.Errorf("failed to generate random bytes: %w", err)
 	}
 
 	// Encode as hex
@@ -255,7 +278,7 @@ func (s *APIKeyService) generateAPIKey() (string, string, string) {
 	// Hash the full key
 	keyHash := s.hashKey(plaintextKey)
 
-	return plaintextKey, keyPrefix, keyHash
+	return plaintextKey, keyPrefix, keyHash, nil
 }
 
 // hashKey hashes an API key using SHA256.
@@ -279,9 +302,11 @@ func (s *APIKeyService) logAuditEvent(ctx context.Context, userID, apiKeyID *uui
 		log.ResourceID = apiKeyID
 	}
 
-	// Log asynchronously
+	// Log asynchronously with timeout to prevent goroutine leaks
 	go func() {
-		if err := s.auditRepo.Create(context.Background(), log); err != nil {
+		auditCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := s.auditRepo.Create(auditCtx, log); err != nil {
 			s.logger.Warn("failed to create audit log", "action", action, "error", err)
 		}
 	}()

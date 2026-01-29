@@ -25,6 +25,9 @@ type AuthConfig struct {
 
 	// APIKeyService is the API key service for API key validation
 	APIKeyService *services.APIKeyService
+
+	// APIKeyPrefix is the prefix used for API keys (e.g., "pk_")
+	APIKeyPrefix string
 }
 
 // Authenticate returns a middleware that extracts authentication credentials
@@ -138,7 +141,11 @@ func extractAuthContext(c *gin.Context, cfg AuthConfig) *models.AuthContext {
 	case "bearer":
 		// Could be JWT or API key
 		// API keys start with configured prefix (e.g., "pk_")
-		if strings.HasPrefix(credential, "pk_") {
+		prefix := cfg.APIKeyPrefix
+		if prefix == "" {
+			prefix = "pk_" // Default prefix
+		}
+		if strings.HasPrefix(credential, prefix) {
 			return validateAPIKey(c, cfg, credential)
 		}
 		// Otherwise, treat as JWT

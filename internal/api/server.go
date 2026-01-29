@@ -176,6 +176,7 @@ func (s *Server) registerRoutes() {
 		Enabled:       s.cfg.Auth.Enabled,
 		AuthService:   s.authService,
 		APIKeyService: s.apiKeyService,
+		APIKeyPrefix:  s.cfg.Auth.APIKeyPrefix,
 	}
 
 	// Auth middleware: extracts credentials but doesn't require auth
