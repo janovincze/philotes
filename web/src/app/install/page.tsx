@@ -132,7 +132,7 @@ export default function InstallPage() {
                         {provider.regions.length} regions
                       </div>
                       <Badge variant="secondary">
-                        From &euro;{minPrice.toFixed(0)}/mo
+                        &euro;{minPrice.toFixed(0)}-{maxPrice.toFixed(0)}/mo
                       </Badge>
                     </div>
 

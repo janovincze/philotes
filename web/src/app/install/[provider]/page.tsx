@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useMemo } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { ArrowLeft, Check, Loader2 } from "lucide-react"
 import {
@@ -34,29 +34,27 @@ export default function ProviderConfigPage() {
   const { data: provider, isLoading: providerLoading } = useProvider(providerId)
   const createDeployment = useCreateDeployment()
 
-  // Form state
+  // Form state - region is null until user explicitly selects one
   const [name, setName] = useState("")
-  const [region, setRegion] = useState("")
+  const [selectedRegion, setSelectedRegion] = useState<string | null>(null)
   const [size, setSize] = useState<DeploymentSize>("small")
   const [domain, setDomain] = useState("")
   const [sshPublicKey, setSshPublicKey] = useState("")
+
+  // Compute the default region from provider data
+  const defaultRegion = useMemo(() => {
+    if (!provider) return null
+    const def = provider.regions.find((r) => r.is_default)
+    return def?.id || provider.regions[0]?.id || null
+  }, [provider])
+
+  // Use selected region if set, otherwise use default
+  const region = selectedRegion ?? defaultRegion ?? ""
 
   const { data: costEstimate, isLoading: costLoading } = useCostEstimate(
     providerId,
     size
   )
-
-  // Set default region when provider loads
-  useEffect(() => {
-    if (provider && !region) {
-      const defaultRegion = provider.regions.find((r) => r.is_default)
-      if (defaultRegion) {
-        setRegion(defaultRegion.id)
-      } else if (provider.regions.length > 0) {
-        setRegion(provider.regions[0].id)
-      }
-    }
-  }, [provider, region])
 
   const selectedSize = provider?.sizes.find((s) => s.id === size)
 
@@ -151,7 +149,7 @@ export default function ProviderConfigPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="region">Region</Label>
-                <Select value={region} onValueChange={setRegion}>
+                <Select value={region} onValueChange={setSelectedRegion}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select region" />
                   </SelectTrigger>

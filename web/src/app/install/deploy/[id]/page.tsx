@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Label } from "@/components/ui/label"
 import { useDeployment, useDeploymentLogsStream, useCancelDeployment } from "@/lib/hooks/use-installer"
 import type { DeploymentStatus } from "@/lib/api/types"
 
@@ -449,18 +450,5 @@ export default function DeploymentPage() {
         </div>
       </div>
     </div>
-  )
-}
-
-// Placeholder for Label component (should be imported from UI)
-function Label({
-  className,
-  children,
-}: {
-  className?: string
-  children: React.ReactNode
-}) {
-  return (
-    <label className={`text-sm font-medium ${className || ""}`}>{children}</label>
   )
 }

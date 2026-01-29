@@ -129,7 +129,16 @@ func (r *DeploymentRunner) Deploy(ctx context.Context, cfg *DeploymentConfig, lo
 	logCallback("info", "configuring", "Configuring deployment parameters")
 
 	// Set stack configuration
-	if err := r.configureStack(ctx, stack, cfg); err != nil {
+	tempFiles, err := r.configureStack(ctx, stack, cfg)
+	// Clean up temp files when function exits
+	defer func() {
+		for _, f := range tempFiles {
+			if err := os.Remove(f); err != nil {
+				r.logger.Debug("failed to remove temp file", "path", f, "error", err)
+			}
+		}
+	}()
+	if err != nil {
 		logCallback("error", "configuring", fmt.Sprintf("Failed to configure stack: %v", err))
 		return nil, fmt.Errorf("failed to configure stack: %w", err)
 	}
@@ -281,11 +290,12 @@ func (r *DeploymentRunner) createOrSelectStack(ctx context.Context, stackName st
 }
 
 // configureStack sets the stack configuration.
-func (r *DeploymentRunner) configureStack(ctx context.Context, stack auto.Stack, cfg *DeploymentConfig) error {
+// Returns the path to any temp files created (for cleanup) and an error if any.
+func (r *DeploymentRunner) configureStack(ctx context.Context, stack auto.Stack, cfg *DeploymentConfig) (tempFiles []string, err error) {
 	// Get size configuration
 	sizeConfig := GetSizeConfig(cfg.Provider, cfg.Size)
 	if sizeConfig == nil {
-		return fmt.Errorf("invalid size %s for provider %s", cfg.Size, cfg.Provider)
+		return nil, fmt.Errorf("invalid size %s for provider %s", cfg.Size, cfg.Provider)
 	}
 
 	// Set basic configuration
@@ -314,27 +324,28 @@ func (r *DeploymentRunner) configureStack(ctx context.Context, stack auto.Stack,
 			// Write SSH public key to a temp file
 			sshKeyPath := filepath.Join(os.TempDir(), fmt.Sprintf("philotes-%s.pub", cfg.DeploymentID.String()[:8]))
 			if err := os.WriteFile(sshKeyPath, []byte(cfg.Config.SSHPublicKey), 0600); err != nil {
-				return fmt.Errorf("failed to write SSH public key: %w", err)
+				return nil, fmt.Errorf("failed to write SSH public key: %w", err)
 			}
 			configs["philotes:sshPublicKeyPath"] = sshKeyPath
+			tempFiles = append(tempFiles, sshKeyPath)
 		}
 	}
 
 	// Apply configuration
 	for key, value := range configs {
 		if err := stack.SetConfig(ctx, key, auto.ConfigValue{Value: value}); err != nil {
-			return fmt.Errorf("failed to set config %s: %w", key, err)
+			return tempFiles, fmt.Errorf("failed to set config %s: %w", key, err)
 		}
 	}
 
 	// Set provider credentials as secrets
 	if cfg.Credentials != nil {
 		if err := r.setProviderCredentials(ctx, stack, cfg.Provider, cfg.Credentials); err != nil {
-			return err
+			return tempFiles, err
 		}
 	}
 
-	return nil
+	return tempFiles, nil
 }
 
 // setProviderCredentials sets provider-specific credentials as secrets.

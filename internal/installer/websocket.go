@@ -93,13 +93,19 @@ func (h *LogHub) Unsubscribe(deploymentID uuid.UUID, conn *websocket.Conn) {
 
 // Broadcast sends a message to all subscribers of a deployment.
 func (h *LogHub) Broadcast(deploymentID uuid.UUID, msg LogMessage) {
+	// Copy connection references while holding the lock to avoid data race
 	h.mu.RLock()
-	conns := h.connections[deploymentID]
-	h.mu.RUnlock()
-
-	if len(conns) == 0 {
+	connMap := h.connections[deploymentID]
+	if len(connMap) == 0 {
+		h.mu.RUnlock()
 		return
 	}
+	// Make a copy of the connections slice to avoid race with Unsubscribe
+	conns := make([]*websocket.Conn, 0, len(connMap))
+	for conn := range connMap {
+		conns = append(conns, conn)
+	}
+	h.mu.RUnlock()
 
 	data, err := json.Marshal(msg)
 	if err != nil {
@@ -109,7 +115,7 @@ func (h *LogHub) Broadcast(deploymentID uuid.UUID, msg LogMessage) {
 
 	var toRemove []*websocket.Conn
 
-	for conn := range conns {
+	for _, conn := range conns {
 		if err := conn.WriteMessage(websocket.TextMessage, data); err != nil {
 			h.logger.Debug("failed to send message", "error", err)
 			toRemove = append(toRemove, conn)
@@ -120,7 +126,9 @@ func (h *LogHub) Broadcast(deploymentID uuid.UUID, msg LogMessage) {
 	if len(toRemove) > 0 {
 		h.mu.Lock()
 		for _, conn := range toRemove {
-			delete(h.connections[deploymentID], conn)
+			if connMap, ok := h.connections[deploymentID]; ok {
+				delete(connMap, conn)
+			}
 		}
 		h.mu.Unlock()
 	}
