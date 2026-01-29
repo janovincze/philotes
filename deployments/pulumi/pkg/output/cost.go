@@ -200,7 +200,7 @@ func exoscaleServerCost(instanceType string) float64 {
 
 // estimateContabo calculates costs for Contabo.
 // Prices as of 2024 (EUR/month, incl. VAT).
-// Note: Contabo has no managed LB; cost is $0 for LB (uses ingress controller).
+// Note: Contabo has no managed LB; cost is €0 for LB (uses ingress controller).
 func estimateContabo(cfg *config.Config) *CostEstimate {
 	cpCost := contaboServerCost(cfg.ControlPlaneType)
 	workerCost := contaboServerCost(cfg.WorkerType) * float64(cfg.WorkerCount)

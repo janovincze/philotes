@@ -51,15 +51,18 @@ func (p *Provider) CreateFirewall(ctx *pulumi.Context, name string, rules []prov
 			continue // Exoscale security groups are ingress-only
 		}
 
-		// Parse port
+		// Parse port (support "port" or "start-end" range), and fail on invalid format
 		startPort := 0
 		endPort := 0
-		fmt.Sscanf(rule.Port, "%d", &startPort)
-		endPort = startPort
 
-		// Check for port range
-		if n, _ := fmt.Sscanf(rule.Port, "%d-%d", &startPort, &endPort); n < 2 {
+		// First try to parse as a port range "start-end"
+		if n, err := fmt.Sscanf(rule.Port, "%d-%d", &startPort, &endPort); err == nil && n == 2 {
+			// successfully parsed range
+		} else if n, err := fmt.Sscanf(rule.Port, "%d", &startPort); err == nil && n == 1 {
+			// single port, use same value for endPort
 			endPort = startPort
+		} else {
+			return nil, fmt.Errorf("invalid port format %q for rule %d", rule.Port, i)
 		}
 
 		for _, cidr := range rule.SourceIPs {

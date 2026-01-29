@@ -55,13 +55,20 @@ func (p *Provider) CreateServer(ctx *pulumi.Context, name string, opts provider.
 	}
 
 	// For worker nodes, create a node pool
-	// Note: This requires an existing cluster ID, which complicates the interface
-	// In practice, OVH Managed K8s handles node pools differently
+	// Determine the Kubernetes cluster ID for this worker node pool.
+	// Expect it to be provided via labels to avoid passing new fields through ServerOptions.
+	var kubeID string
+	if opts.Labels != nil {
+		kubeID = opts.Labels["kubeId"]
+	}
+	if kubeID == "" {
+		return nil, fmt.Errorf("missing Kubernetes cluster ID for worker node pool (expected label \"kubeId\")")
+	}
 
 	// Create a node pool
 	nodePool, err := cloudproject.NewKubeNodePool(ctx, name, &cloudproject.KubeNodePoolArgs{
 		ServiceName:  pulumi.String(serviceName),
-		KubeId:       pulumi.String(""), // Would need cluster ID from control plane
+		KubeId:       pulumi.String(kubeID),
 		Name:         pulumi.String(name),
 		FlavorName:   pulumi.String(flavorName),
 		DesiredNodes: pulumi.Int(1),
