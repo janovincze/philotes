@@ -33,6 +33,7 @@ type Server struct {
 	installerLogHub  *installer.LogHub
 	authService      *services.AuthService
 	apiKeyService    *services.APIKeyService
+	oauthService     *services.OAuthService
 	httpServer       *http.Server
 	router           *gin.Engine
 }
@@ -71,6 +72,9 @@ type ServerConfig struct {
 
 	// APIKeyService is the API key service for API key management.
 	APIKeyService *services.APIKeyService
+
+	// OAuthService is the OAuth service for cloud provider authentication.
+	OAuthService *services.OAuthService
 
 	// CORSConfig is the CORS configuration.
 	CORSConfig middleware.CORSConfig
@@ -133,6 +137,7 @@ func NewServer(serverCfg ServerConfig) *Server {
 		installerLogHub:  serverCfg.InstallerLogHub,
 		authService:      serverCfg.AuthService,
 		apiKeyService:    serverCfg.APIKeyService,
+		oauthService:     serverCfg.OAuthService,
 		router:           router,
 	}
 
@@ -277,6 +282,27 @@ func (s *Server) registerRoutes() {
 			installerGroup.GET("/providers", installerHandler.ListProviders)
 			installerGroup.GET("/providers/:id", installerHandler.GetProvider)
 			installerGroup.GET("/providers/:id/estimate", installerHandler.GetCostEstimate)
+
+			// OAuth endpoints (registered if OAuth service is available)
+			if s.oauthService != nil {
+				oauthHandler := handlers.NewOAuthHandler(s.oauthService)
+
+				// OAuth provider info (public)
+				installerGroup.GET("/oauth/providers", oauthHandler.GetOAuthProviders)
+
+				// OAuth flow endpoints (start auth requires optional auth, callback is public)
+				installerGroup.POST("/oauth/:provider/authorize", oauthHandler.Authorize)
+				installerGroup.GET("/oauth/:provider/callback", oauthHandler.Callback)
+
+				// Manual credential storage (public for now, will store with session/user)
+				installerGroup.POST("/credentials/:provider", oauthHandler.StoreCredential)
+
+				// Protected credential endpoints
+				credentialsGroup := installerGroup.Group("/credentials")
+				credentialsGroup.Use(requireAuth)
+				credentialsGroup.GET("", oauthHandler.ListCredentials)
+				credentialsGroup.DELETE("/:provider", oauthHandler.DeleteCredential)
+			}
 
 			// Deployment endpoints (protected when auth is enabled)
 			deployments := installerGroup.Group("/deployments")

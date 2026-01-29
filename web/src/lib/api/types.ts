@@ -326,6 +326,7 @@ export interface Provider {
   logo_url?: string
   regions: ProviderRegion[]
   sizes: ProviderSize[]
+  oauth_supported: boolean
 }
 
 export interface DeploymentConfig {
@@ -446,4 +447,67 @@ export interface DeploymentLogsResponse {
 
 export interface CostEstimateResponse {
   estimate: CostEstimate
+}
+
+// OAuth Types
+
+export type CredentialType = "oauth" | "manual"
+
+export interface OAuthAuthorizeRequest {
+  redirect_uri: string
+  session_id?: string
+}
+
+export interface OAuthAuthorizeResponse {
+  authorization_url: string
+  state: string
+  provider: string
+}
+
+export interface OAuthCallbackResponse {
+  success: boolean
+  provider: string
+  credential_id?: string
+  error?: string
+  redirect_uri?: string
+}
+
+export interface OAuthProviderInfo {
+  provider: string
+  name: string
+  oauth_url?: string
+  scopes: string[]
+  enabled: boolean
+  description?: string
+}
+
+export interface OAuthProvidersResponse {
+  providers: OAuthProviderInfo[]
+}
+
+export interface CredentialSummary {
+  id: string
+  provider: string
+  credential_type: CredentialType
+  token_expires_at?: string
+  expires_at: string
+  created_at: string
+}
+
+export interface CredentialListResponse {
+  credentials: CredentialSummary[]
+  total_count: number
+}
+
+export interface StoreCredentialRequest {
+  provider: string
+  credentials: ProviderCredentials
+  deployment_id?: string
+  expires_in?: number
+}
+
+export interface StoreCredentialResponse {
+  credential_id: string
+  provider: string
+  expires_at: string
 }

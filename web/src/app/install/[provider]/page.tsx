@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react"
 import { useRouter, useParams } from "next/navigation"
-import { ArrowLeft, Check, Loader2 } from "lucide-react"
+import { ArrowLeft, Check, Loader2, Key } from "lucide-react"
 import {
   Card,
   CardContent,
@@ -24,6 +24,8 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useProvider, useCostEstimate, useCreateDeployment } from "@/lib/hooks/use-installer"
+import { useHasCredentials } from "@/lib/hooks/use-oauth"
+import { OAuthConnect, ManualCredentials } from "@/components/installer"
 import type { DeploymentSize, ProviderRegion } from "@/lib/api/types"
 
 export default function ProviderConfigPage() {
@@ -33,6 +35,10 @@ export default function ProviderConfigPage() {
 
   const { data: provider, isLoading: providerLoading } = useProvider(providerId)
   const createDeployment = useCreateDeployment()
+  const { hasCredentials, isLoading: credentialsLoading } = useHasCredentials(providerId)
+
+  // Credentials state
+  const [showManualEntry, setShowManualEntry] = useState(false)
 
   // Form state - region is null until user explicitly selects one
   const [name, setName] = useState("")
@@ -128,6 +134,40 @@ export default function ProviderConfigPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Configuration Form */}
         <div className="lg:col-span-2 space-y-6">
+          {/* Credentials */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Key className="h-5 w-5" />
+                {provider.name} Credentials
+              </CardTitle>
+              <CardDescription>
+                Connect your {provider.name} account to deploy infrastructure
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {credentialsLoading ? (
+                <Skeleton className="h-10 w-full" />
+              ) : showManualEntry ? (
+                <ManualCredentials
+                  provider={providerId}
+                  providerName={provider.name}
+                  onSuccess={() => {
+                    setShowManualEntry(false)
+                  }}
+                  onCancel={() => setShowManualEntry(false)}
+                />
+              ) : (
+                <OAuthConnect
+                  provider={providerId}
+                  providerName={provider.name}
+                  oauthSupported={provider.oauth_supported}
+                  onManualEntry={() => setShowManualEntry(true)}
+                />
+              )}
+            </CardContent>
+          </Card>
+
           {/* Basic Info */}
           <Card>
             <CardHeader>
@@ -356,7 +396,7 @@ export default function ProviderConfigPage() {
                 className="w-full"
                 size="lg"
                 onClick={handleDeploy}
-                disabled={!name || !region || createDeployment.isPending}
+                disabled={!name || !region || !hasCredentials || createDeployment.isPending}
               >
                 {createDeployment.isPending ? (
                   <>
@@ -367,6 +407,12 @@ export default function ProviderConfigPage() {
                   "Deploy Philotes"
                 )}
               </Button>
+
+              {!hasCredentials && (
+                <p className="text-sm text-muted-foreground text-center">
+                  Connect your {provider.name} account above to deploy
+                </p>
+              )}
 
               {createDeployment.isError && (
                 <p className="text-sm text-destructive text-center">
