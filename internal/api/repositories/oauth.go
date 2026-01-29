@@ -329,12 +329,14 @@ func (r *OAuthRepository) scanCredential(row *sql.Row) (*models.CloudCredential,
 	}
 
 	if deploymentID.Valid {
-		did, _ := uuid.Parse(deploymentID.String)
-		cred.DeploymentID = &did
+		if did, parseErr := uuid.Parse(deploymentID.String); parseErr == nil {
+			cred.DeploymentID = &did
+		}
 	}
 	if userID.Valid {
-		uid, _ := uuid.Parse(userID.String)
-		cred.UserID = &uid
+		if uid, parseErr := uuid.Parse(userID.String); parseErr == nil {
+			cred.UserID = &uid
+		}
 	}
 	if tokenExpiresAt.Valid {
 		cred.TokenExpiresAt = &tokenExpiresAt.Time
@@ -368,12 +370,14 @@ func (r *OAuthRepository) scanCredentialFromRows(rows *sql.Rows) (*models.CloudC
 	}
 
 	if deploymentID.Valid {
-		did, _ := uuid.Parse(deploymentID.String)
-		cred.DeploymentID = &did
+		if did, parseErr := uuid.Parse(deploymentID.String); parseErr == nil {
+			cred.DeploymentID = &did
+		}
 	}
 	if userID.Valid {
-		uid, _ := uuid.Parse(userID.String)
-		cred.UserID = &uid
+		if uid, parseErr := uuid.Parse(userID.String); parseErr == nil {
+			cred.UserID = &uid
+		}
 	}
 	if tokenExpiresAt.Valid {
 		cred.TokenExpiresAt = &tokenExpiresAt.Time

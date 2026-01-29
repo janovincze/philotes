@@ -255,7 +255,7 @@ func (s *OAuthService) HandleCallback(
 	}
 	defer func() {
 		if err != nil {
-			tx.Rollback()
+			_ = tx.Rollback()
 		}
 	}()
 
@@ -571,14 +571,14 @@ func (s *OAuthService) ListCredentials(
 	}
 
 	summaries := make([]models.CredentialSummary, len(credentials))
-	for i, cred := range credentials {
+	for i := range credentials {
 		summaries[i] = models.CredentialSummary{
-			ID:             cred.ID,
-			Provider:       cred.Provider,
-			CredentialType: cred.CredentialType,
-			TokenExpiresAt: cred.TokenExpiresAt,
-			ExpiresAt:      cred.ExpiresAt,
-			CreatedAt:      cred.CreatedAt,
+			ID:             credentials[i].ID,
+			Provider:       credentials[i].Provider,
+			CredentialType: credentials[i].CredentialType,
+			TokenExpiresAt: credentials[i].TokenExpiresAt,
+			ExpiresAt:      credentials[i].ExpiresAt,
+			CreatedAt:      credentials[i].CreatedAt,
 		}
 	}
 
@@ -756,7 +756,7 @@ func (s *OAuthService) refreshToken(
 }
 
 // CleanupExpired removes expired OAuth states and credentials.
-func (s *OAuthService) CleanupExpired(ctx context.Context) (states int64, creds int64, err error) {
+func (s *OAuthService) CleanupExpired(ctx context.Context) (states, creds int64, err error) {
 	states, err = s.repo.CleanupExpiredStates(ctx)
 	if err != nil {
 		return 0, 0, fmt.Errorf("failed to cleanup states: %w", err)

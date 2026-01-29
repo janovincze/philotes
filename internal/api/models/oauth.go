@@ -32,16 +32,16 @@ type OAuthState struct {
 
 // CloudCredential represents stored cloud provider credentials.
 type CloudCredential struct {
-	ID                      uuid.UUID      `json:"id"`
-	DeploymentID            *uuid.UUID     `json:"deployment_id,omitempty"`
-	UserID                  *uuid.UUID     `json:"user_id,omitempty"`
-	Provider                string         `json:"provider"`
-	CredentialType          CredentialType `json:"credential_type"`
-	CredentialsEncrypted    []byte         `json:"-"` // Never expose encrypted data
-	RefreshTokenEncrypted   []byte         `json:"-"`
-	TokenExpiresAt          *time.Time     `json:"token_expires_at,omitempty"`
-	ExpiresAt               time.Time      `json:"expires_at"`
-	CreatedAt               time.Time      `json:"created_at"`
+	ID                    uuid.UUID      `json:"id"`
+	DeploymentID          *uuid.UUID     `json:"deployment_id,omitempty"`
+	UserID                *uuid.UUID     `json:"user_id,omitempty"`
+	Provider              string         `json:"provider"`
+	CredentialType        CredentialType `json:"credential_type"`
+	CredentialsEncrypted  []byte         `json:"-"` // Never expose encrypted data
+	RefreshTokenEncrypted []byte         `json:"-"`
+	TokenExpiresAt        *time.Time     `json:"token_expires_at,omitempty"`
+	ExpiresAt             time.Time      `json:"expires_at"`
+	CreatedAt             time.Time      `json:"created_at"`
 }
 
 // OAuthToken represents the token response from OAuth providers.
@@ -81,11 +81,11 @@ type OAuthAuthorizeResponse struct {
 
 // OAuthCallbackResponse contains the result of OAuth callback.
 type OAuthCallbackResponse struct {
-	Success      bool       `json:"success"`
-	Provider     string     `json:"provider"`
-	CredentialID uuid.UUID  `json:"credential_id,omitempty"`
-	Error        string     `json:"error,omitempty"`
-	RedirectURI  string     `json:"redirect_uri,omitempty"`
+	Success      bool      `json:"success"`
+	Provider     string    `json:"provider"`
+	CredentialID uuid.UUID `json:"credential_id,omitempty"`
+	Error        string    `json:"error,omitempty"`
+	RedirectURI  string    `json:"redirect_uri,omitempty"`
 }
 
 // CredentialSummary represents a stored credential without sensitive data.
