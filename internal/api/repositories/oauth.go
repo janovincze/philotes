@@ -94,8 +94,9 @@ func (r *OAuthRepository) GetStateByState(ctx context.Context, state string) (*m
 	}
 
 	if userID.Valid {
-		uid, _ := uuid.Parse(userID.String)
-		oauthState.UserID = &uid
+		if uid, parseErr := uuid.Parse(userID.String); parseErr == nil {
+			oauthState.UserID = &uid
+		}
 	}
 	if sessionID.Valid {
 		oauthState.SessionID = sessionID.String
@@ -249,7 +250,10 @@ func (r *OAuthRepository) UpdateCredential(ctx context.Context, cred *models.Clo
 		return fmt.Errorf("failed to update credential: %w", err)
 	}
 
-	rows, _ := result.RowsAffected()
+	rows, rowsErr := result.RowsAffected()
+	if rowsErr != nil {
+		return fmt.Errorf("failed to get rows affected: %w", rowsErr)
+	}
 	if rows == 0 {
 		return ErrCredentialNotFound
 	}
@@ -265,7 +269,10 @@ func (r *OAuthRepository) DeleteCredential(ctx context.Context, id uuid.UUID) er
 		return fmt.Errorf("failed to delete credential: %w", err)
 	}
 
-	rows, _ := result.RowsAffected()
+	rows, rowsErr := result.RowsAffected()
+	if rowsErr != nil {
+		return fmt.Errorf("failed to get rows affected: %w", rowsErr)
+	}
 	if rows == 0 {
 		return ErrCredentialNotFound
 	}

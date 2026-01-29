@@ -19,7 +19,7 @@ function OAuthCallbackContent() {
 
   // Determine status from URL params
   const isSuccess = success === "true" && provider && credentialId
-  const status = isSuccess ? "success" : error ? "error" : "error"
+  const status = isSuccess ? "success" : "error"
   const message = isSuccess
     ? `Successfully connected to ${provider}`
     : error || "Invalid callback parameters"

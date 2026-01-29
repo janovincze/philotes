@@ -11,6 +11,14 @@ import type {
 
 const BASE_PATH = "/api/v1/installer"
 
+/**
+ * Get the base URL for building absolute URLs.
+ * Returns empty string for SSR contexts.
+ */
+function getBaseUrl(): string {
+  return typeof window !== "undefined" ? window.location.origin : ""
+}
+
 export const oauthApi = {
   /**
    * Get list of available OAuth providers with their configuration.
@@ -73,15 +81,13 @@ export const oauthApi = {
    * This is the URL that the OAuth provider will redirect to after authorization.
    */
   getCallbackUrl(provider: string): string {
-    const baseUrl = typeof window !== "undefined" ? window.location.origin : ""
-    return `${baseUrl}/api/v1/installer/oauth/${provider}/callback`
+    return `${getBaseUrl()}/api/v1/installer/oauth/${provider}/callback`
   },
 
   /**
    * Build the frontend redirect URL for OAuth callback handling.
    */
   getFrontendCallbackUrl(provider: string): string {
-    const baseUrl = typeof window !== "undefined" ? window.location.origin : ""
-    return `${baseUrl}/install/oauth/callback?provider=${provider}`
+    return `${getBaseUrl()}/install/oauth/callback?provider=${provider}`
   },
 }

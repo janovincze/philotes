@@ -111,16 +111,27 @@ func GenerateCodeChallenge(verifier string) string {
 
 // generateRandomString generates a cryptographically secure random string.
 func generateRandomString(length int) (string, error) {
-	bytes := make([]byte, length)
+	// Calculate bytes needed: base64 encoding produces 4 chars per 3 bytes
+	// To get at least 'length' chars, we need ceil(length * 3 / 4) bytes
+	bytesNeeded := (length*3 + 3) / 4
+	bytes := make([]byte, bytesNeeded)
 	if _, err := io.ReadFull(rand.Reader, bytes); err != nil {
 		return "", fmt.Errorf("failed to generate random bytes: %w", err)
 	}
-	return base64.RawURLEncoding.EncodeToString(bytes)[:length], nil
+	encoded := base64.RawURLEncoding.EncodeToString(bytes)
+	if len(encoded) < length {
+		return "", fmt.Errorf("encoded string too short: got %d, need %d", len(encoded), length)
+	}
+	return encoded[:length], nil
 }
 
 // BuildAuthURL is a helper to construct OAuth authorization URLs.
 func BuildAuthURL(baseURL string, params map[string]string) string {
-	u, _ := url.Parse(baseURL)
+	u, err := url.Parse(baseURL)
+	if err != nil {
+		// Return baseURL as-is if parsing fails; this shouldn't happen with valid provider URLs
+		return baseURL
+	}
 	q := u.Query()
 	for k, v := range params {
 		q.Set(k, v)

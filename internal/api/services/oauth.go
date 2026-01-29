@@ -372,59 +372,6 @@ func (s *OAuthService) exchangeCode(
 	return token, nil
 }
 
-// storeOAuthCredential encrypts and stores OAuth tokens.
-func (s *OAuthService) storeOAuthCredential(
-	ctx context.Context,
-	providerID string,
-	token *models.OAuthToken,
-	userID *uuid.UUID,
-) (uuid.UUID, error) {
-	if s.encryptor == nil {
-		return uuid.Nil, fmt.Errorf("encryption not configured")
-	}
-
-	// Encrypt access token
-	credentialsEncrypted, err := s.encryptor.EncryptToBytes(token.AccessToken)
-	if err != nil {
-		return uuid.Nil, fmt.Errorf("failed to encrypt credentials: %w", err)
-	}
-
-	// Encrypt refresh token if present
-	var refreshTokenEncrypted []byte
-	if token.RefreshToken != "" {
-		refreshTokenEncrypted, err = s.encryptor.EncryptToBytes(token.RefreshToken)
-		if err != nil {
-			return uuid.Nil, fmt.Errorf("failed to encrypt refresh token: %w", err)
-		}
-	}
-
-	// Set expiration (credential valid for 30 days, or until token expires)
-	expiresAt := time.Now().Add(30 * 24 * time.Hour)
-
-	var tokenExpiresAt *time.Time
-	if !token.ExpiresAt.IsZero() {
-		tokenExpiresAt = &token.ExpiresAt
-	}
-
-	cred := &models.CloudCredential{
-		ID:                    uuid.New(),
-		UserID:                userID,
-		Provider:              providerID,
-		CredentialType:        models.CredentialTypeOAuth,
-		CredentialsEncrypted:  credentialsEncrypted,
-		RefreshTokenEncrypted: refreshTokenEncrypted,
-		TokenExpiresAt:        tokenExpiresAt,
-		ExpiresAt:             expiresAt,
-		CreatedAt:             time.Now(),
-	}
-
-	if err := s.repo.CreateCredential(ctx, cred); err != nil {
-		return uuid.Nil, fmt.Errorf("failed to store credential: %w", err)
-	}
-
-	return cred.ID, nil
-}
-
 // storeOAuthCredentialTx encrypts and stores OAuth tokens within a transaction.
 func (s *OAuthService) storeOAuthCredentialTx(
 	ctx context.Context,
