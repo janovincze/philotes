@@ -1,4 +1,4 @@
-// Package secrets provides SSH key management for Pulumi deployments.
+// Package sshkeys provides SSH key management for Pulumi deployments.
 // It supports multiple sources: Pulumi secrets (encrypted), HashiCorp Vault,
 // and local files (fallback for development).
 package sshkeys

@@ -21,11 +21,11 @@ type KubeconfigOptions struct {
 
 // GetKubeconfig retrieves the kubeconfig from the K3s control plane node.
 // It replaces the internal cluster address with the public IP for external access.
+// The SSHPrivateKey must be a valid Pulumi StringOutput containing the private key content.
 func GetKubeconfig(ctx *pulumi.Context, name string, opts KubeconfigOptions) (pulumi.StringOutput, error) {
-	// Validate SSH key is provided
-	if opts.SSHPrivateKey == (pulumi.StringOutput{}) {
-		return pulumi.StringOutput{}, fmt.Errorf("SSH private key is required")
-	}
+	// Note: We don't validate SSHPrivateKey here as Pulumi StringOutput comparison is unreliable.
+	// The key is loaded by config.LoadConfig() which validates the source before we reach here.
+	// If the key is empty, Pulumi will fail with a descriptive error during SSH connection.
 
 	// Use remote command to fetch kubeconfig from the control plane
 	fetchCmd, err := remote.NewCommand(ctx, name+"-kubeconfig", &remote.CommandArgs{
