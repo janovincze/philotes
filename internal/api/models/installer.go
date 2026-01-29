@@ -91,12 +91,13 @@ type DeploymentLog struct {
 
 // Provider represents a cloud provider with its configuration.
 type Provider struct {
-	ID          string           `json:"id"`
-	Name        string           `json:"name"`
-	Description string           `json:"description"`
-	LogoURL     string           `json:"logo_url,omitempty"`
-	Regions     []ProviderRegion `json:"regions"`
-	Sizes       []ProviderSize   `json:"sizes"`
+	ID             string           `json:"id"`
+	Name           string           `json:"name"`
+	Description    string           `json:"description"`
+	LogoURL        string           `json:"logo_url,omitempty"`
+	Regions        []ProviderRegion `json:"regions"`
+	Sizes          []ProviderSize   `json:"sizes"`
+	OAuthSupported bool             `json:"oauth_supported"`
 }
 
 // ProviderRegion represents a region for a cloud provider.

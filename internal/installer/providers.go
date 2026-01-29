@@ -31,10 +31,11 @@ func GetProvider(id string) *models.Provider {
 // getHetznerProvider returns the Hetzner Cloud provider configuration.
 func getHetznerProvider() models.Provider {
 	return models.Provider{
-		ID:          "hetzner",
-		Name:        "Hetzner Cloud",
-		Description: "German cloud provider with excellent price/performance ratio. Data centers in Germany and Finland.",
-		LogoURL:     "/images/providers/hetzner.svg",
+		ID:             "hetzner",
+		Name:           "Hetzner Cloud",
+		Description:    "German cloud provider with excellent price/performance ratio. Data centers in Germany and Finland.",
+		LogoURL:        "/images/providers/hetzner.svg",
+		OAuthSupported: true,
 		Regions: []models.ProviderRegion{
 			{ID: "nbg1", Name: "Nuremberg", Location: "Germany", IsDefault: true, IsAvailable: true},
 			{ID: "fsn1", Name: "Falkenstein", Location: "Germany", IsAvailable: true},
@@ -106,10 +107,11 @@ var hetznerServerCosts = map[string]float64{
 // getScalewayProvider returns the Scaleway provider configuration.
 func getScalewayProvider() models.Provider {
 	return models.Provider{
-		ID:          "scaleway",
-		Name:        "Scaleway",
-		Description: "French cloud provider with strong European presence. Data centers in Paris, Amsterdam, and Warsaw.",
-		LogoURL:     "/images/providers/scaleway.svg",
+		ID:             "scaleway",
+		Name:           "Scaleway",
+		Description:    "French cloud provider with strong European presence. Data centers in Paris, Amsterdam, and Warsaw.",
+		LogoURL:        "/images/providers/scaleway.svg",
+		OAuthSupported: false, // Scaleway does not support OAuth
 		Regions: []models.ProviderRegion{
 			{ID: "fr-par", Name: "Paris", Location: "France", IsDefault: true, IsAvailable: true},
 			{ID: "nl-ams", Name: "Amsterdam", Location: "Netherlands", IsAvailable: true},
@@ -179,10 +181,11 @@ var scalewayServerCosts = map[string]float64{
 // getOVHProvider returns the OVHcloud provider configuration.
 func getOVHProvider() models.Provider {
 	return models.Provider{
-		ID:          "ovh",
-		Name:        "OVHcloud",
-		Description: "Major European cloud provider headquartered in France. Extensive European data center network.",
-		LogoURL:     "/images/providers/ovh.svg",
+		ID:             "ovh",
+		Name:           "OVHcloud",
+		Description:    "Major European cloud provider headquartered in France. Extensive European data center network.",
+		LogoURL:        "/images/providers/ovh.svg",
+		OAuthSupported: true,
 		Regions: []models.ProviderRegion{
 			{ID: "gra", Name: "Gravelines", Location: "France", IsDefault: true, IsAvailable: true},
 			{ID: "sbg", Name: "Strasbourg", Location: "France", IsAvailable: true},
@@ -256,10 +259,11 @@ var ovhServerCosts = map[string]float64{
 // getExoscaleProvider returns the Exoscale provider configuration.
 func getExoscaleProvider() models.Provider {
 	return models.Provider{
-		ID:          "exoscale",
-		Name:        "Exoscale",
-		Description: "Swiss cloud provider with focus on privacy and compliance. GDPR-friendly with Swiss data protection laws.",
-		LogoURL:     "/images/providers/exoscale.svg",
+		ID:             "exoscale",
+		Name:           "Exoscale",
+		Description:    "Swiss cloud provider with focus on privacy and compliance. GDPR-friendly with Swiss data protection laws.",
+		LogoURL:        "/images/providers/exoscale.svg",
+		OAuthSupported: false, // Exoscale does not support OAuth
 		Regions: []models.ProviderRegion{
 			{ID: "ch-gva-2", Name: "Geneva", Location: "Switzerland", IsDefault: true, IsAvailable: true},
 			{ID: "ch-dk-2", Name: "Zurich", Location: "Switzerland", IsAvailable: true},
@@ -332,10 +336,11 @@ var exoscaleServerCosts = map[string]float64{
 // getContaboProvider returns the Contabo provider configuration.
 func getContaboProvider() models.Provider {
 	return models.Provider{
-		ID:          "contabo",
-		Name:        "Contabo",
-		Description: "German hosting provider with extremely competitive pricing. Great for budget-conscious deployments.",
-		LogoURL:     "/images/providers/contabo.svg",
+		ID:             "contabo",
+		Name:           "Contabo",
+		Description:    "German hosting provider with extremely competitive pricing. Great for budget-conscious deployments.",
+		LogoURL:        "/images/providers/contabo.svg",
+		OAuthSupported: false, // Contabo does not support OAuth
 		Regions: []models.ProviderRegion{
 			{ID: "EU", Name: "Europe", Location: "Germany", IsDefault: true, IsAvailable: true},
 			{ID: "US-central", Name: "US Central", Location: "United States", IsAvailable: true},

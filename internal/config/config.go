@@ -46,6 +46,46 @@ type Config struct {
 
 	// Vault configuration for secrets management
 	Vault VaultConfig
+
+	// OAuth configuration for cloud providers
+	OAuth OAuthConfig
+}
+
+// OAuthConfig holds OAuth configuration for cloud providers.
+type OAuthConfig struct {
+	// EncryptionKey is the base64-encoded 32-byte key for encrypting tokens.
+	// Generate with: openssl rand -base64 32
+	EncryptionKey string
+
+	// BaseURL is the base URL of the Philotes API (for OAuth callbacks).
+	// Example: https://philotes.example.com
+	BaseURL string
+
+	// Hetzner OAuth configuration
+	Hetzner HetznerOAuthConfig
+
+	// OVH OAuth configuration
+	OVH OVHOAuthConfig
+}
+
+// HetznerOAuthConfig holds Hetzner Cloud OAuth settings.
+type HetznerOAuthConfig struct {
+	// ClientID is the OAuth application client ID
+	ClientID string
+	// ClientSecret is the OAuth application client secret
+	ClientSecret string
+	// Enabled indicates if Hetzner OAuth is configured
+	Enabled bool
+}
+
+// OVHOAuthConfig holds OVHcloud OAuth settings.
+type OVHOAuthConfig struct {
+	// ClientID is the OAuth application client ID
+	ClientID string
+	// ClientSecret is the OAuth application client secret
+	ClientSecret string
+	// Enabled indicates if OVH OAuth is configured
+	Enabled bool
 }
 
 // VaultConfig holds HashiCorp Vault configuration.
@@ -555,6 +595,21 @@ func Load() (*Config, error) {
 				DatabaseBuffer: getEnv("PHILOTES_VAULT_SECRET_PATH_DATABASE_BUFFER", "philotes/database/buffer"),
 				DatabaseSource: getEnv("PHILOTES_VAULT_SECRET_PATH_DATABASE_SOURCE", "philotes/database/source"),
 				StorageMinio:   getEnv("PHILOTES_VAULT_SECRET_PATH_STORAGE_MINIO", "philotes/storage/minio"),
+			},
+		},
+
+		OAuth: OAuthConfig{
+			EncryptionKey: getEnv("PHILOTES_OAUTH_ENCRYPTION_KEY", ""),
+			BaseURL:       getEnv("PHILOTES_OAUTH_BASE_URL", getEnv("PHILOTES_API_BASE_URL", "http://localhost:8080")),
+			Hetzner: HetznerOAuthConfig{
+				ClientID:     getEnv("PHILOTES_OAUTH_HETZNER_CLIENT_ID", ""),
+				ClientSecret: getEnv("PHILOTES_OAUTH_HETZNER_CLIENT_SECRET", ""),
+				Enabled:      getEnv("PHILOTES_OAUTH_HETZNER_CLIENT_ID", "") != "",
+			},
+			OVH: OVHOAuthConfig{
+				ClientID:     getEnv("PHILOTES_OAUTH_OVH_CLIENT_ID", ""),
+				ClientSecret: getEnv("PHILOTES_OAUTH_OVH_CLIENT_SECRET", ""),
+				Enabled:      getEnv("PHILOTES_OAUTH_OVH_CLIENT_ID", "") != "",
 			},
 		},
 	}
