@@ -10,7 +10,10 @@ import (
 	"github.com/janovincze/philotes/deployments/pulumi/pkg/output"
 	"github.com/janovincze/philotes/deployments/pulumi/pkg/platform"
 	"github.com/janovincze/philotes/deployments/pulumi/pkg/provider"
+	"github.com/janovincze/philotes/deployments/pulumi/pkg/provider/contabo"
+	"github.com/janovincze/philotes/deployments/pulumi/pkg/provider/exoscale"
 	"github.com/janovincze/philotes/deployments/pulumi/pkg/provider/hetzner"
+	"github.com/janovincze/philotes/deployments/pulumi/pkg/provider/ovh"
 	"github.com/janovincze/philotes/deployments/pulumi/pkg/provider/scaleway"
 )
 
@@ -60,7 +63,13 @@ func selectProvider(cfg *config.Config) (provider.CloudProvider, error) {
 		return hetzner.New(cfg.Region), nil
 	case "scaleway":
 		return scaleway.New(cfg.Region), nil
+	case "ovh":
+		return ovh.New(cfg.Region), nil
+	case "exoscale":
+		return exoscale.New(cfg.Region), nil
+	case "contabo":
+		return contabo.New(cfg.Region), nil
 	default:
-		return nil, fmt.Errorf("unsupported provider: %s (supported: hetzner, scaleway)", cfg.Provider)
+		return nil, fmt.Errorf("unsupported provider: %s (supported: hetzner, scaleway, ovh, exoscale, contabo)", cfg.Provider)
 	}
 }

@@ -51,6 +51,33 @@ func ScalewayDefaults() map[string]string {
 	}
 }
 
+// OVHDefaults returns default values for OVHcloud.
+func OVHDefaults() map[string]string {
+	return map[string]string{
+		"region":           "GRA7",
+		"controlPlaneType": "d2-4",
+		"workerType":       "d2-8",
+	}
+}
+
+// ExoscaleDefaults returns default values for Exoscale.
+func ExoscaleDefaults() map[string]string {
+	return map[string]string{
+		"region":           "de-fra-1",
+		"controlPlaneType": "standard.medium",
+		"workerType":       "standard.large",
+	}
+}
+
+// ContaboDefaults returns default values for Contabo.
+func ContaboDefaults() map[string]string {
+	return map[string]string{
+		"region":           "EU",
+		"controlPlaneType": "VPS-S",  // 4 vCPU, 8GB RAM
+		"workerType":       "VPS-M",  // 6 vCPU, 16GB RAM
+	}
+}
+
 // LoadConfig loads configuration from the Pulumi stack.
 func LoadConfig(ctx *pulumi.Context) (*Config, error) {
 	cfg := pulumiconfig.New(ctx, "philotes")
@@ -67,8 +94,14 @@ func LoadConfig(ctx *pulumi.Context) (*Config, error) {
 		defaults = HetznerDefaults()
 	case "scaleway":
 		defaults = ScalewayDefaults()
+	case "ovh":
+		defaults = OVHDefaults()
+	case "exoscale":
+		defaults = ExoscaleDefaults()
+	case "contabo":
+		defaults = ContaboDefaults()
 	default:
-		return nil, fmt.Errorf("unsupported provider: %s (supported: hetzner, scaleway)", provider)
+		return nil, fmt.Errorf("unsupported provider: %s (supported: hetzner, scaleway, ovh, exoscale, contabo)", provider)
 	}
 
 	region := cfg.Get("region")
