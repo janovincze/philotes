@@ -61,6 +61,11 @@ type OAuthConfig struct {
 	// Example: https://philotes.example.com
 	BaseURL string
 
+	// AllowedRedirectHosts is a list of allowed hosts for OAuth redirects.
+	// If empty, only the host from BaseURL is allowed.
+	// Example: ["localhost:3000", "philotes.example.com"]
+	AllowedRedirectHosts []string
+
 	// Hetzner OAuth configuration
 	Hetzner HetznerOAuthConfig
 

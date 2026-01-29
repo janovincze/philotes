@@ -3,6 +3,7 @@ package services
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -34,6 +35,14 @@ func NewOAuthService(
 	repo *repositories.OAuthRepository,
 	cfg config.OAuthConfig,
 ) (*OAuthService, error) {
+	// Check if any OAuth provider is enabled
+	anyProviderEnabled := cfg.Hetzner.Enabled || cfg.OVH.Enabled
+
+	// Fail fast: if OAuth is enabled, encryption key must be configured
+	if anyProviderEnabled && cfg.EncryptionKey == "" {
+		return nil, fmt.Errorf("OAuth encryption key is required when OAuth providers are enabled")
+	}
+
 	// Create encryptor if encryption key is configured
 	var encryptor *crypto.Encryptor
 	if cfg.EncryptionKey != "" {
@@ -76,6 +85,51 @@ func NewOAuthService(
 	}, nil
 }
 
+// validateRedirectURI validates that the redirect URI is allowed to prevent open redirect attacks.
+func (s *OAuthService) validateRedirectURI(redirectURI string) error {
+	parsed, err := url.Parse(redirectURI)
+	if err != nil {
+		return fmt.Errorf("malformed URL: %w", err)
+	}
+
+	// Must be an absolute URL with http or https scheme
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return fmt.Errorf("redirect URI must use http or https scheme")
+	}
+
+	if parsed.Host == "" {
+		return fmt.Errorf("redirect URI must have a host")
+	}
+
+	// Build list of allowed hosts
+	allowedHosts := make(map[string]bool)
+
+	// Add explicitly configured allowed hosts
+	for _, host := range s.config.AllowedRedirectHosts {
+		allowedHosts[host] = true
+	}
+
+	// Add host from BaseURL if configured
+	if s.config.BaseURL != "" {
+		if baseURL, err := url.Parse(s.config.BaseURL); err == nil && baseURL.Host != "" {
+			allowedHosts[baseURL.Host] = true
+		}
+	}
+
+	// Always allow localhost for development
+	allowedHosts["localhost"] = true
+	allowedHosts["localhost:3000"] = true
+	allowedHosts["127.0.0.1"] = true
+	allowedHosts["127.0.0.1:3000"] = true
+
+	// Check if the redirect host is allowed
+	if !allowedHosts[parsed.Host] {
+		return fmt.Errorf("host %q is not in the allowed redirect hosts", parsed.Host)
+	}
+
+	return nil
+}
+
 // StartAuthorization initiates the OAuth flow for a provider.
 func (s *OAuthService) StartAuthorization(
 	ctx context.Context,
@@ -84,6 +138,11 @@ func (s *OAuthService) StartAuthorization(
 	userID *uuid.UUID,
 	sessionID string,
 ) (*models.OAuthAuthorizeResponse, error) {
+	// Validate redirect URI to prevent open redirect attacks
+	if err := s.validateRedirectURI(redirectURI); err != nil {
+		return nil, fmt.Errorf("invalid redirect URI: %w", err)
+	}
+
 	// Get provider
 	provider, ok := s.registry.Get(providerID)
 	if !ok {
@@ -161,12 +220,6 @@ func (s *OAuthService) HandleCallback(
 		}, nil
 	}
 
-	// Delete state (one-time use)
-	if deleteErr := s.repo.DeleteState(ctx, state); deleteErr != nil {
-		// Log but don't fail - the state will expire automatically
-		// This is a non-critical error; the OAuth flow can still succeed
-	}
-
 	// Get provider
 	provider, ok := s.registry.Get(providerID)
 	if !ok {
@@ -179,7 +232,8 @@ func (s *OAuthService) HandleCallback(
 	// Build callback URL (same as in StartAuthorization)
 	callbackURL := fmt.Sprintf("%s/api/v1/installer/oauth/%s/callback", s.config.BaseURL, providerID)
 
-	// Exchange code for tokens
+	// Exchange code for tokens BEFORE deleting state
+	// If this fails, the state is still available for retry (until it expires)
 	token, err := s.exchangeCode(ctx, provider, code, oauthState.CodeVerifier, callbackURL)
 	if err != nil {
 		return &models.OAuthCallbackResponse{
@@ -189,12 +243,46 @@ func (s *OAuthService) HandleCallback(
 		}, nil
 	}
 
-	// Store credential
-	credID, err := s.storeOAuthCredential(ctx, providerID, token, oauthState.UserID)
+	// Use a transaction to atomically delete state and store credential
+	// This ensures we don't lose the credential if state deletion succeeds but storage fails
+	tx, err := s.repo.DB().BeginTx(ctx, nil)
+	if err != nil {
+		return &models.OAuthCallbackResponse{
+			Success:     false,
+			Error:       "failed to start transaction",
+			RedirectURI: oauthState.RedirectURI,
+		}, nil
+	}
+	defer func() {
+		if err != nil {
+			tx.Rollback()
+		}
+	}()
+
+	// Delete state within transaction
+	if _, err = tx.ExecContext(ctx, `DELETE FROM philotes.oauth_states WHERE state = $1`, state); err != nil {
+		return &models.OAuthCallbackResponse{
+			Success:     false,
+			Error:       "failed to delete oauth state",
+			RedirectURI: oauthState.RedirectURI,
+		}, nil
+	}
+
+	// Store credential within transaction
+	credID, err := s.storeOAuthCredentialTx(ctx, tx, providerID, token, oauthState.UserID)
 	if err != nil {
 		return &models.OAuthCallbackResponse{
 			Success:     false,
 			Error:       fmt.Sprintf("failed to store credential: %v", err),
+			RedirectURI: oauthState.RedirectURI,
+		}, nil
+	}
+
+	// Commit transaction
+	if err = tx.Commit(); err != nil {
+		return &models.OAuthCallbackResponse{
+			Success:     false,
+			Error:       "failed to commit transaction",
 			RedirectURI: oauthState.RedirectURI,
 		}, nil
 	}
@@ -335,6 +423,69 @@ func (s *OAuthService) storeOAuthCredential(
 	}
 
 	return cred.ID, nil
+}
+
+// storeOAuthCredentialTx encrypts and stores OAuth tokens within a transaction.
+func (s *OAuthService) storeOAuthCredentialTx(
+	ctx context.Context,
+	tx *sql.Tx,
+	providerID string,
+	token *models.OAuthToken,
+	userID *uuid.UUID,
+) (uuid.UUID, error) {
+	if s.encryptor == nil {
+		return uuid.Nil, fmt.Errorf("encryption not configured")
+	}
+
+	// Encrypt access token
+	credentialsEncrypted, err := s.encryptor.EncryptToBytes(token.AccessToken)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("failed to encrypt credentials: %w", err)
+	}
+
+	// Encrypt refresh token if present
+	var refreshTokenEncrypted []byte
+	if token.RefreshToken != "" {
+		refreshTokenEncrypted, err = s.encryptor.EncryptToBytes(token.RefreshToken)
+		if err != nil {
+			return uuid.Nil, fmt.Errorf("failed to encrypt refresh token: %w", err)
+		}
+	}
+
+	// Set expiration (credential valid for 30 days)
+	expiresAt := time.Now().Add(30 * 24 * time.Hour)
+
+	var tokenExpiresAt *time.Time
+	if !token.ExpiresAt.IsZero() {
+		tokenExpiresAt = &token.ExpiresAt
+	}
+
+	credID := uuid.New()
+
+	query := `
+		INSERT INTO philotes.cloud_credentials (
+			id, deployment_id, user_id, provider, credential_type,
+			credentials_encrypted, refresh_token_encrypted, token_expires_at, expires_at, created_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+	`
+
+	_, err = tx.ExecContext(ctx, query,
+		credID,
+		nil, // deployment_id
+		userID,
+		providerID,
+		models.CredentialTypeOAuth,
+		credentialsEncrypted,
+		refreshTokenEncrypted,
+		tokenExpiresAt,
+		expiresAt,
+		time.Now(),
+	)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("failed to store credential: %w", err)
+	}
+
+	return credID, nil
 }
 
 // StoreManualCredential stores manually entered API credentials.

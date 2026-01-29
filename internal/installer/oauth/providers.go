@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"sort"
 )
 
 // Provider represents an OAuth provider configuration.
@@ -60,16 +61,20 @@ func (r *ProviderRegistry) Get(name string) (Provider, bool) {
 	return p, ok
 }
 
-// List returns all registered providers.
+// List returns all registered providers in deterministic order (sorted by name).
 func (r *ProviderRegistry) List() []Provider {
 	providers := make([]Provider, 0, len(r.providers))
 	for _, p := range r.providers {
 		providers = append(providers, p)
 	}
+	// Sort by provider name for deterministic ordering
+	sort.Slice(providers, func(i, j int) bool {
+		return providers[i].Name() < providers[j].Name()
+	})
 	return providers
 }
 
-// ListEnabled returns all enabled OAuth providers.
+// ListEnabled returns all enabled OAuth providers in deterministic order.
 func (r *ProviderRegistry) ListEnabled() []Provider {
 	providers := make([]Provider, 0)
 	for _, p := range r.providers {
@@ -77,6 +82,10 @@ func (r *ProviderRegistry) ListEnabled() []Provider {
 			providers = append(providers, p)
 		}
 	}
+	// Sort by provider name for deterministic ordering
+	sort.Slice(providers, func(i, j int) bool {
+		return providers[i].Name() < providers[j].Name()
+	})
 	return providers
 }
 

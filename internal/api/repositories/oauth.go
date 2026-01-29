@@ -30,6 +30,11 @@ func NewOAuthRepository(db *sql.DB) *OAuthRepository {
 	return &OAuthRepository{db: db}
 }
 
+// DB returns the underlying database connection for transaction support.
+func (r *OAuthRepository) DB() *sql.DB {
+	return r.db
+}
+
 // --- OAuth State Operations ---
 
 // CreateState stores a new OAuth state for PKCE flow.

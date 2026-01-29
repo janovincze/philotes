@@ -102,6 +102,18 @@ DELETE /api/v1/installer/credentials/:provider
 - State parameter with 10-minute TTL for CSRF protection
 - One-time use of state (deleted after callback)
 - Credentials expire after 24 hours (configurable)
+- Open redirect protection via allowed hosts validation
+- Fail-fast validation when OAuth is enabled without encryption key
+
+## Code Review Fixes
+
+After initial implementation, the following issues from the code review were addressed:
+
+1. **URL encoding in redirects** - Error messages in redirect URLs are now properly URL-encoded
+2. **Deterministic provider ordering** - Provider lists are now sorted by name for consistent API responses
+3. **Fail-fast encryption validation** - Service initialization now fails if OAuth providers are enabled but encryption key is missing
+4. **Open redirect protection** - Redirect URIs are validated against an allowlist of allowed hosts
+5. **Transaction for callback handling** - State deletion and credential storage are now wrapped in a transaction for atomicity
 
 ## Configuration Required
 
