@@ -56,3 +56,11 @@ export function useTestSourceConnection() {
     mutationFn: (id: string) => sourcesApi.testConnection(id),
   })
 }
+
+export function useDiscoverTables(sourceId: string, schema?: string) {
+  return useQuery({
+    queryKey: ["sources", sourceId, "tables", schema],
+    queryFn: () => sourcesApi.discoverTables(sourceId, schema),
+    enabled: !!sourceId,
+  })
+}
