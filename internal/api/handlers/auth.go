@@ -88,11 +88,8 @@ func (h *AuthHandler) GetMe(c *gin.Context) {
 // Register registers routes for the auth handler.
 func (h *AuthHandler) Register(rg *gin.RouterGroup, authMiddleware gin.HandlerFunc) {
 	auth := rg.Group("/auth")
-	{
-		// Public routes
-		auth.POST("/login", h.Login)
-
-		// Protected routes
-		auth.GET("/me", authMiddleware, h.GetMe)
-	}
+	// Public routes
+	auth.POST("/login", h.Login)
+	// Protected routes
+	auth.GET("/me", authMiddleware, h.GetMe)
 }
