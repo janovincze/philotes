@@ -217,39 +217,35 @@ func (s *Server) registerRoutes() {
 		if sourceHandler != nil {
 			sources := v1.Group("/sources")
 			sources.Use(requireAuth)
-			{
-				sources.POST("", sourceHandler.Create)
-				sources.GET("", sourceHandler.List)
-				sources.GET("/:id", sourceHandler.Get)
-				sources.PUT("/:id", sourceHandler.Update)
-				sources.DELETE("/:id", sourceHandler.Delete)
-				sources.POST("/:id/test", sourceHandler.TestConnection)
-				sources.GET("/:id/tables", sourceHandler.DiscoverTables)
-			}
+			sources.POST("", sourceHandler.Create)
+			sources.GET("", sourceHandler.List)
+			sources.GET("/:id", sourceHandler.Get)
+			sources.PUT("/:id", sourceHandler.Update)
+			sources.DELETE("/:id", sourceHandler.Delete)
+			sources.POST("/:id/test", sourceHandler.TestConnection)
+			sources.GET("/:id/tables", sourceHandler.DiscoverTables)
 		}
 
 		// Pipeline endpoints (protected when auth is enabled)
 		if pipelineHandler != nil {
 			pipelines := v1.Group("/pipelines")
 			pipelines.Use(requireAuth)
-			{
-				pipelines.POST("", pipelineHandler.Create)
-				pipelines.GET("", pipelineHandler.List)
-				pipelines.GET("/:id", pipelineHandler.Get)
-				pipelines.PUT("/:id", pipelineHandler.Update)
-				pipelines.DELETE("/:id", pipelineHandler.Delete)
-				pipelines.POST("/:id/start", pipelineHandler.Start)
-				pipelines.POST("/:id/stop", pipelineHandler.Stop)
-				pipelines.GET("/:id/status", pipelineHandler.GetStatus)
-				pipelines.POST("/:id/tables", pipelineHandler.AddTableMapping)
-				pipelines.DELETE("/:id/tables/:mappingId", pipelineHandler.RemoveTableMapping)
+			pipelines.POST("", pipelineHandler.Create)
+			pipelines.GET("", pipelineHandler.List)
+			pipelines.GET("/:id", pipelineHandler.Get)
+			pipelines.PUT("/:id", pipelineHandler.Update)
+			pipelines.DELETE("/:id", pipelineHandler.Delete)
+			pipelines.POST("/:id/start", pipelineHandler.Start)
+			pipelines.POST("/:id/stop", pipelineHandler.Stop)
+			pipelines.GET("/:id/status", pipelineHandler.GetStatus)
+			pipelines.POST("/:id/tables", pipelineHandler.AddTableMapping)
+			pipelines.DELETE("/:id/tables/:mappingId", pipelineHandler.RemoveTableMapping)
 
-				// Pipeline metrics endpoints
-				if s.metricsService != nil {
-					metricsHandler := handlers.NewMetricsHandler(s.metricsService)
-					pipelines.GET("/:id/metrics", metricsHandler.GetPipelineMetrics)
-					pipelines.GET("/:id/metrics/history", metricsHandler.GetPipelineMetricsHistory)
-				}
+			// Pipeline metrics endpoints
+			if s.metricsService != nil {
+				metricsHandler := handlers.NewMetricsHandler(s.metricsService)
+				pipelines.GET("/:id/metrics", metricsHandler.GetPipelineMetrics)
+				pipelines.GET("/:id/metrics/history", metricsHandler.GetPipelineMetricsHistory)
 			}
 		}
 

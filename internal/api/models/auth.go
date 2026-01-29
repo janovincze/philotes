@@ -106,17 +106,17 @@ type AuditLog struct {
 
 // Audit action constants.
 const (
-	AuditActionLogin           = "login"
-	AuditActionLoginFailed     = "login_failed"
-	AuditActionLogout          = "logout"
-	AuditActionAPIKeyCreated   = "api_key_created"
-	AuditActionAPIKeyRevoked   = "api_key_revoked"
-	AuditActionAPIKeyUsed      = "api_key_used"
-	AuditActionUserCreated     = "user_created"
-	AuditActionUserUpdated     = "user_updated"
-	AuditActionUserDeleted     = "user_deleted"
-	AuditActionUnauthorized    = "unauthorized"
-	AuditActionForbidden       = "forbidden"
+	AuditActionLogin         = "login"
+	AuditActionLoginFailed   = "login_failed"
+	AuditActionLogout        = "logout"
+	AuditActionAPIKeyCreated = "api_key_created"
+	AuditActionAPIKeyRevoked = "api_key_revoked"
+	AuditActionAPIKeyUsed    = "api_key_used"
+	AuditActionUserCreated   = "user_created"
+	AuditActionUserUpdated   = "user_updated"
+	AuditActionUserDeleted   = "user_deleted"
+	AuditActionUnauthorized  = "unauthorized"
+	AuditActionForbidden     = "forbidden"
 )
 
 // JWTClaims represents the claims in a JWT token.
@@ -194,8 +194,8 @@ type UpdateUserRequest struct {
 
 // CreateAPIKeyRequest represents a request to create an API key.
 type CreateAPIKeyRequest struct {
-	Name        string    `json:"name" binding:"required"`
-	Permissions []string  `json:"permissions,omitempty"`
+	Name        string     `json:"name" binding:"required"`
+	Permissions []string   `json:"permissions,omitempty"`
 	ExpiresAt   *time.Time `json:"expires_at,omitempty"`
 }
 

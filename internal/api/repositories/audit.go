@@ -164,16 +164,19 @@ func (r *AuditRepository) List(ctx context.Context, opts AuditListOptions) ([]mo
 		}
 
 		if userID.Valid {
-			id, _ := uuid.Parse(userID.String)
-			log.UserID = &id
+			if id, err := uuid.Parse(userID.String); err == nil {
+				log.UserID = &id
+			}
 		}
 		if apiKeyID.Valid {
-			id, _ := uuid.Parse(apiKeyID.String)
-			log.APIKeyID = &id
+			if id, err := uuid.Parse(apiKeyID.String); err == nil {
+				log.APIKeyID = &id
+			}
 		}
 		if resourceID.Valid {
-			id, _ := uuid.Parse(resourceID.String)
-			log.ResourceID = &id
+			if id, err := uuid.Parse(resourceID.String); err == nil {
+				log.ResourceID = &id
+			}
 		}
 		log.ResourceType = resourceType.String
 		log.IPAddress = ipAddress.String

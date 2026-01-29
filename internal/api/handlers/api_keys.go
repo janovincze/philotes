@@ -193,13 +193,11 @@ func (h *APIKeyHandler) Revoke(c *gin.Context) {
 func (h *APIKeyHandler) Register(rg *gin.RouterGroup, authMiddleware gin.HandlerFunc) {
 	apiKeys := rg.Group("/api-keys")
 	apiKeys.Use(authMiddleware)
-	{
-		apiKeys.POST("", h.Create)
-		apiKeys.GET("", h.List)
-		apiKeys.GET("/:id", h.Get)
-		apiKeys.DELETE("/:id", h.Delete)
-		apiKeys.POST("/:id/revoke", h.Revoke)
-	}
+	apiKeys.POST("", h.Create)
+	apiKeys.GET("", h.List)
+	apiKeys.GET("/:id", h.Get)
+	apiKeys.DELETE("/:id", h.Delete)
+	apiKeys.POST("/:id/revoke", h.Revoke)
 }
 
 // respondWithError converts service errors to HTTP responses.

@@ -188,7 +188,7 @@ func (s *APIKeyService) Get(ctx context.Context, id uuid.UUID) (*models.APIKey, 
 }
 
 // Revoke deactivates an API key.
-func (s *APIKeyService) Revoke(ctx context.Context, id uuid.UUID, userID uuid.UUID, userRole models.UserRole, ipAddress, userAgent string) error {
+func (s *APIKeyService) Revoke(ctx context.Context, id, userID uuid.UUID, userRole models.UserRole, ipAddress, userAgent string) error {
 	// Get the API key first to verify ownership
 	apiKey, err := s.apiKeyRepo.GetByID(ctx, id)
 	if err != nil {
@@ -222,7 +222,7 @@ func (s *APIKeyService) Revoke(ctx context.Context, id uuid.UUID, userID uuid.UU
 }
 
 // Delete permanently deletes an API key.
-func (s *APIKeyService) Delete(ctx context.Context, id uuid.UUID, userID uuid.UUID, userRole models.UserRole, ipAddress, userAgent string) error {
+func (s *APIKeyService) Delete(ctx context.Context, id, userID uuid.UUID, userRole models.UserRole, ipAddress, userAgent string) error {
 	// Get the API key first to verify ownership
 	apiKey, err := s.apiKeyRepo.GetByID(ctx, id)
 	if err != nil {
@@ -258,11 +258,11 @@ func (s *APIKeyService) Delete(ctx context.Context, id uuid.UUID, userID uuid.UU
 
 // generateAPIKey generates a new API key.
 // Returns: plaintext key, key prefix (first 8 chars), key hash, error
-func (s *APIKeyService) generateAPIKey() (string, string, string, error) {
+func (s *APIKeyService) generateAPIKey() (plaintextKey, keyPrefix, keyHash string, err error) {
 	// Generate 32 random bytes
 	randomBytes := make([]byte, 32)
-	if _, err := rand.Read(randomBytes); err != nil {
-		return "", "", "", fmt.Errorf("failed to generate random bytes: %w", err)
+	if _, randErr := rand.Read(randomBytes); randErr != nil {
+		return "", "", "", fmt.Errorf("failed to generate random bytes: %w", randErr)
 	}
 
 	// Encode as hex
@@ -270,18 +270,21 @@ func (s *APIKeyService) generateAPIKey() (string, string, string, error) {
 
 	// Build full key with prefix
 	// Format: pk_live_[64 hex chars]
-	plaintextKey := fmt.Sprintf("%slive_%s", s.cfg.APIKeyPrefix, randomPart)
+	plaintextKey = fmt.Sprintf("%slive_%s", s.cfg.APIKeyPrefix, randomPart)
 
 	// Extract prefix for storage (first 8 chars)
-	keyPrefix := plaintextKey[:8]
+	keyPrefix = plaintextKey[:8]
 
 	// Hash the full key
-	keyHash := s.hashKey(plaintextKey)
+	keyHash = s.hashKey(plaintextKey)
 
 	return plaintextKey, keyPrefix, keyHash, nil
 }
 
 // hashKey hashes an API key using SHA256.
+// Note: SHA256 is appropriate for API keys (high-entropy random strings)
+// unlike passwords which require bcrypt. API keys have 256 bits of entropy
+// from crypto/rand, making brute-force attacks infeasible.
 func (s *APIKeyService) hashKey(key string) string {
 	hash := sha256.Sum256([]byte(key))
 	return hex.EncodeToString(hash[:])

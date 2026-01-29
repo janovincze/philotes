@@ -76,7 +76,7 @@ func (s *AuthService) Login(ctx context.Context, req *models.LoginRequest, ipAdd
 	}
 
 	// Verify password
-	if err := bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(req.Password)); err != nil {
+	if pwdErr := bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(req.Password)); pwdErr != nil {
 		s.logAuditEvent(ctx, &user.ID, nil, models.AuditActionLoginFailed, ipAddress, userAgent, map[string]interface{}{
 			"reason": "invalid password",
 		})
