@@ -1,10 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { pipelinesApi, type CreatePipelineInput } from "@/lib/api"
 
-export function usePipelines() {
+export function usePipelines(options?: { refetchInterval?: number | false }) {
   return useQuery({
     queryKey: ["pipelines"],
     queryFn: () => pipelinesApi.list(),
+    refetchInterval: options?.refetchInterval,
   })
 }
 

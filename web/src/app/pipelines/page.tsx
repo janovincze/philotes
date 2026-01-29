@@ -1,46 +1,22 @@
 "use client"
 
+import { useState } from "react"
 import Link from "next/link"
-import { GitBranch, Plus, Play, Square, XCircle } from "lucide-react"
+import { GitBranch, Plus, Play, Square, XCircle, Activity } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { usePipelines, useStartPipeline, useStopPipeline } from "@/lib/hooks/use-pipelines"
+import { usePipelineMetrics } from "@/lib/hooks/use-metrics"
+import { AutoRefreshToggle } from "@/components/pipelines/auto-refresh-toggle"
+import { PipelineStatusBadge } from "@/components/pipelines/pipeline-status-badge"
+import { formatEventsPerSecond } from "@/lib/utils/format-metrics"
 import type { PipelineStatus } from "@/lib/api/types"
-import { cn } from "@/lib/utils"
-
-function PipelineStatusBadge({ status }: { status: PipelineStatus }) {
-  const variants: Record<PipelineStatus, "default" | "secondary" | "destructive" | "outline"> = {
-    running: "default",
-    starting: "secondary",
-    stopping: "secondary",
-    stopped: "outline",
-    error: "destructive",
-  }
-
-  const pulseClass = status === "running" || status === "starting" || status === "stopping"
-
-  return (
-    <Badge variant={variants[status]} className="gap-1.5">
-      <span
-        className={cn(
-          "h-2 w-2 rounded-full",
-          status === "running" && "bg-green-500",
-          status === "starting" && "bg-yellow-500",
-          status === "stopping" && "bg-yellow-500",
-          status === "stopped" && "bg-gray-400",
-          status === "error" && "bg-red-500",
-          pulseClass && "animate-pulse"
-        )}
-      />
-      <span className="capitalize">{status}</span>
-    </Badge>
-  )
-}
 
 function PipelineCard({
   pipeline,
+  refreshInterval,
 }: {
   pipeline: {
     id: string
@@ -49,6 +25,7 @@ function PipelineCard({
     tables: { id: string }[]
     error_message?: string
   }
+  refreshInterval: number | false
 }) {
   const startPipeline = useStartPipeline()
   const stopPipeline = useStopPipeline()
@@ -56,6 +33,14 @@ function PipelineCard({
   const isRunning = pipeline.status === "running"
   const isStopped = pipeline.status === "stopped"
   const isTransitioning = pipeline.status === "starting" || pipeline.status === "stopping"
+
+  // Only fetch metrics for running pipelines
+  const { data: metricsResponse } = usePipelineMetrics(pipeline.id, {
+    enabled: isRunning,
+    refetchInterval: isRunning ? refreshInterval : false,
+  })
+
+  const metrics = metricsResponse?.metrics
 
   return (
     <Card>
@@ -74,6 +59,23 @@ function PipelineCard({
         <PipelineStatusBadge status={pipeline.status} />
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Mini metrics for running pipelines */}
+        {isRunning && metrics && (
+          <div className="flex items-center gap-4 rounded-md bg-muted/50 px-3 py-2 text-sm">
+            <div className="flex items-center gap-1.5">
+              <Activity className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="font-mono">
+                {formatEventsPerSecond(metrics.events_per_second)}
+              </span>
+              <span className="text-muted-foreground">events/s</span>
+            </div>
+            {metrics.error_count > 0 && (
+              <Badge variant="destructive" className="text-xs">
+                {metrics.error_count} errors
+              </Badge>
+            )}
+          </div>
+        )}
         {pipeline.error_message && (
           <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
             {pipeline.error_message}
@@ -140,7 +142,12 @@ function PipelinesListSkeleton() {
 }
 
 export default function PipelinesPage() {
-  const { data: pipelines, isLoading, error } = usePipelines()
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true)
+  const [refreshInterval, setRefreshInterval] = useState(5000)
+
+  const { data: pipelines, isLoading, error } = usePipelines({
+    refetchInterval: autoRefreshEnabled ? refreshInterval : false,
+  })
 
   return (
     <div className="space-y-6">
@@ -152,12 +159,20 @@ export default function PipelinesPage() {
             Manage your CDC replication pipelines
           </p>
         </div>
-        <Button asChild>
-          <Link href="/pipelines/new">
-            <Plus className="mr-2 h-4 w-4" />
-            New Pipeline
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <AutoRefreshToggle
+            enabled={autoRefreshEnabled}
+            interval={refreshInterval}
+            onToggle={setAutoRefreshEnabled}
+            onIntervalChange={setRefreshInterval}
+          />
+          <Button asChild>
+            <Link href="/pipelines/new">
+              <Plus className="mr-2 h-4 w-4" />
+              New Pipeline
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {/* Pipelines list */}
@@ -175,7 +190,11 @@ export default function PipelinesPage() {
       ) : pipelines && pipelines.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2">
           {pipelines.map((pipeline) => (
-            <PipelineCard key={pipeline.id} pipeline={pipeline} />
+            <PipelineCard
+              key={pipeline.id}
+              pipeline={pipeline}
+              refreshInterval={autoRefreshEnabled ? refreshInterval : false}
+            />
           ))}
         </div>
       ) : (

@@ -89,3 +89,51 @@ export interface PaginatedResponse<T> {
   page: number
   page_size: number
 }
+
+// Metrics Types
+
+export interface PipelineMetrics {
+  pipeline_id: string
+  status: PipelineStatus
+  events_processed: number
+  events_per_second: number
+  lag_seconds: number
+  lag_p95_seconds: number
+  buffer_depth: number
+  error_count: number
+  iceberg_commits: number
+  iceberg_bytes_written: number
+  last_event_at?: string
+  uptime?: string
+  tables?: TableMetrics[]
+}
+
+export interface TableMetrics {
+  schema: string
+  table: string
+  events_processed: number
+  lag_seconds: number
+  last_event_at?: string
+}
+
+export interface MetricsDataPoint {
+  timestamp: string
+  events_per_second: number
+  lag_seconds: number
+  buffer_depth: number
+  error_count: number
+}
+
+export interface MetricsHistory {
+  pipeline_id: string
+  time_range: string
+  data_points: MetricsDataPoint[]
+}
+
+export interface PipelineMetricsResponse {
+  metrics: PipelineMetrics
+}
+
+export interface MetricsHistoryResponse {
+  history: MetricsHistory
+}
