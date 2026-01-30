@@ -258,10 +258,10 @@ func (h *OIDCHandler) UpdateProvider(c *gin.Context) {
 	}
 
 	var req models.UpdateOIDCProviderRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if bindErr := c.ShouldBindJSON(&req); bindErr != nil {
 		models.RespondWithError(c, models.NewBadRequestError(
 			c.Request.URL.Path,
-			"invalid request body: "+err.Error(),
+			"invalid request body: "+bindErr.Error(),
 		))
 		return
 	}
@@ -364,22 +364,18 @@ func (h *OIDCHandler) TestProvider(c *gin.Context) {
 func (h *OIDCHandler) Register(rg *gin.RouterGroup, requireAuth gin.HandlerFunc) {
 	// Public OIDC auth endpoints
 	auth := rg.Group("/auth/oidc")
-	{
-		auth.GET("/providers", h.ListEnabledProviders)
-		auth.POST("/:provider/authorize", h.Authorize)
-		auth.POST("/callback", h.Callback)
-		auth.GET("/callback", h.Callback) // Also support GET for IdP redirects
-	}
+	auth.GET("/providers", h.ListEnabledProviders)
+	auth.POST("/:provider/authorize", h.Authorize)
+	auth.POST("/callback", h.Callback)
+	auth.GET("/callback", h.Callback) // Also support GET for IdP redirects
 
 	// Admin settings endpoints (protected)
 	settings := rg.Group("/settings/oidc")
 	settings.Use(requireAuth)
-	{
-		settings.GET("/providers", h.ListProviders)
-		settings.POST("/providers", h.CreateProvider)
-		settings.GET("/providers/:id", h.GetProvider)
-		settings.PUT("/providers/:id", h.UpdateProvider)
-		settings.DELETE("/providers/:id", h.DeleteProvider)
-		settings.POST("/providers/:id/test", h.TestProvider)
-	}
+	settings.GET("/providers", h.ListProviders)
+	settings.POST("/providers", h.CreateProvider)
+	settings.GET("/providers/:id", h.GetProvider)
+	settings.PUT("/providers/:id", h.UpdateProvider)
+	settings.DELETE("/providers/:id", h.DeleteProvider)
+	settings.POST("/providers/:id/test", h.TestProvider)
 }

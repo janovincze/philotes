@@ -231,9 +231,9 @@ func (r *OIDCRepository) UpdateProvider(ctx context.Context, id uuid.UUID, req *
 		argIdx++
 	}
 	if req.ClientSecret != nil {
-		encryptedSecret, err := r.encryptor.EncryptToBytes(*req.ClientSecret)
-		if err != nil {
-			return nil, fmt.Errorf("failed to encrypt client secret: %w", err)
+		encryptedSecret, encryptErr := r.encryptor.EncryptToBytes(*req.ClientSecret)
+		if encryptErr != nil {
+			return nil, fmt.Errorf("failed to encrypt client secret: %w", encryptErr)
 		}
 		query += fmt.Sprintf(", client_secret_encrypted = $%d", argIdx)
 		args = append(args, encryptedSecret)
@@ -250,9 +250,9 @@ func (r *OIDCRepository) UpdateProvider(ctx context.Context, id uuid.UUID, req *
 		argIdx++
 	}
 	if req.RoleMapping != nil {
-		roleMappingJSON, err := json.Marshal(req.RoleMapping)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal role mapping: %w", err)
+		roleMappingJSON, marshalErr := json.Marshal(req.RoleMapping)
+		if marshalErr != nil {
+			return nil, fmt.Errorf("failed to marshal role mapping: %w", marshalErr)
 		}
 		query += fmt.Sprintf(", role_mapping = $%d", argIdx)
 		args = append(args, roleMappingJSON)
@@ -376,6 +376,8 @@ func (r *OIDCRepository) GetState(ctx context.Context, state string) (*models.OI
 
 	// Check if expired
 	if time.Now().After(oidcState.ExpiresAt) {
+		// Best-effort cleanup of expired state to avoid unbounded growth
+		_ = r.DeleteState(ctx, oidcState.State)
 		return nil, ErrOIDCStateExpired
 	}
 

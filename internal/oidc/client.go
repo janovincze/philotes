@@ -98,7 +98,7 @@ func (c *Client) Discover(ctx context.Context) (*DiscoveryConfig, error) {
 	}
 
 	discoveryURL := c.issuerURL + "/.well-known/openid-configuration"
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, discoveryURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, discoveryURL, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create discovery request: %w", err)
 	}
@@ -110,7 +110,7 @@ func (c *Client) Discover(ctx context.Context) (*DiscoveryConfig, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, _ := io.ReadAll(resp.Body) //nolint:errcheck // best-effort read for error message
 		return nil, fmt.Errorf("discovery endpoint returned %d: %s", resp.StatusCode, string(body))
 	}
 
@@ -253,7 +253,7 @@ func (c *Client) GetUserInfo(ctx context.Context, accessToken string) (*models.O
 		return nil, fmt.Errorf("userinfo endpoint not available")
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, config.UserInfoEndpoint, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, config.UserInfoEndpoint, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create userinfo request: %w", err)
 	}
@@ -267,7 +267,7 @@ func (c *Client) GetUserInfo(ctx context.Context, accessToken string) (*models.O
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, _ := io.ReadAll(resp.Body) //nolint:errcheck // best-effort read for error message
 		return nil, fmt.Errorf("userinfo endpoint returned %d: %s", resp.StatusCode, string(body))
 	}
 

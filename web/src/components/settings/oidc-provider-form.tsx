@@ -176,7 +176,7 @@ export function OIDCProviderForm({
       } else {
         // For creates, client_secret is required
         if (!payload.client_secret) {
-          throw new Error("Client secret is required for new providers")
+          throw new Error("Please provide a client secret. This is required when creating a new OIDC provider.")
         }
         await createProvider.mutateAsync({
           name: payload.name,

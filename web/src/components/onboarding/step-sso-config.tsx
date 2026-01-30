@@ -149,11 +149,21 @@ export function StepSSOConfig({ onNext, onBack, onSkip, onConfigured }: StepSSOC
 
   const onSubmit = async (values: QuickSetupValues) => {
     try {
-      // Generate a URL-safe name from the display name
-      const name = values.display_name
+      // Generate a URL-safe, collision-resistant name from the display name
+      const baseName = values.display_name
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-|-$/g, "")
+
+      // Add a short hash suffix to prevent collisions
+      let hash = 0
+      for (let i = 0; i < values.display_name.length; i++) {
+        const char = values.display_name.charCodeAt(i)
+        hash = (hash << 5) - hash + char
+        hash |= 0 // Convert to 32-bit integer
+      }
+      const suffix = Math.abs(hash).toString(36).slice(0, 4)
+      const name = `${baseName}-${suffix}`
 
       await createProvider.mutateAsync({
         name,

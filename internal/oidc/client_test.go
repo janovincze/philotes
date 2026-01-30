@@ -96,7 +96,10 @@ func TestGenerateCodeChallenge(t *testing.T) {
 	}
 
 	// Different verifier should produce different challenge
-	verifier2, _ := GenerateCodeVerifier()
+	verifier2, err := GenerateCodeVerifier()
+	if err != nil {
+		t.Fatalf("GenerateCodeVerifier failed: %v", err)
+	}
 	challenge3 := GenerateCodeChallenge(verifier2)
 	if challenge == challenge3 {
 		t.Error("different verifiers should produce different challenges")
@@ -116,7 +119,7 @@ func TestClient_Discover(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/.well-known/openid-configuration" {
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(discoveryDoc)
+			_ = json.NewEncoder(w).Encode(discoveryDoc)
 		} else {
 			http.NotFound(w, r)
 		}
@@ -145,7 +148,7 @@ func TestClient_Discover(t *testing.T) {
 func TestClient_Discover_InvalidResponse(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte("invalid json"))
+		_, _ = w.Write([]byte("invalid json"))
 	}))
 	defer server.Close()
 
@@ -185,7 +188,7 @@ func TestClient_AuthorizationURL(t *testing.T) {
 				"jwks_uri":               "https://example.com/.well-known/jwks.json",
 			}
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(discoveryDoc)
+			_ = json.NewEncoder(w).Encode(discoveryDoc)
 		} else {
 			http.NotFound(w, r)
 		}
@@ -252,7 +255,7 @@ func TestClient_Exchange(t *testing.T) {
 				"jwks_uri":               "http://" + r.Host + "/.well-known/jwks.json",
 			}
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(discoveryDoc)
+			_ = json.NewEncoder(w).Encode(discoveryDoc)
 			return
 		}
 		if r.URL.Path == "/token" {
@@ -268,7 +271,7 @@ func TestClient_Exchange(t *testing.T) {
 			}
 
 			// Verify required parameters
-			r.ParseForm()
+			_ = r.ParseForm()
 			if r.Form.Get("grant_type") != "authorization_code" {
 				http.Error(w, "invalid grant_type", http.StatusBadRequest)
 				return
@@ -279,7 +282,7 @@ func TestClient_Exchange(t *testing.T) {
 			}
 
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(tokenResponse)
+			_ = json.NewEncoder(w).Encode(tokenResponse)
 			return
 		}
 		http.NotFound(w, r)
@@ -316,13 +319,13 @@ func TestClient_Exchange_Error(t *testing.T) {
 				"jwks_uri":               "http://" + r.Host + "/.well-known/jwks.json",
 			}
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(discoveryDoc)
+			_ = json.NewEncoder(w).Encode(discoveryDoc)
 			return
 		}
 		if r.URL.Path == "/token" {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(map[string]string{
+			_ = json.NewEncoder(w).Encode(map[string]string{
 				"error":             "invalid_grant",
 				"error_description": "The authorization code has expired",
 			})
@@ -452,7 +455,7 @@ func TestClient_GetUserInfo(t *testing.T) {
 				"jwks_uri":               "http://" + r.Host + "/.well-known/jwks.json",
 			}
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(discoveryDoc)
+			_ = json.NewEncoder(w).Encode(discoveryDoc)
 			return
 		}
 		if r.URL.Path == "/userinfo" {
@@ -464,7 +467,7 @@ func TestClient_GetUserInfo(t *testing.T) {
 			}
 
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(userInfo)
+			_ = json.NewEncoder(w).Encode(userInfo)
 			return
 		}
 		http.NotFound(w, r)
@@ -577,7 +580,11 @@ func createTestIDToken(issuer, audience string) string {
 		"given_name":     "Test",
 		"family_name":    "User",
 	}
-	claimsJSON, _ := json.Marshal(claims)
+	claimsJSON, err := json.Marshal(claims)
+	if err != nil {
+		// This should never happen with a static map, but handle it anyway
+		return ""
+	}
 	payload := base64.RawURLEncoding.EncodeToString(claimsJSON)
 
 	// Use a fake signature for testing (real validation would need JWKS)

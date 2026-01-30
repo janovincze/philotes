@@ -99,8 +99,8 @@ func (s *OIDCService) StartAuthorization(ctx context.Context, providerName, redi
 	}
 
 	// Validate redirect URI
-	if err := s.validateRedirectURI(redirectURI); err != nil {
-		return nil, fmt.Errorf("invalid redirect URI: %w", err)
+	if validateErr := s.validateRedirectURI(redirectURI); validateErr != nil {
+		return nil, fmt.Errorf("invalid redirect URI: %w", validateErr)
 	}
 
 	// Generate PKCE values
@@ -133,8 +133,8 @@ func (s *OIDCService) StartAuthorization(ctx context.Context, providerName, redi
 		ExpiresAt:    time.Now().Add(s.oidcCfg.StateExpiration),
 	}
 
-	if err := s.oidcRepo.CreateState(ctx, oidcState); err != nil {
-		return nil, fmt.Errorf("failed to store state: %w", err)
+	if stateErr := s.oidcRepo.CreateState(ctx, oidcState); stateErr != nil {
+		return nil, fmt.Errorf("failed to store state: %w", stateErr)
 	}
 
 	// Build callback URL
@@ -174,8 +174,8 @@ func (s *OIDCService) HandleCallback(ctx context.Context, code, state, ipAddress
 	}
 
 	// Delete state immediately (one-time use)
-	if err := s.oidcRepo.DeleteState(ctx, state); err != nil {
-		s.logger.Warn("failed to delete state", "error", err)
+	if delErr := s.oidcRepo.DeleteState(ctx, state); delErr != nil {
+		s.logger.Warn("failed to delete state", "error", delErr)
 	}
 
 	// Get provider
@@ -228,7 +228,7 @@ func (s *OIDCService) HandleCallback(ctx context.Context, code, state, ipAddress
 	userInfo := oidc.ClaimsToUserInfo(claims, provider.GroupsClaim)
 
 	// Try to fetch additional user info if available
-	if extendedInfo, err := client.GetUserInfo(ctx, tokenResp.AccessToken); err == nil {
+	if extendedInfo, infoErr := client.GetUserInfo(ctx, tokenResp.AccessToken); infoErr == nil {
 		if userInfo.Email == "" && extendedInfo.Email != "" {
 			userInfo.Email = extendedInfo.Email
 			userInfo.EmailVerified = extendedInfo.EmailVerified
@@ -427,21 +427,21 @@ func (s *OIDCService) provisionUser(ctx context.Context, provider *models.OIDCPr
 	if err == nil {
 		// Update existing user's OIDC groups
 		groups := userInfo.Groups
-		if err := s.userRepo.UpdateOIDCGroups(ctx, existingUser.ID, groups); err != nil {
-			s.logger.Warn("failed to update OIDC groups", "user_id", existingUser.ID, "error", err)
+		if groupsErr := s.userRepo.UpdateOIDCGroups(ctx, existingUser.ID, groups); groupsErr != nil {
+			s.logger.Warn("failed to update OIDC groups", "user_id", existingUser.ID, "error", groupsErr)
 		}
 
 		// Update role if group mapping changed
 		if newRole := s.mapGroupsToRole(provider, groups); newRole != existingUser.Role {
-			if _, err := s.userRepo.Update(ctx, existingUser.ID, &models.UpdateUserRequest{Role: &newRole}); err != nil {
-				s.logger.Warn("failed to update role from groups", "user_id", existingUser.ID, "error", err)
+			if _, roleErr := s.userRepo.Update(ctx, existingUser.ID, &models.UpdateUserRequest{Role: &newRole}); roleErr != nil {
+				s.logger.Warn("failed to update role from groups", "user_id", existingUser.ID, "error", roleErr)
 			}
 			existingUser.Role = newRole
 		}
 
 		// Update last login
-		if err := s.userRepo.UpdateLastLogin(ctx, existingUser.ID); err != nil {
-			s.logger.Warn("failed to update last login", "user_id", existingUser.ID, "error", err)
+		if loginErr := s.userRepo.UpdateLastLogin(ctx, existingUser.ID); loginErr != nil {
+			s.logger.Warn("failed to update last login", "user_id", existingUser.ID, "error", loginErr)
 		}
 
 		return existingUser, nil

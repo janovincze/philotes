@@ -23,7 +23,7 @@ export function useEnabledOIDCProviders() {
   return useQuery({
     queryKey: oidcKeys.enabledProviders(),
     queryFn: () => oidcApi.listEnabledProviders(),
-    staleTime: 5 * 60 * 1000, // 5 minutes - providers don't change often
+    staleTime: 5 * 60 * 1000, // client-side cache: up to 5 minutes; disabled providers may still appear until refresh
   })
 }
 

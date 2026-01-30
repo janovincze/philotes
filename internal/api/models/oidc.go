@@ -88,11 +88,12 @@ func (r *CreateOIDCProviderRequest) Validate() []FieldError {
 	var errors []FieldError
 
 	// Validate name
-	if r.Name == "" {
+	switch {
+	case r.Name == "":
 		errors = append(errors, FieldError{Field: "name", Message: "name is required"})
-	} else if len(r.Name) > 100 {
+	case len(r.Name) > 100:
 		errors = append(errors, FieldError{Field: "name", Message: "name must be at most 100 characters"})
-	} else if !isValidProviderName(r.Name) {
+	case !isValidProviderName(r.Name):
 		errors = append(errors, FieldError{Field: "name", Message: "name must contain only lowercase letters, numbers, and hyphens"})
 	}
 
