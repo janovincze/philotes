@@ -274,3 +274,56 @@ func (s *InstallerService) GetCostEstimate(_ context.Context, providerID string,
 
 	return estimate, nil
 }
+
+// RetryDeployment initiates a retry of a failed deployment.
+func (s *InstallerService) RetryDeployment(ctx context.Context, id uuid.UUID, deployment *models.Deployment, orchestrator *installer.DeploymentOrchestrator) error {
+	// Check if deployment can be retried (should be failed)
+	if deployment.Status != models.DeploymentStatusFailed {
+		return &ConflictError{Message: "only failed deployments can be retried"}
+	}
+
+	// Update status to pending
+	if err := s.repo.UpdateStatus(ctx, id, models.DeploymentStatusPending, ""); err != nil {
+		return fmt.Errorf("failed to update deployment status: %w", err)
+	}
+
+	// Add retry log
+	if err := s.repo.AddLog(ctx, id, "info", "retry", "Retrying deployment"); err != nil {
+		s.logger.Warn("failed to add retry log", "deployment_id", id, "error", err)
+	}
+
+	// Build deployment config for orchestrator
+	cfg := &installer.DeploymentConfig{
+		DeploymentID: id,
+		StackName:    deployment.PulumiStackName,
+		Provider:     deployment.Provider,
+		Region:       deployment.Region,
+		Environment:  deployment.Environment,
+		Size:         deployment.Size,
+		Config:       deployment.Config,
+	}
+
+	// Create status callback to update database
+	statusCallback := func(status string, err error) {
+		dbStatus := models.DeploymentStatus(status)
+		errMsg := ""
+		if err != nil {
+			errMsg = err.Error()
+		}
+		if updateErr := s.repo.UpdateStatus(ctx, id, dbStatus, errMsg); updateErr != nil {
+			s.logger.Error("failed to update deployment status", "deployment_id", id, "error", updateErr)
+		}
+	}
+
+	// Start retry
+	if err := orchestrator.RetryDeployment(ctx, id, cfg, statusCallback); err != nil {
+		// Revert to failed status
+		if revertErr := s.repo.UpdateStatus(ctx, id, models.DeploymentStatusFailed, err.Error()); revertErr != nil {
+			s.logger.Error("failed to revert deployment status", "deployment_id", id, "error", revertErr)
+		}
+		return fmt.Errorf("failed to start retry: %w", err)
+	}
+
+	s.logger.Info("deployment retry initiated", "id", id)
+	return nil
+}

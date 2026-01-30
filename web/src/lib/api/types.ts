@@ -449,6 +449,106 @@ export interface CostEstimateResponse {
   estimate: CostEstimate
 }
 
+// Progress Tracking Types
+
+export type StepStatus = "pending" | "in_progress" | "completed" | "failed" | "skipped"
+
+export interface SubStep {
+  id: string
+  name: string
+  status: StepStatus
+  details?: string
+  current?: number
+  total?: number
+}
+
+export interface StepError {
+  code: string
+  message: string
+  details?: string
+  suggestions: string[]
+  retryable: boolean
+  docs_url?: string
+}
+
+export interface DeploymentStep {
+  id: string
+  name: string
+  description: string
+  status: StepStatus
+  estimated_time_ms: number
+  elapsed_time_ms?: number
+  started_at?: string
+  completed_at?: string
+  sub_steps?: SubStep[]
+  current_sub_step: number
+  error?: StepError
+}
+
+export interface CreatedResource {
+  type: string
+  name: string
+  id?: string
+  region?: string
+}
+
+export interface DeploymentProgress {
+  deployment_id: string
+  overall_progress: number
+  current_step_index: number
+  steps: DeploymentStep[]
+  started_at?: string
+  estimated_remaining_ms: number
+  can_retry: boolean
+  resources_created?: CreatedResource[]
+}
+
+export interface DeploymentProgressResponse {
+  progress?: DeploymentProgress
+  message?: string
+}
+
+export interface CleanupResourcesResponse {
+  resources: CreatedResource[]
+  count: number
+}
+
+export interface RetryInfo {
+  can_retry: boolean
+  failed_step?: DeploymentStep
+  failed_step_id?: string
+  reason: string
+}
+
+// Enhanced WebSocket message types
+export interface ProgressUpdate {
+  overall_percent: number
+  current_step_index: number
+  estimated_remaining_ms: number
+}
+
+export interface StepUpdate {
+  step_id: string
+  status: StepStatus
+  sub_step_index?: number
+  sub_step_current?: number
+  sub_step_total?: number
+  elapsed_time_ms: number
+}
+
+export interface DeploymentLogMessage {
+  type: "log" | "status" | "connected" | "error" | "progress" | "step"
+  deployment_id: string
+  timestamp: string
+  level?: string
+  step?: string
+  message?: string
+  status?: string
+  progress?: ProgressUpdate
+  step_update?: StepUpdate
+  error_info?: StepError
+}
+
 // OAuth Types
 
 export type CredentialType = "oauth" | "manual"

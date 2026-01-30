@@ -11,6 +11,12 @@ import type {
   CostEstimate,
   CostEstimateResponse,
   CreateDeploymentInput,
+  DeploymentProgress,
+  DeploymentProgressResponse,
+  CleanupResourcesResponse,
+  CreatedResource,
+  RetryInfo,
+  DeploymentLogMessage,
 } from "./types"
 
 const BASE_PATH = "/api/v1/installer"
@@ -74,6 +80,27 @@ export const installerApi = {
       })
       .then((res) => res.logs)
   },
+
+  // Progress tracking endpoints
+  getDeploymentProgress(deploymentId: string): Promise<DeploymentProgress | null> {
+    return apiClient
+      .get<DeploymentProgressResponse>(`${BASE_PATH}/deployments/${deploymentId}/progress`)
+      .then((res) => res.progress || null)
+  },
+
+  retryDeployment(deploymentId: string): Promise<{ message: string; deployment_id: string; retry_from_step: string }> {
+    return apiClient.post(`${BASE_PATH}/deployments/${deploymentId}/retry`)
+  },
+
+  getCleanupResources(deploymentId: string): Promise<CreatedResource[]> {
+    return apiClient
+      .get<CleanupResourcesResponse>(`${BASE_PATH}/deployments/${deploymentId}/cleanup-preview`)
+      .then((res) => res.resources)
+  },
+
+  getRetryInfo(deploymentId: string): Promise<RetryInfo> {
+    return apiClient.get<RetryInfo>(`${BASE_PATH}/deployments/${deploymentId}/retry-info`)
+  },
 }
 
 // WebSocket connection helper for real-time logs
@@ -114,13 +141,5 @@ function getWebSocketUrl(path: string): string {
   return url.toString()
 }
 
-// WebSocket message types
-export interface DeploymentLogMessage {
-  type: "log" | "status" | "connected" | "error"
-  deployment_id: string
-  timestamp: string
-  level?: string
-  step?: string
-  message?: string
-  status?: string
-}
+// Re-export DeploymentLogMessage type for convenience
+export type { DeploymentLogMessage }

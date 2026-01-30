@@ -15,7 +15,7 @@ import (
 
 // LogMessage represents a log message sent over WebSocket.
 type LogMessage struct {
-	// Type is the message type (log, status, error).
+	// Type is the message type (log, status, connected, progress, step, error).
 	Type string `json:"type"`
 	// DeploymentID is the deployment this message relates to.
 	DeploymentID uuid.UUID `json:"deployment_id"`
@@ -29,6 +29,39 @@ type LogMessage struct {
 	Message string `json:"message,omitempty"`
 	// Status is the deployment status for status messages.
 	Status string `json:"status,omitempty"`
+
+	// Progress contains overall progress information (type="progress").
+	Progress *ProgressUpdate `json:"progress,omitempty"`
+	// StepUpdate contains detailed step status (type="step").
+	StepUpdate *StepUpdate `json:"step_update,omitempty"`
+	// ErrorInfo contains error details with suggestions (type="error").
+	ErrorInfo *StepError `json:"error_info,omitempty"`
+}
+
+// ProgressUpdate provides overall deployment progress information.
+type ProgressUpdate struct {
+	// OverallPercent is the completion percentage (0-100).
+	OverallPercent int `json:"overall_percent"`
+	// CurrentStepIndex is the index of the current step.
+	CurrentStepIndex int `json:"current_step_index"`
+	// EstimatedRemainingMs is the estimated time remaining in milliseconds.
+	EstimatedRemainingMs int64 `json:"estimated_remaining_ms"`
+}
+
+// StepUpdate provides detailed step status information.
+type StepUpdate struct {
+	// StepID is the ID of the step being updated.
+	StepID string `json:"step_id"`
+	// Status is the current status of the step.
+	Status StepStatus `json:"status"`
+	// SubStepIndex is the current sub-step index (if applicable).
+	SubStepIndex int `json:"sub_step_index,omitempty"`
+	// SubStepCurrent is the current item within the sub-step.
+	SubStepCurrent int `json:"sub_step_current,omitempty"`
+	// SubStepTotal is the total items in the sub-step.
+	SubStepTotal int `json:"sub_step_total,omitempty"`
+	// ElapsedTimeMs is the elapsed time for this step in milliseconds.
+	ElapsedTimeMs int64 `json:"elapsed_time_ms"`
 }
 
 // LogHub manages WebSocket connections for deployment log streaming.
@@ -156,6 +189,40 @@ func (h *LogHub) BroadcastStatus(deploymentID uuid.UUID, status string) {
 	})
 }
 
+// BroadcastProgress sends a progress update to all subscribers.
+func (h *LogHub) BroadcastProgress(deploymentID uuid.UUID, progress *ProgressUpdate) {
+	h.Broadcast(deploymentID, LogMessage{
+		Type:         "progress",
+		DeploymentID: deploymentID,
+		Timestamp:    time.Now(),
+		Progress:     progress,
+	})
+}
+
+// BroadcastStepUpdate sends a step status update to all subscribers.
+func (h *LogHub) BroadcastStepUpdate(deploymentID uuid.UUID, update *StepUpdate) {
+	h.Broadcast(deploymentID, LogMessage{
+		Type:         "step",
+		DeploymentID: deploymentID,
+		Timestamp:    time.Now(),
+		Step:         update.StepID,
+		StepUpdate:   update,
+	})
+}
+
+// BroadcastErrorWithSuggestions sends an error with troubleshooting suggestions.
+func (h *LogHub) BroadcastErrorWithSuggestions(deploymentID uuid.UUID, stepID string, errInfo *StepError) {
+	h.Broadcast(deploymentID, LogMessage{
+		Type:         "error",
+		DeploymentID: deploymentID,
+		Timestamp:    time.Now(),
+		Level:        "error",
+		Step:         stepID,
+		Message:      errInfo.Message,
+		ErrorInfo:    errInfo,
+	})
+}
+
 // HandleWebSocket handles WebSocket connections for deployment logs.
 // This is the HTTP handler that should be mounted at the WebSocket endpoint.
 func (h *LogHub) HandleWebSocket(w http.ResponseWriter, r *http.Request, deploymentID uuid.UUID) error {
@@ -241,9 +308,10 @@ func (h *LogHub) CreateLogCallback(deploymentID uuid.UUID) LogCallback {
 
 // DeploymentOrchestrator coordinates deployments with real-time log streaming.
 type DeploymentOrchestrator struct {
-	runner *DeploymentRunner
-	hub    *LogHub
-	logger *slog.Logger
+	runner  *DeploymentRunner
+	hub     *LogHub
+	tracker *ProgressTracker
+	logger  *slog.Logger
 }
 
 // NewDeploymentOrchestrator creates a new DeploymentOrchestrator.
@@ -253,24 +321,35 @@ func NewDeploymentOrchestrator(runner *DeploymentRunner, hub *LogHub, logger *sl
 	}
 
 	return &DeploymentOrchestrator{
-		runner: runner,
-		hub:    hub,
-		logger: logger.With("component", "deployment-orchestrator"),
+		runner:  runner,
+		hub:     hub,
+		tracker: NewProgressTracker(hub, logger),
+		logger:  logger.With("component", "deployment-orchestrator"),
 	}
+}
+
+// GetTracker returns the progress tracker for external access.
+func (o *DeploymentOrchestrator) GetTracker() *ProgressTracker {
+	return o.tracker
 }
 
 // StartDeployment starts a deployment asynchronously with WebSocket log streaming.
 func (o *DeploymentOrchestrator) StartDeployment(ctx context.Context, cfg *DeploymentConfig, statusCallback func(status string, err error)) {
+	// Initialize progress tracking
+	workerCount := cfg.WorkerCount()
+	o.tracker.InitProgress(cfg.DeploymentID, cfg.Provider, workerCount)
+
 	// Create log callback that broadcasts to WebSocket subscribers
 	logCallback := o.hub.CreateLogCallback(cfg.DeploymentID)
 
 	go func() {
-		// Broadcast starting status
+		// Start auth step
+		o.tracker.StartStep(cfg.DeploymentID, "auth")
 		o.hub.BroadcastStatus(cfg.DeploymentID, "provisioning")
 		statusCallback("provisioning", nil)
 
-		// Run the deployment
-		result, err := o.runner.Deploy(ctx, cfg, logCallback)
+		// Run the deployment with progress tracking
+		result, err := o.runner.DeployWithTracker(ctx, cfg, logCallback, o.tracker)
 		if err != nil {
 			o.hub.BroadcastStatus(cfg.DeploymentID, "failed")
 			o.hub.BroadcastLog(cfg.DeploymentID, "error", "failed", err.Error())
@@ -278,12 +357,25 @@ func (o *DeploymentOrchestrator) StartDeployment(ctx context.Context, cfg *Deplo
 			return
 		}
 
+		// Mark deployment as complete
+		o.tracker.MarkComplete(cfg.DeploymentID)
+
 		// Broadcast completion
 		o.hub.BroadcastStatus(cfg.DeploymentID, "completed")
 		o.hub.BroadcastLog(cfg.DeploymentID, "info", "completed",
 			"Deployment completed. Control plane IP: "+result.ControlPlaneIP)
 		statusCallback("completed", nil)
 	}()
+}
+
+// GetProgress returns the current progress for a deployment.
+func (o *DeploymentOrchestrator) GetProgress(deploymentID uuid.UUID) *DeploymentProgress {
+	return o.tracker.GetProgress(deploymentID)
+}
+
+// GetResourcesForCleanup returns the resources that would be cleaned up on cancel.
+func (o *DeploymentOrchestrator) GetResourcesForCleanup(deploymentID uuid.UUID) []CreatedResource {
+	return o.tracker.GetResourcesForCleanup(deploymentID)
 }
 
 // CancelDeployment cancels an active deployment.
