@@ -298,9 +298,9 @@ func (r *DeploymentRunner) DeployWithTracker(ctx context.Context, cfg *Deploymen
 		// Find the current step and fail it
 		progress := tracker.GetProgress(cfg.DeploymentID)
 		if progress != nil {
-			for _, step := range progress.Steps {
-				if step.Status == StepStatusInProgress {
-					tracker.FailStep(cfg.DeploymentID, step.ID, err)
+			for i := range progress.Steps {
+				if progress.Steps[i].Status == StepStatusInProgress {
+					tracker.FailStep(cfg.DeploymentID, progress.Steps[i].ID, err)
 					break
 				}
 			}

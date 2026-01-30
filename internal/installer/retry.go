@@ -59,8 +59,8 @@ func CanRetryDeployment(progress *DeploymentProgress) bool {
 	}
 
 	// Check if any step is currently in progress
-	for _, step := range progress.Steps {
-		if step.Status == StepStatusInProgress {
+	for i := range progress.Steps {
+		if progress.Steps[i].Status == StepStatusInProgress {
 			return false
 		}
 	}
@@ -83,8 +83,8 @@ func (o *DeploymentOrchestrator) RetryDeployment(ctx context.Context, deployment
 	}
 
 	// Check if any step is currently in progress
-	for _, step := range progress.Steps {
-		if step.Status == StepStatusInProgress {
+	for i := range progress.Steps {
+		if progress.Steps[i].Status == StepStatusInProgress {
 			return ErrDeploymentActive
 		}
 	}
@@ -166,8 +166,8 @@ func (o *DeploymentOrchestrator) GetRetryInfo(deploymentID uuid.UUID) *RetryInfo
 	}
 
 	// Check if any step is in progress
-	for _, step := range progress.Steps {
-		if step.Status == StepStatusInProgress {
+	for i := range progress.Steps {
+		if progress.Steps[i].Status == StepStatusInProgress {
 			return &RetryInfo{
 				CanRetry: false,
 				Reason:   "Deployment is still in progress",
