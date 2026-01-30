@@ -201,6 +201,10 @@ func TestRetryInfo(t *testing.T) {
 	if info.FailedStep == nil {
 		t.Error("FailedStep should not be nil")
 	}
+
+	if info.Reason == "" {
+		t.Error("Reason should not be empty")
+	}
 }
 
 func TestGetRetryInfo_Scenarios(t *testing.T) {

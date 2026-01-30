@@ -313,8 +313,8 @@ func GetDeploymentSteps(provider string, workerCount int) []DeploymentStep {
 // CalculateTotalEstimate returns the total estimated time for all steps.
 func CalculateTotalEstimate(steps []DeploymentStep) int64 {
 	var total int64
-	for _, step := range steps {
-		total += step.EstimatedTimeMs
+	for i := range steps {
+		total += steps[i].EstimatedTimeMs
 	}
 	return total
 }
@@ -326,8 +326,8 @@ func CalculateOverallProgress(steps []DeploymentStep) int {
 	}
 
 	completed := 0
-	for _, step := range steps {
-		if step.Status == StepStatusCompleted || step.Status == StepStatusSkipped {
+	for i := range steps {
+		if steps[i].Status == StepStatusCompleted || steps[i].Status == StepStatusSkipped {
 			completed++
 		}
 	}
@@ -367,8 +367,8 @@ func CalculateRemainingTime(steps []DeploymentStep, currentStepIndex int) int64 
 
 // StepIDToIndex returns the index of a step by ID.
 func StepIDToIndex(steps []DeploymentStep, stepID string) int {
-	for i, step := range steps {
-		if step.ID == stepID {
+	for i := range steps {
+		if steps[i].ID == stepID {
 			return i
 		}
 	}

@@ -195,16 +195,15 @@ export default function DeploymentPage() {
   useEffect(() => {
     if (!deployment) return
 
-    // Use a microtask to batch state updates and avoid cascading renders
-    const scheduleUpdates = () => {
+    // Schedule state updates outside effect body to avoid cascading renders
+    const timeoutId = setTimeout(() => {
       if (deployment.status === "completed" && previousStatus !== "completed") {
         setShowCelebration(true)
       }
       setPreviousStatus(deployment.status)
-    }
+    }, 0)
 
-    // Schedule to avoid direct setState in effect body
-    queueMicrotask(scheduleUpdates)
+    return () => clearTimeout(timeoutId)
   }, [deployment, previousStatus])
 
   const handleCancel = async () => {

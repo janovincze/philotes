@@ -204,11 +204,15 @@ func (o *DeploymentOrchestrator) GetRetryInfo(deploymentID uuid.UUID) *RetryInfo
 
 	// Check error retryability
 	if failedStep.Error != nil && !failedStep.Error.Retryable {
+		reason := "The error is not retryable"
+		if len(failedStep.Error.Suggestions) > 0 {
+			reason = failedStep.Error.Suggestions[0]
+		}
 		return &RetryInfo{
 			CanRetry:     false,
 			FailedStep:   failedStep,
 			FailedStepID: failedStep.ID,
-			Reason:       failedStep.Error.Suggestions[0],
+			Reason:       reason,
 		}
 	}
 

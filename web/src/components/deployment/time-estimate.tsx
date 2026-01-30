@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import { Clock } from "lucide-react"
 
 interface TimeEstimateProps {
@@ -27,6 +27,11 @@ function formatDuration(ms: number): string {
   return `${seconds}s`
 }
 
+function calculateElapsed(startedAt: string | undefined): number {
+  if (!startedAt) return 0
+  return Math.max(0, Date.now() - new Date(startedAt).getTime())
+}
+
 export function TimeEstimate({
   startedAt,
   estimatedRemainingMs,
@@ -34,27 +39,41 @@ export function TimeEstimate({
   showRemaining = true,
   className = "",
 }: TimeEstimateProps) {
-  const [elapsedMs, setElapsedMs] = useState(0)
+  const [elapsedMs, setElapsedMs] = useState(() => calculateElapsed(startedAt))
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  useEffect(() => {
-    if (!startedAt) {
-      // Schedule reset to avoid direct setState in effect body
-      queueMicrotask(() => setElapsedMs(0))
-      return
-    }
-
-    const startTime = new Date(startedAt).getTime()
-
-    const updateElapsed = () => {
-      setElapsedMs(Date.now() - startTime)
-    }
-
-    // Initial update via microtask
-    queueMicrotask(updateElapsed)
-    const interval = setInterval(updateElapsed, 1000)
-
-    return () => clearInterval(interval)
+  const updateElapsed = useCallback(() => {
+    setElapsedMs(calculateElapsed(startedAt))
   }, [startedAt])
+
+  // Set up interval for elapsed time updates
+  useEffect(() => {
+    // Clear any existing interval
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current)
+      intervalRef.current = null
+    }
+
+    if (!startedAt) {
+      // Schedule state reset outside effect body via timeout
+      const timeoutId = setTimeout(() => setElapsedMs(0), 0)
+      return () => clearTimeout(timeoutId)
+    }
+
+    // Schedule initial update outside effect body
+    const initialTimeoutId = setTimeout(updateElapsed, 0)
+
+    // Set up recurring interval
+    intervalRef.current = setInterval(updateElapsed, 1000)
+
+    return () => {
+      clearTimeout(initialTimeoutId)
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+        intervalRef.current = null
+      }
+    }
+  }, [startedAt, updateElapsed])
 
   return (
     <div className={`flex items-center gap-4 text-sm text-muted-foreground ${className}`}>

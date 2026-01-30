@@ -657,9 +657,9 @@ func (r *DeploymentRunner) processEvent(event events.EngineEvent, logCallback Lo
 // resourceTypeToStep maps Pulumi resource types to deployment steps.
 var resourceTypeToStep = map[string]string{
 	// Network resources
-	"hcloud:index/network:Network":           "network",
-	"hcloud:index/networkSubnet:NetworkSubnet": "network",
-	"hcloud:index/firewall:Firewall":         "network",
+	"hcloud:index/network:Network":                       "network",
+	"hcloud:index/networkSubnet:NetworkSubnet":           "network",
+	"hcloud:index/firewall:Firewall":                     "network",
 	"scaleway:index/vpcPrivateNetwork:VpcPrivateNetwork": "network",
 	"exoscale:index/securityGroup:SecurityGroup":         "network",
 
@@ -670,12 +670,12 @@ var resourceTypeToStep = map[string]string{
 	"exoscale:index/compute:Compute":   "compute",
 
 	// Load balancer
-	"hcloud:index/loadBalancer:LoadBalancer":             "compute",
+	"hcloud:index/loadBalancer:LoadBalancer":               "compute",
 	"hcloud:index/loadBalancerService:LoadBalancerService": "compute",
-	"hcloud:index/loadBalancerTarget:LoadBalancerTarget": "compute",
+	"hcloud:index/loadBalancerTarget:LoadBalancerTarget":   "compute",
 
 	// Volume/storage
-	"hcloud:index/volume:Volume":           "storage",
+	"hcloud:index/volume:Volume":                     "storage",
 	"hcloud:index/volumeAttachment:VolumeAttachment": "storage",
 
 	// Kubernetes resources

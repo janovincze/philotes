@@ -204,7 +204,7 @@ func (t *ProgressTracker) FailStep(deploymentID uuid.UUID, stepID string, err er
 }
 
 // UpdateSubStep updates sub-step progress.
-func (t *ProgressTracker) UpdateSubStep(deploymentID uuid.UUID, stepID string, subStepIndex int, current, total int, details string) {
+func (t *ProgressTracker) UpdateSubStep(deploymentID uuid.UUID, stepID string, subStepIndex, current, total int, details string) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 

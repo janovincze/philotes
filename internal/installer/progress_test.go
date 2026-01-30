@@ -1,6 +1,7 @@
 package installer
 
 import (
+	"strconv"
 	"testing"
 	"time"
 )
@@ -321,7 +322,7 @@ func TestGenerateComputeSubSteps(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run("workers="+string(rune('0'+tt.workerCount)), func(t *testing.T) {
+		t.Run("workers="+strconv.Itoa(tt.workerCount), func(t *testing.T) {
 			subSteps := generateComputeSubSteps(tt.workerCount)
 			if len(subSteps) != tt.expected {
 				t.Errorf("generateComputeSubSteps(%d) returned %d sub-steps, want %d",
