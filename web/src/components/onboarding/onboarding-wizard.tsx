@@ -129,7 +129,9 @@ export function OnboardingWizard() {
       additionalData?: Record<string, unknown>,
       stepSkipped?: number
     ) => {
-      const stepTimeMs = Date.now() - currentState.stepStartTime
+      // Only calculate step time if we have a valid start time (not the initial 0)
+      const stepTimeMs =
+        currentState.stepStartTime > 0 ? Date.now() - currentState.stepStartTime : undefined
 
       try {
         await saveProgressMutation.mutateAsync({

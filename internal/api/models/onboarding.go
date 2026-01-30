@@ -52,7 +52,7 @@ type OnboardingProgress struct {
 
 // OnboardingMetrics tracks analytics for the wizard.
 type OnboardingMetrics struct {
-	TimePerStep  map[int]int64 `json:"time_per_step"`  // step -> milliseconds
+	TimePerStep  map[int]int64 `json:"time_per_step"`
 	TotalTimeMs  int64         `json:"total_time_ms"`
 	StepsSkipped []int         `json:"steps_skipped"`
 }

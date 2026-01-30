@@ -200,7 +200,7 @@ func (s *OnboardingService) CompleteOnboarding(ctx context.Context, progressID u
 }
 
 // AssociateUser associates a user with an onboarding session.
-func (s *OnboardingService) AssociateUser(ctx context.Context, progressID uuid.UUID, userID uuid.UUID) error {
+func (s *OnboardingService) AssociateUser(ctx context.Context, progressID, userID uuid.UUID) error {
 	err := s.onboardingRepo.AssociateUser(ctx, progressID, userID)
 	if err != nil {
 		if errors.Is(err, repositories.ErrOnboardingNotFound) {
@@ -224,7 +224,7 @@ func (s *OnboardingService) AssociateUser(ctx context.Context, progressID uuid.U
 
 // CheckAdminExists checks if an admin user already exists.
 func (s *OnboardingService) CheckAdminExists(ctx context.Context) (bool, error) {
-	return s.onboardingRepo.HasAdminUser(ctx)
+	return s.userRepo.HasAdminUser(ctx)
 }
 
 // VerifyDataFlow verifies that data is flowing to Iceberg.

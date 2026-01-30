@@ -347,7 +347,7 @@ func (r *OnboardingRepository) Complete(ctx context.Context, id uuid.UUID) (*mod
 }
 
 // AssociateUser associates a user with an onboarding session.
-func (r *OnboardingRepository) AssociateUser(ctx context.Context, id uuid.UUID, userID uuid.UUID) error {
+func (r *OnboardingRepository) AssociateUser(ctx context.Context, id, userID uuid.UUID) error {
 	query := `
 		UPDATE philotes.onboarding_progress
 		SET user_id = $1, updated_at = NOW()
@@ -369,19 +369,6 @@ func (r *OnboardingRepository) AssociateUser(ctx context.Context, id uuid.UUID, 
 	}
 
 	return nil
-}
-
-// HasAdminUser checks if any admin user exists in the system.
-func (r *OnboardingRepository) HasAdminUser(ctx context.Context) (bool, error) {
-	query := `SELECT EXISTS(SELECT 1 FROM philotes.users WHERE role = 'admin' AND is_active = true)`
-
-	var exists bool
-	err := r.db.QueryRowContext(ctx, query).Scan(&exists)
-	if err != nil {
-		return false, fmt.Errorf("failed to check admin existence: %w", err)
-	}
-
-	return exists, nil
 }
 
 // nullUUID converts a UUID pointer to sql.NullUUID.
