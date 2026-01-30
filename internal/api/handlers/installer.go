@@ -15,15 +15,17 @@ import (
 
 // InstallerHandler handles installer-related HTTP requests.
 type InstallerHandler struct {
-	service *services.InstallerService
-	logHub  *installer.LogHub
+	service      *services.InstallerService
+	logHub       *installer.LogHub
+	orchestrator *installer.DeploymentOrchestrator
 }
 
 // NewInstallerHandler creates a new InstallerHandler.
-func NewInstallerHandler(service *services.InstallerService, logHub *installer.LogHub) *InstallerHandler {
+func NewInstallerHandler(service *services.InstallerService, logHub *installer.LogHub, orchestrator *installer.DeploymentOrchestrator) *InstallerHandler {
 	return &InstallerHandler{
-		service: service,
-		logHub:  logHub,
+		service:      service,
+		logHub:       logHub,
+		orchestrator: orchestrator,
 	}
 }
 
@@ -303,4 +305,167 @@ func (h *InstallerHandler) StreamDeploymentLogs(c *gin.Context) {
 		))
 		return
 	}
+}
+
+// GetDeploymentProgress returns detailed progress for a deployment.
+// GET /api/v1/installer/deployments/:id/progress
+func (h *InstallerHandler) GetDeploymentProgress(c *gin.Context) {
+	if h.orchestrator == nil {
+		models.RespondWithError(c, models.NewInternalError(
+			c.Request.URL.Path,
+			"progress tracking not configured",
+		))
+		return
+	}
+
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		models.RespondWithError(c, models.NewBadRequestError(
+			c.Request.URL.Path,
+			"invalid deployment ID format",
+		))
+		return
+	}
+
+	// Verify deployment exists
+	_, err = h.service.GetDeployment(c.Request.Context(), id)
+	if err != nil {
+		respondWithInstallerError(c, err)
+		return
+	}
+
+	progress := h.orchestrator.GetProgress(id)
+	if progress == nil {
+		// Return a minimal progress structure for deployments without tracked progress
+		c.JSON(http.StatusOK, models.DeploymentProgressResponse{
+			Progress: nil,
+			Message:  "Progress tracking not available for this deployment",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.DeploymentProgressResponse{
+		Progress: progress,
+	})
+}
+
+// RetryDeployment retries a failed deployment.
+// POST /api/v1/installer/deployments/:id/retry
+func (h *InstallerHandler) RetryDeployment(c *gin.Context) {
+	if h.orchestrator == nil {
+		models.RespondWithError(c, models.NewInternalError(
+			c.Request.URL.Path,
+			"deployment orchestration not configured",
+		))
+		return
+	}
+
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		models.RespondWithError(c, models.NewBadRequestError(
+			c.Request.URL.Path,
+			"invalid deployment ID format",
+		))
+		return
+	}
+
+	// Get retry info first
+	retryInfo := h.orchestrator.GetRetryInfo(id)
+	if retryInfo == nil || !retryInfo.CanRetry {
+		reason := "deployment cannot be retried"
+		if retryInfo != nil {
+			reason = retryInfo.Reason
+		}
+		models.RespondWithError(c, models.NewBadRequestError(
+			c.Request.URL.Path,
+			reason,
+		))
+		return
+	}
+
+	// Get deployment details for retry
+	deployment, err := h.service.GetDeployment(c.Request.Context(), id)
+	if err != nil {
+		respondWithInstallerError(c, err)
+		return
+	}
+
+	// Start retry (this will update status asynchronously)
+	if err := h.service.RetryDeployment(c.Request.Context(), id, deployment, h.orchestrator); err != nil {
+		respondWithInstallerError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusAccepted, gin.H{
+		"message":         "retry started",
+		"deployment_id":   id,
+		"retry_from_step": retryInfo.FailedStepID,
+	})
+}
+
+// GetCleanupResources returns resources that would be cleaned up on cancel.
+// GET /api/v1/installer/deployments/:id/cleanup-preview
+func (h *InstallerHandler) GetCleanupResources(c *gin.Context) {
+	if h.orchestrator == nil {
+		models.RespondWithError(c, models.NewInternalError(
+			c.Request.URL.Path,
+			"progress tracking not configured",
+		))
+		return
+	}
+
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		models.RespondWithError(c, models.NewBadRequestError(
+			c.Request.URL.Path,
+			"invalid deployment ID format",
+		))
+		return
+	}
+
+	// Verify deployment exists
+	_, err = h.service.GetDeployment(c.Request.Context(), id)
+	if err != nil {
+		respondWithInstallerError(c, err)
+		return
+	}
+
+	resources := h.orchestrator.GetResourcesForCleanup(id)
+
+	c.JSON(http.StatusOK, models.CleanupResourcesResponse{
+		Resources: resources,
+		Count:     len(resources),
+	})
+}
+
+// GetRetryInfo returns retry information for a deployment.
+// GET /api/v1/installer/deployments/:id/retry-info
+func (h *InstallerHandler) GetRetryInfo(c *gin.Context) {
+	if h.orchestrator == nil {
+		models.RespondWithError(c, models.NewInternalError(
+			c.Request.URL.Path,
+			"progress tracking not configured",
+		))
+		return
+	}
+
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		models.RespondWithError(c, models.NewBadRequestError(
+			c.Request.URL.Path,
+			"invalid deployment ID format",
+		))
+		return
+	}
+
+	// Verify deployment exists
+	_, err = h.service.GetDeployment(c.Request.Context(), id)
+	if err != nil {
+		respondWithInstallerError(c, err)
+		return
+	}
+
+	retryInfo := h.orchestrator.GetRetryInfo(id)
+
+	c.JSON(http.StatusOK, retryInfo)
 }

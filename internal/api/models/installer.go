@@ -248,3 +248,15 @@ type CostEstimate struct {
 type CostEstimateResponse struct {
 	Estimate *CostEstimate `json:"estimate"`
 }
+
+// DeploymentProgressResponse wraps deployment progress for API responses.
+type DeploymentProgressResponse struct {
+	Progress interface{} `json:"progress,omitempty"`
+	Message  string      `json:"message,omitempty"`
+}
+
+// CleanupResourcesResponse wraps cleanup resources for API responses.
+type CleanupResourcesResponse struct {
+	Resources interface{} `json:"resources"`
+	Count     int         `json:"count"`
+}

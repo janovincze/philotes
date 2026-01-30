@@ -3,10 +3,14 @@ import { useEffect, useRef, useCallback, useState } from "react"
 import {
   installerApi,
   createDeploymentLogsWebSocket,
-  type DeploymentLogMessage,
-  type CreateDeploymentInput,
-  type DeploymentSize,
 } from "@/lib/api"
+import type {
+  DeploymentLogMessage,
+  CreateDeploymentInput,
+  DeploymentSize,
+  StepUpdate,
+  ProgressUpdate,
+} from "@/lib/api/types"
 
 // Provider hooks
 
@@ -108,13 +112,66 @@ export function useDeploymentLogs(deploymentId: string, limit?: number) {
   })
 }
 
-// WebSocket hook for real-time logs
+// Progress tracking hooks
+
+export function useDeploymentProgress(deploymentId: string) {
+  return useQuery({
+    queryKey: ["installer", "deployments", deploymentId, "progress"],
+    queryFn: () => installerApi.getDeploymentProgress(deploymentId),
+    enabled: !!deploymentId,
+    refetchInterval: (query) => {
+      // Refetch while deployment is active
+      const progress = query.state.data
+      if (progress && progress.overall_progress < 100) {
+        return 3000 // Refetch every 3 seconds
+      }
+      return false
+    },
+  })
+}
+
+export function useRetryDeployment() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (deploymentId: string) => installerApi.retryDeployment(deploymentId),
+    onSuccess: (_, deploymentId) => {
+      queryClient.invalidateQueries({ queryKey: ["installer", "deployments"] })
+      queryClient.invalidateQueries({
+        queryKey: ["installer", "deployments", deploymentId],
+      })
+      queryClient.invalidateQueries({
+        queryKey: ["installer", "deployments", deploymentId, "progress"],
+      })
+    },
+  })
+}
+
+export function useCleanupResources(deploymentId: string) {
+  return useQuery({
+    queryKey: ["installer", "deployments", deploymentId, "cleanup-preview"],
+    queryFn: () => installerApi.getCleanupResources(deploymentId),
+    enabled: !!deploymentId,
+  })
+}
+
+export function useRetryInfo(deploymentId: string) {
+  return useQuery({
+    queryKey: ["installer", "deployments", deploymentId, "retry-info"],
+    queryFn: () => installerApi.getRetryInfo(deploymentId),
+    enabled: !!deploymentId,
+  })
+}
+
+// WebSocket hook for real-time logs and progress
 
 export function useDeploymentLogsStream(deploymentId: string) {
   const [logs, setLogs] = useState<DeploymentLogMessage[]>([])
   const [status, setStatus] = useState<string | null>(null)
   const [connected, setConnected] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [progress, setProgress] = useState<ProgressUpdate | null>(null)
+  const [stepUpdates, setStepUpdates] = useState<Map<string, StepUpdate>>(new Map())
   const wsRef = useRef<WebSocket | null>(null)
 
   const connect = useCallback(() => {
@@ -127,12 +184,33 @@ export function useDeploymentLogsStream(deploymentId: string) {
     const ws = createDeploymentLogsWebSocket(
       deploymentId,
       (message) => {
-        if (message.type === "log") {
-          setLogs((prev) => [...prev, message])
-        } else if (message.type === "status") {
-          setStatus(message.status || null)
-        } else if (message.type === "connected") {
-          setConnected(true)
+        switch (message.type) {
+          case "log":
+            setLogs((prev) => [...prev, message])
+            break
+          case "status":
+            setStatus(message.status || null)
+            break
+          case "connected":
+            setConnected(true)
+            break
+          case "progress":
+            if (message.progress) {
+              setProgress(message.progress)
+            }
+            break
+          case "step":
+            if (message.step_update) {
+              setStepUpdates((prev) => {
+                const newMap = new Map(prev)
+                newMap.set(message.step_update!.step_id, message.step_update!)
+                return newMap
+              })
+            }
+            break
+          case "error":
+            setLogs((prev) => [...prev, message])
+            break
         }
       },
       (event: Event) => {
@@ -157,6 +235,7 @@ export function useDeploymentLogsStream(deploymentId: string) {
 
   const clearLogs = useCallback(() => {
     setLogs([])
+    setStepUpdates(new Map())
   }, [])
 
   useEffect(() => {
@@ -170,6 +249,8 @@ export function useDeploymentLogsStream(deploymentId: string) {
     status,
     connected,
     error,
+    progress,
+    stepUpdates,
     connect,
     disconnect,
     clearLogs,

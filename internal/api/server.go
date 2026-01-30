@@ -22,20 +22,21 @@ import (
 
 // Server is the HTTP API server.
 type Server struct {
-	cfg              *config.Config
-	logger           *slog.Logger
-	healthManager    *health.Manager
-	sourceService    *services.SourceService
-	pipelineService  *services.PipelineService
-	alertService     *services.AlertService
-	metricsService   *services.MetricsService
-	installerService *services.InstallerService
-	installerLogHub  *installer.LogHub
-	authService      *services.AuthService
-	apiKeyService    *services.APIKeyService
-	oauthService     *services.OAuthService
-	httpServer       *http.Server
-	router           *gin.Engine
+	cfg                   *config.Config
+	logger                *slog.Logger
+	healthManager         *health.Manager
+	sourceService         *services.SourceService
+	pipelineService       *services.PipelineService
+	alertService          *services.AlertService
+	metricsService        *services.MetricsService
+	installerService      *services.InstallerService
+	installerLogHub       *installer.LogHub
+	installerOrchestrator *installer.DeploymentOrchestrator
+	authService           *services.AuthService
+	apiKeyService         *services.APIKeyService
+	oauthService          *services.OAuthService
+	httpServer            *http.Server
+	router                *gin.Engine
 }
 
 // ServerConfig holds server configuration options.
@@ -66,6 +67,9 @@ type ServerConfig struct {
 
 	// InstallerLogHub is the WebSocket log hub for deployment streaming.
 	InstallerLogHub *installer.LogHub
+
+	// InstallerOrchestrator is the deployment orchestrator for progress tracking.
+	InstallerOrchestrator *installer.DeploymentOrchestrator
 
 	// AuthService is the auth service for authentication.
 	AuthService *services.AuthService
@@ -126,19 +130,20 @@ func NewServer(serverCfg ServerConfig) *Server {
 
 	// Create server
 	s := &Server{
-		cfg:              serverCfg.Config,
-		logger:           logger.With("component", "api-server"),
-		healthManager:    serverCfg.HealthManager,
-		sourceService:    serverCfg.SourceService,
-		pipelineService:  serverCfg.PipelineService,
-		alertService:     serverCfg.AlertService,
-		metricsService:   serverCfg.MetricsService,
-		installerService: serverCfg.InstallerService,
-		installerLogHub:  serverCfg.InstallerLogHub,
-		authService:      serverCfg.AuthService,
-		apiKeyService:    serverCfg.APIKeyService,
-		oauthService:     serverCfg.OAuthService,
-		router:           router,
+		cfg:                   serverCfg.Config,
+		logger:                logger.With("component", "api-server"),
+		healthManager:         serverCfg.HealthManager,
+		sourceService:         serverCfg.SourceService,
+		pipelineService:       serverCfg.PipelineService,
+		alertService:          serverCfg.AlertService,
+		metricsService:        serverCfg.MetricsService,
+		installerService:      serverCfg.InstallerService,
+		installerLogHub:       serverCfg.InstallerLogHub,
+		installerOrchestrator: serverCfg.InstallerOrchestrator,
+		authService:           serverCfg.AuthService,
+		apiKeyService:         serverCfg.APIKeyService,
+		oauthService:          serverCfg.OAuthService,
+		router:                router,
 	}
 
 	// Register routes
@@ -275,7 +280,7 @@ func (s *Server) registerRoutes() {
 
 		// Installer endpoints
 		if s.installerService != nil {
-			installerHandler := handlers.NewInstallerHandler(s.installerService, s.installerLogHub)
+			installerHandler := handlers.NewInstallerHandler(s.installerService, s.installerLogHub, s.installerOrchestrator)
 
 			// Provider endpoints (public - no auth required for browsing)
 			installerGroup := v1.Group("/installer")
@@ -315,6 +320,11 @@ func (s *Server) registerRoutes() {
 			deployments.GET("/:id/logs", installerHandler.GetDeploymentLogs)
 			// WebSocket endpoint for real-time log streaming
 			deployments.GET("/:id/logs/stream", installerHandler.StreamDeploymentLogs)
+			// Progress tracking endpoints
+			deployments.GET("/:id/progress", installerHandler.GetDeploymentProgress)
+			deployments.POST("/:id/retry", installerHandler.RetryDeployment)
+			deployments.GET("/:id/cleanup-preview", installerHandler.GetCleanupResources)
+			deployments.GET("/:id/retry-info", installerHandler.GetRetryInfo)
 		}
 	}
 }

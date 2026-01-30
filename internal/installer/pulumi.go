@@ -74,6 +74,19 @@ type DeploymentConfig struct {
 	Credentials *models.ProviderCredentials
 }
 
+// WorkerCount returns the configured worker count, or a default based on size.
+func (c *DeploymentConfig) WorkerCount() int {
+	if c.Config != nil && c.Config.WorkerCount > 0 {
+		return c.Config.WorkerCount
+	}
+	// Get from size config
+	sizeConfig := GetSizeConfig(c.Provider, c.Size)
+	if sizeConfig != nil {
+		return sizeConfig.WorkerCount
+	}
+	return 2 // Default
+}
+
 // DeploymentResult holds the result of a deployment.
 type DeploymentResult struct {
 	// ControlPlaneIP is the IP address of the control plane node.
@@ -205,6 +218,153 @@ func (r *DeploymentRunner) Deploy(ctx context.Context, cfg *DeploymentConfig, lo
 	)
 
 	return deployResult, nil
+}
+
+// DeployWithTracker runs a deployment with progress tracking.
+func (r *DeploymentRunner) DeployWithTracker(ctx context.Context, cfg *DeploymentConfig, logCallback LogCallback, tracker *ProgressTracker) (*DeploymentResult, error) {
+	r.logger.Info("starting deployment with tracker",
+		"deployment_id", cfg.DeploymentID,
+		"provider", cfg.Provider,
+		"region", cfg.Region,
+	)
+
+	// Complete auth step (credentials already validated)
+	tracker.CompleteStep(cfg.DeploymentID, "auth")
+
+	// Generate stack name if not provided
+	stackName := cfg.StackName
+	if stackName == "" {
+		stackName = fmt.Sprintf("%s/%s-%s", r.pulumiOrg, cfg.Provider, cfg.DeploymentID.String()[:8])
+	}
+
+	// Start network step
+	tracker.StartStep(cfg.DeploymentID, "network")
+	logCallback("info", "network", "Initializing Pulumi stack")
+
+	// Create or select the stack
+	stack, err := r.createOrSelectStack(ctx, stackName)
+	if err != nil {
+		tracker.FailStep(cfg.DeploymentID, "network", err)
+		logCallback("error", "network", fmt.Sprintf("Failed to initialize stack: %v", err))
+		return nil, fmt.Errorf("failed to create/select stack: %w", err)
+	}
+
+	// Store active stack for potential cancellation
+	r.mu.Lock()
+	r.activeStacks[cfg.DeploymentID] = &stack
+	r.mu.Unlock()
+
+	defer func() {
+		r.mu.Lock()
+		delete(r.activeStacks, cfg.DeploymentID)
+		r.mu.Unlock()
+	}()
+
+	logCallback("info", "network", "Configuring deployment parameters")
+
+	// Set stack configuration
+	tempFiles, err := r.configureStack(ctx, stack, cfg)
+	defer func() {
+		for _, f := range tempFiles {
+			if removeErr := os.Remove(f); removeErr != nil {
+				r.logger.Debug("failed to remove temp file", "path", f, "error", removeErr)
+			}
+		}
+	}()
+	if err != nil {
+		tracker.FailStep(cfg.DeploymentID, "network", err)
+		logCallback("error", "network", fmt.Sprintf("Failed to configure stack: %v", err))
+		return nil, fmt.Errorf("failed to configure stack: %w", err)
+	}
+
+	logCallback("info", "network", "Provisioning cloud infrastructure")
+
+	// Create event stream channel for logging
+	eventsChan := make(chan events.EngineEvent)
+
+	// Start a goroutine to process events with tracker
+	go func() {
+		for event := range eventsChan {
+			r.processEventWithTracker(event, cfg.DeploymentID, logCallback, tracker)
+		}
+	}()
+
+	// Run pulumi up
+	result, err := stack.Up(ctx,
+		optup.EventStreams(eventsChan),
+		optup.ProgressStreams(io.Discard),
+	)
+	if err != nil {
+		// Find the current step and fail it
+		progress := tracker.GetProgress(cfg.DeploymentID)
+		if progress != nil {
+			for i := range progress.Steps {
+				if progress.Steps[i].Status == StepStatusInProgress {
+					tracker.FailStep(cfg.DeploymentID, progress.Steps[i].ID, err)
+					break
+				}
+			}
+		}
+		logCallback("error", "provisioning", fmt.Sprintf("Deployment failed: %v", err))
+		return nil, fmt.Errorf("deployment failed: %w", err)
+	}
+
+	// Complete remaining steps
+	tracker.CompleteStep(cfg.DeploymentID, "health")
+	tracker.CompleteStep(cfg.DeploymentID, "ssl")
+
+	logCallback("info", "completed", "Deployment completed successfully")
+
+	// Extract outputs
+	outputs := result.Outputs
+	deployResult := &DeploymentResult{}
+
+	if v, ok := outputs["controlPlaneIP"]; ok {
+		if s, ok := v.Value.(string); ok {
+			deployResult.ControlPlaneIP = s
+		}
+	}
+	if v, ok := outputs["loadBalancerIP"]; ok {
+		if s, ok := v.Value.(string); ok {
+			deployResult.LoadBalancerIP = s
+		}
+	}
+	if v, ok := outputs["kubeconfig"]; ok {
+		if s, ok := v.Value.(string); ok {
+			deployResult.Kubeconfig = s
+		}
+	}
+
+	// Derive URLs from load balancer IP
+	if deployResult.LoadBalancerIP != "" {
+		if cfg.Config != nil && cfg.Config.Domain != "" {
+			deployResult.DashboardURL = fmt.Sprintf("https://%s", cfg.Config.Domain)
+			deployResult.APIURL = fmt.Sprintf("https://api.%s", cfg.Config.Domain)
+		} else {
+			deployResult.DashboardURL = fmt.Sprintf("http://%s", deployResult.LoadBalancerIP)
+			deployResult.APIURL = fmt.Sprintf("http://%s:8080", deployResult.LoadBalancerIP)
+		}
+	}
+
+	r.logger.Info("deployment with tracker completed",
+		"deployment_id", cfg.DeploymentID,
+		"control_plane_ip", deployResult.ControlPlaneIP,
+		"load_balancer_ip", deployResult.LoadBalancerIP,
+	)
+
+	return deployResult, nil
+}
+
+// DeployFromStep runs a deployment starting from a specific step (for retries).
+func (r *DeploymentRunner) DeployFromStep(ctx context.Context, cfg *DeploymentConfig, fromStep string, logCallback LogCallback, tracker *ProgressTracker) (*DeploymentResult, error) {
+	r.logger.Info("resuming deployment from step",
+		"deployment_id", cfg.DeploymentID,
+		"from_step", fromStep,
+	)
+
+	// For now, retry means running the full deployment again
+	// The Pulumi state will handle idempotency for already-created resources
+	return r.DeployWithTracker(ctx, cfg, logCallback, tracker)
 }
 
 // Destroy destroys a deployment.
@@ -492,4 +652,168 @@ func (r *DeploymentRunner) processEvent(event events.EngineEvent, logCallback Lo
 		}
 		return
 	}
+}
+
+// resourceTypeToStep maps Pulumi resource types to deployment steps.
+var resourceTypeToStep = map[string]string{
+	// Network resources
+	"hcloud:index/network:Network":                       "network",
+	"hcloud:index/networkSubnet:NetworkSubnet":           "network",
+	"hcloud:index/firewall:Firewall":                     "network",
+	"scaleway:index/vpcPrivateNetwork:VpcPrivateNetwork": "network",
+	"exoscale:index/securityGroup:SecurityGroup":         "network",
+
+	// Compute resources
+	"hcloud:index/server:Server":       "compute",
+	"hcloud:index/sshKey:SshKey":       "compute",
+	"scaleway:index/instance:Instance": "compute",
+	"exoscale:index/compute:Compute":   "compute",
+
+	// Load balancer
+	"hcloud:index/loadBalancer:LoadBalancer":               "compute",
+	"hcloud:index/loadBalancerService:LoadBalancerService": "compute",
+	"hcloud:index/loadBalancerTarget:LoadBalancerTarget":   "compute",
+
+	// Volume/storage
+	"hcloud:index/volume:Volume":                     "storage",
+	"hcloud:index/volumeAttachment:VolumeAttachment": "storage",
+
+	// Kubernetes resources
+	"command:remote:Command": "k3s",
+
+	// Helm charts
+	"kubernetes:helm.sh/v3:Release": "philotes",
+}
+
+// processEventWithTracker processes events and updates the progress tracker.
+func (r *DeploymentRunner) processEventWithTracker(event events.EngineEvent, deploymentID uuid.UUID, logCallback LogCallback, tracker *ProgressTracker) {
+	// Handle diagnostic events
+	if e := event.DiagnosticEvent; e != nil {
+		level := "info"
+		switch e.Severity {
+		case "warning":
+			level = "warn"
+		case "error":
+			level = "error"
+		}
+		if e.Message != "" {
+			logCallback(level, "provisioning", e.Message)
+		}
+		return
+	}
+
+	// Handle resource pre events (resource is being created)
+	if e := event.ResourcePreEvent; e != nil {
+		if e.Metadata.Type != "" {
+			// Determine which step this resource belongs to
+			stepID := r.mapResourceTypeToStep(e.Metadata.Type)
+			if stepID != "" {
+				// Get current progress
+				progress := tracker.GetProgress(deploymentID)
+				if progress != nil {
+					currentStepID := ""
+					if progress.CurrentStepIndex < len(progress.Steps) {
+						currentStepID = progress.Steps[progress.CurrentStepIndex].ID
+					}
+
+					// If this resource belongs to a different step, complete current and start new
+					if stepID != currentStepID {
+						// Complete current step
+						if currentStepID != "" && currentStepID != stepID {
+							tracker.CompleteStep(deploymentID, currentStepID)
+						}
+						// Start new step
+						tracker.StartStep(deploymentID, stepID)
+					}
+				}
+			}
+
+			msg := fmt.Sprintf("Creating %s", r.extractResourceName(e.Metadata.URN))
+			logCallback("info", stepID, msg)
+		}
+		return
+	}
+
+	// Handle resource outputs events (resource created)
+	if e := event.ResOutputsEvent; e != nil {
+		if e.Metadata.Type != "" {
+			stepID := r.mapResourceTypeToStep(e.Metadata.Type)
+			resourceName := r.extractResourceName(e.Metadata.URN)
+
+			// Track created resource
+			tracker.AddResource(deploymentID, CreatedResource{
+				Type: e.Metadata.Type,
+				Name: resourceName,
+			})
+
+			msg := fmt.Sprintf("Created %s", resourceName)
+			logCallback("info", stepID, msg)
+		}
+		return
+	}
+
+	// Handle summary events
+	if e := event.SummaryEvent; e != nil {
+		if e.ResourceChanges != nil {
+			var changes []string
+			for op, count := range e.ResourceChanges {
+				if count > 0 {
+					changes = append(changes, fmt.Sprintf("%s: %d", op, count))
+				}
+			}
+			if len(changes) > 0 {
+				logCallback("info", "summary", strings.Join(changes, ", "))
+			}
+		}
+		return
+	}
+}
+
+// mapResourceTypeToStep maps a Pulumi resource type to a deployment step ID.
+func (r *DeploymentRunner) mapResourceTypeToStep(resourceType string) string {
+	if stepID, ok := resourceTypeToStep[resourceType]; ok {
+		return stepID
+	}
+
+	// Infer from resource type name
+	typeLower := strings.ToLower(resourceType)
+	switch {
+	case strings.Contains(typeLower, "network") || strings.Contains(typeLower, "subnet") || strings.Contains(typeLower, "firewall") || strings.Contains(typeLower, "security"):
+		return "network"
+	case strings.Contains(typeLower, "server") || strings.Contains(typeLower, "instance") || strings.Contains(typeLower, "compute") || strings.Contains(typeLower, "ssh"):
+		return "compute"
+	case strings.Contains(typeLower, "loadbalancer") || strings.Contains(typeLower, "lb"):
+		return "compute"
+	case strings.Contains(typeLower, "volume") || strings.Contains(typeLower, "storage"):
+		return "storage"
+	case strings.Contains(typeLower, "command"):
+		return "k3s"
+	case strings.Contains(typeLower, "helm") || strings.Contains(typeLower, "release"):
+		return "philotes"
+	case strings.Contains(typeLower, "cert") || strings.Contains(typeLower, "certificate"):
+		return "ssl"
+	default:
+		return "provisioning"
+	}
+}
+
+// extractResourceName extracts a friendly name from a Pulumi URN.
+func (r *DeploymentRunner) extractResourceName(urn string) string {
+	// URN format: urn:pulumi:stack::project::type::name
+	parts := strings.Split(urn, "::")
+	if len(parts) >= 4 {
+		// Get the last part (resource name)
+		name := parts[len(parts)-1]
+		// Also get the type for context
+		resourceType := parts[len(parts)-2]
+		// Extract just the type name (after the last /)
+		typeParts := strings.Split(resourceType, "/")
+		shortType := typeParts[len(typeParts)-1]
+		// Split by : and get last part
+		typeNameParts := strings.Split(shortType, ":")
+		shortType = typeNameParts[len(typeNameParts)-1]
+
+		return fmt.Sprintf("%s (%s)", name, shortType)
+	}
+	return urn
 }
