@@ -611,3 +611,95 @@ export interface StoreCredentialResponse {
   provider: string
   expires_at: string
 }
+
+// Onboarding Types
+
+export type OnboardingStep = 1 | 2 | 3 | 4 | 5 | 6 | 7
+
+export interface OnboardingMetrics {
+  time_per_step: Record<number, number>
+  total_time_ms: number
+  steps_skipped: number[]
+}
+
+export interface OnboardingProgress {
+  id: string
+  user_id?: string
+  session_id?: string
+  current_step: number
+  completed_steps: number[]
+  step_data: Record<string, unknown>
+  metrics?: OnboardingMetrics
+  started_at: string
+  updated_at: string
+  completed_at?: string
+}
+
+export interface ClusterHealthResponse {
+  overall: HealthStatus
+  components: Record<string, ComponentHealth>
+  api_ready: boolean
+  buffer_db_ready: boolean
+  minio_ready: boolean
+  lakekeeper_ready: boolean
+  all_critical_ready: boolean
+  pods_healthy?: number
+  pods_total?: number
+  timestamp: string
+}
+
+export interface OnboardingProgressResponse {
+  progress: OnboardingProgress
+}
+
+export interface SaveOnboardingProgressRequest {
+  session_id?: string
+  current_step: number
+  completed_steps: number[]
+  step_data?: Record<string, unknown>
+  step_skipped?: number
+  step_time_ms?: number
+}
+
+export interface DataVerificationRequest {
+  pipeline_id: string
+  table_name: string
+  max_wait_sec?: number
+}
+
+export interface DataVerificationResponse {
+  success: boolean
+  row_count: number
+  sample_rows?: Record<string, unknown>[]
+  query_time_ms: number
+  error_message?: string
+}
+
+export interface RegisterRequest {
+  email: string
+  password: string
+  confirm_password: string
+  name?: string
+  generate_api_key?: boolean
+}
+
+export interface RegisterResponse {
+  user: User
+  token: string
+  api_key?: string
+}
+
+export interface User {
+  id: string
+  email: string
+  name?: string
+  role: "admin" | "operator" | "viewer"
+  is_active: boolean
+  last_login_at?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface AdminExistsResponse {
+  exists: boolean
+}

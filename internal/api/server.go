@@ -35,6 +35,7 @@ type Server struct {
 	authService           *services.AuthService
 	apiKeyService         *services.APIKeyService
 	oauthService          *services.OAuthService
+	onboardingService     *services.OnboardingService
 	httpServer            *http.Server
 	router                *gin.Engine
 }
@@ -79,6 +80,9 @@ type ServerConfig struct {
 
 	// OAuthService is the OAuth service for cloud provider authentication.
 	OAuthService *services.OAuthService
+
+	// OnboardingService is the onboarding service for post-installation wizard.
+	OnboardingService *services.OnboardingService
 
 	// CORSConfig is the CORS configuration.
 	CORSConfig middleware.CORSConfig
@@ -143,6 +147,7 @@ func NewServer(serverCfg ServerConfig) *Server {
 		authService:           serverCfg.AuthService,
 		apiKeyService:         serverCfg.APIKeyService,
 		oauthService:          serverCfg.OAuthService,
+		onboardingService:     serverCfg.OnboardingService,
 		router:                router,
 	}
 
@@ -186,10 +191,16 @@ func (s *Server) registerRoutes() {
 	var authHandler *handlers.AuthHandler
 	var apiKeyHandler *handlers.APIKeyHandler
 	if s.authService != nil {
-		authHandler = handlers.NewAuthHandler(s.authService)
+		authHandler = handlers.NewAuthHandler(s.authService, s.apiKeyService)
 	}
 	if s.apiKeyService != nil {
 		apiKeyHandler = handlers.NewAPIKeyHandler(s.apiKeyService)
+	}
+
+	// Create onboarding handler
+	var onboardingHandler *handlers.OnboardingHandler
+	if s.onboardingService != nil {
+		onboardingHandler = handlers.NewOnboardingHandler(s.onboardingService)
 	}
 
 	// Configure auth middleware
@@ -232,6 +243,11 @@ func (s *Server) registerRoutes() {
 		// API key endpoints (registered by handler)
 		if apiKeyHandler != nil {
 			apiKeyHandler.Register(v1, requireAuth)
+		}
+
+		// Onboarding endpoints (mostly public for initial setup)
+		if onboardingHandler != nil {
+			onboardingHandler.Register(v1)
 		}
 
 		// Source endpoints (protected when auth is enabled)

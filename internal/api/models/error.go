@@ -48,6 +48,7 @@ const (
 	ErrorTypeNotImplemented = "https://philotes.io/errors/not-implemented"
 	ErrorTypeBadRequest     = "https://philotes.io/errors/bad-request"
 	ErrorTypeRateLimited    = "https://philotes.io/errors/rate-limited"
+	ErrorTypeConflict       = "https://philotes.io/errors/conflict"
 )
 
 // NewValidationError creates a validation error with field errors.
@@ -113,6 +114,17 @@ func NewRateLimitedError(instance string) *ProblemDetails {
 		Title:    "Too Many Requests",
 		Status:   http.StatusTooManyRequests,
 		Detail:   "Rate limit exceeded. Please try again later.",
+		Instance: instance,
+	}
+}
+
+// NewConflictError creates a conflict error.
+func NewConflictError(instance, detail string) *ProblemDetails {
+	return &ProblemDetails{
+		Type:     ErrorTypeConflict,
+		Title:    "Conflict",
+		Status:   http.StatusConflict,
+		Detail:   detail,
 		Instance: instance,
 	}
 }
