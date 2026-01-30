@@ -35,6 +35,7 @@ type Server struct {
 	authService           *services.AuthService
 	apiKeyService         *services.APIKeyService
 	oauthService          *services.OAuthService
+	oidcService           *services.OIDCService
 	onboardingService     *services.OnboardingService
 	httpServer            *http.Server
 	router                *gin.Engine
@@ -80,6 +81,9 @@ type ServerConfig struct {
 
 	// OAuthService is the OAuth service for cloud provider authentication.
 	OAuthService *services.OAuthService
+
+	// OIDCService is the OIDC service for SSO authentication.
+	OIDCService *services.OIDCService
 
 	// OnboardingService is the onboarding service for post-installation wizard.
 	OnboardingService *services.OnboardingService
@@ -147,6 +151,7 @@ func NewServer(serverCfg ServerConfig) *Server {
 		authService:           serverCfg.AuthService,
 		apiKeyService:         serverCfg.APIKeyService,
 		oauthService:          serverCfg.OAuthService,
+		oidcService:           serverCfg.OIDCService,
 		onboardingService:     serverCfg.OnboardingService,
 		router:                router,
 	}
@@ -203,6 +208,12 @@ func (s *Server) registerRoutes() {
 		onboardingHandler = handlers.NewOnboardingHandler(s.onboardingService)
 	}
 
+	// Create OIDC handler
+	var oidcHandler *handlers.OIDCHandler
+	if s.oidcService != nil {
+		oidcHandler = handlers.NewOIDCHandler(s.oidcService)
+	}
+
 	// Configure auth middleware
 	authConfig := middleware.AuthConfig{
 		Enabled:       s.cfg.Auth.Enabled,
@@ -248,6 +259,11 @@ func (s *Server) registerRoutes() {
 		// Onboarding endpoints (mostly public for initial setup)
 		if onboardingHandler != nil {
 			onboardingHandler.Register(v1)
+		}
+
+		// OIDC SSO endpoints (registered by handler)
+		if oidcHandler != nil {
+			oidcHandler.Register(v1, requireAuth)
 		}
 
 		// Source endpoints (protected when auth is enabled)

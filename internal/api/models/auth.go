@@ -66,14 +66,17 @@ var RolePermissions = map[UserRole][]string{
 
 // User represents a user in the system.
 type User struct {
-	ID          uuid.UUID  `json:"id"`
-	Email       string     `json:"email"`
-	Name        string     `json:"name,omitempty"`
-	Role        UserRole   `json:"role"`
-	IsActive    bool       `json:"is_active"`
-	LastLoginAt *time.Time `json:"last_login_at,omitempty"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
+	ID             uuid.UUID  `json:"id"`
+	Email          string     `json:"email"`
+	Name           string     `json:"name,omitempty"`
+	Role           UserRole   `json:"role"`
+	IsActive       bool       `json:"is_active"`
+	LastLoginAt    *time.Time `json:"last_login_at,omitempty"`
+	OIDCProviderID *uuid.UUID `json:"oidc_provider_id,omitempty"`
+	OIDCSubject    string     `json:"oidc_subject,omitempty"`
+	OIDCGroups     []string   `json:"oidc_groups,omitempty"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
 }
 
 // APIKey represents an API key for programmatic access.

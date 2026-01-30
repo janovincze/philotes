@@ -703,3 +703,91 @@ export interface User {
 export interface AdminExistsResponse {
   exists: boolean
 }
+
+// OIDC SSO Types
+
+export type OIDCProviderType = "google" | "okta" | "azure_ad" | "auth0" | "generic"
+
+export interface OIDCProviderSummary {
+  id: string
+  name: string
+  display_name: string
+  provider_type: OIDCProviderType
+  issuer_url: string
+  client_id: string
+  scopes: string[]
+  groups_claim: string
+  role_mapping: Record<string, "admin" | "operator" | "viewer">
+  default_role: "admin" | "operator" | "viewer"
+  enabled: boolean
+  auto_create_users: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface OIDCProviderResponse {
+  provider: OIDCProviderSummary
+}
+
+export interface OIDCProvidersResponse {
+  providers: OIDCProviderSummary[]
+  total_count: number
+}
+
+export interface CreateOIDCProviderRequest {
+  name: string
+  display_name: string
+  provider_type: OIDCProviderType
+  issuer_url: string
+  client_id: string
+  client_secret: string
+  scopes?: string[]
+  groups_claim?: string
+  role_mapping?: Record<string, "admin" | "operator" | "viewer">
+  default_role?: "admin" | "operator" | "viewer"
+  enabled?: boolean
+  auto_create_users?: boolean
+}
+
+export interface UpdateOIDCProviderRequest {
+  display_name?: string
+  issuer_url?: string
+  client_id?: string
+  client_secret?: string
+  scopes?: string[]
+  groups_claim?: string
+  role_mapping?: Record<string, "admin" | "operator" | "viewer">
+  default_role?: "admin" | "operator" | "viewer"
+  enabled?: boolean
+  auto_create_users?: boolean
+}
+
+export interface OIDCAuthorizeRequest {
+  redirect_uri: string
+}
+
+export interface OIDCAuthorizeResponse {
+  authorization_url: string
+  state: string
+  provider: string
+}
+
+export interface OIDCCallbackRequest {
+  code: string
+  state: string
+  error?: string
+}
+
+export interface OIDCCallbackResponse {
+  success: boolean
+  token?: string
+  expires_at?: string
+  user?: User
+  redirect_uri?: string
+  error?: string
+}
+
+export interface OIDCTestResponse {
+  success: boolean
+  message: string
+}

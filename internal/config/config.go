@@ -49,6 +49,9 @@ type Config struct {
 
 	// OAuth configuration for cloud providers
 	OAuth OAuthConfig
+
+	// OIDC configuration for SSO authentication
+	OIDC OIDCConfig
 }
 
 // OAuthConfig holds OAuth configuration for cloud providers.
@@ -91,6 +94,29 @@ type OVHOAuthConfig struct {
 	ClientSecret string
 	// Enabled indicates if OVH OAuth is configured
 	Enabled bool
+}
+
+// OIDCConfig holds OIDC/SSO configuration.
+type OIDCConfig struct {
+	// Enabled enables OIDC authentication
+	Enabled bool
+
+	// AllowLocalLogin allows local username/password login when OIDC is enabled
+	AllowLocalLogin bool
+
+	// AutoCreateUsers automatically creates users on first OIDC login
+	AutoCreateUsers bool
+
+	// DefaultRole is the default role for auto-created users
+	DefaultRole string
+
+	// EncryptionKey is the base64-encoded 32-byte key for encrypting OIDC secrets.
+	// Generate with: openssl rand -base64 32
+	// If empty, falls back to OAuth.EncryptionKey
+	EncryptionKey string
+
+	// StateExpiration is how long OIDC states are valid
+	StateExpiration time.Duration
 }
 
 // VaultConfig holds HashiCorp Vault configuration.
@@ -616,6 +642,15 @@ func Load() (*Config, error) {
 				ClientSecret: getEnv("PHILOTES_OAUTH_OVH_CLIENT_SECRET", ""),
 				Enabled:      getEnv("PHILOTES_OAUTH_OVH_CLIENT_ID", "") != "",
 			},
+		},
+
+		OIDC: OIDCConfig{
+			Enabled:         getBoolEnv("PHILOTES_OIDC_ENABLED", false),
+			AllowLocalLogin: getBoolEnv("PHILOTES_OIDC_ALLOW_LOCAL_LOGIN", true),
+			AutoCreateUsers: getBoolEnv("PHILOTES_OIDC_AUTO_CREATE_USERS", true),
+			DefaultRole:     getEnv("PHILOTES_OIDC_DEFAULT_ROLE", "viewer"),
+			EncryptionKey:   getEnv("PHILOTES_OIDC_ENCRYPTION_KEY", ""),
+			StateExpiration: getDurationEnv("PHILOTES_OIDC_STATE_EXPIRATION", 10*time.Minute),
 		},
 	}
 

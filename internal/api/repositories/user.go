@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 
 	"github.com/janovincze/philotes/internal/api/models"
 )
@@ -31,30 +32,40 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 
 // userRow represents a database row for a user.
 type userRow struct {
-	ID           uuid.UUID
-	Email        string
-	PasswordHash string
-	Name         sql.NullString
-	Role         string
-	IsActive     bool
-	LastLoginAt  sql.NullTime
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	ID             uuid.UUID
+	Email          string
+	PasswordHash   sql.NullString
+	Name           sql.NullString
+	Role           string
+	IsActive       bool
+	LastLoginAt    sql.NullTime
+	OIDCProviderID sql.NullString
+	OIDCSubject    sql.NullString
+	OIDCGroups     []string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
 }
 
 // toModel converts a database row to an API model.
 func (r *userRow) toModel() *models.User {
 	user := &models.User{
-		ID:        r.ID,
-		Email:     r.Email,
-		Name:      r.Name.String,
-		Role:      models.UserRole(r.Role),
-		IsActive:  r.IsActive,
-		CreatedAt: r.CreatedAt,
-		UpdatedAt: r.UpdatedAt,
+		ID:          r.ID,
+		Email:       r.Email,
+		Name:        r.Name.String,
+		Role:        models.UserRole(r.Role),
+		IsActive:    r.IsActive,
+		OIDCSubject: r.OIDCSubject.String,
+		OIDCGroups:  r.OIDCGroups,
+		CreatedAt:   r.CreatedAt,
+		UpdatedAt:   r.UpdatedAt,
 	}
 	if r.LastLoginAt.Valid {
 		user.LastLoginAt = &r.LastLoginAt.Time
+	}
+	if r.OIDCProviderID.Valid {
+		if pid, err := uuid.Parse(r.OIDCProviderID.String); err == nil {
+			user.OIDCProviderID = &pid
+		}
 	}
 	return user
 }
@@ -64,11 +75,12 @@ func (r *UserRepository) Create(ctx context.Context, email, passwordHash, name s
 	query := `
 		INSERT INTO philotes.users (email, password_hash, name, role)
 		VALUES ($1, $2, $3, $4)
-		RETURNING id, email, password_hash, name, role, is_active, last_login_at, created_at, updated_at
+		RETURNING id, email, password_hash, name, role, is_active, last_login_at,
+		          oidc_provider_id, oidc_subject, oidc_groups, created_at, updated_at
 	`
 
 	var row userRow
-	err := r.db.QueryRowContext(ctx, query, email, passwordHash, nullString(name), role).Scan(
+	err := r.db.QueryRowContext(ctx, query, email, nullString(passwordHash), nullString(name), role).Scan(
 		&row.ID,
 		&row.Email,
 		&row.PasswordHash,
@@ -76,6 +88,9 @@ func (r *UserRepository) Create(ctx context.Context, email, passwordHash, name s
 		&row.Role,
 		&row.IsActive,
 		&row.LastLoginAt,
+		&row.OIDCProviderID,
+		&row.OIDCSubject,
+		pq.Array(&row.OIDCGroups),
 		&row.CreatedAt,
 		&row.UpdatedAt,
 	)
@@ -92,7 +107,8 @@ func (r *UserRepository) Create(ctx context.Context, email, passwordHash, name s
 // GetByID retrieves a user by ID.
 func (r *UserRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.User, error) {
 	query := `
-		SELECT id, email, password_hash, name, role, is_active, last_login_at, created_at, updated_at
+		SELECT id, email, password_hash, name, role, is_active, last_login_at,
+		       oidc_provider_id, oidc_subject, oidc_groups, created_at, updated_at
 		FROM philotes.users
 		WHERE id = $1
 	`
@@ -106,6 +122,9 @@ func (r *UserRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Use
 		&row.Role,
 		&row.IsActive,
 		&row.LastLoginAt,
+		&row.OIDCProviderID,
+		&row.OIDCSubject,
+		pq.Array(&row.OIDCGroups),
 		&row.CreatedAt,
 		&row.UpdatedAt,
 	)
@@ -122,7 +141,8 @@ func (r *UserRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Use
 // GetByEmail retrieves a user by email.
 func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*models.User, error) {
 	query := `
-		SELECT id, email, password_hash, name, role, is_active, last_login_at, created_at, updated_at
+		SELECT id, email, password_hash, name, role, is_active, last_login_at,
+		       oidc_provider_id, oidc_subject, oidc_groups, created_at, updated_at
 		FROM philotes.users
 		WHERE email = $1
 	`
@@ -136,6 +156,9 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*models.
 		&row.Role,
 		&row.IsActive,
 		&row.LastLoginAt,
+		&row.OIDCProviderID,
+		&row.OIDCSubject,
+		pq.Array(&row.OIDCGroups),
 		&row.CreatedAt,
 		&row.UpdatedAt,
 	)
@@ -152,7 +175,8 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*models.
 // GetByEmailWithPassword retrieves a user by email including the password hash.
 func (r *UserRepository) GetByEmailWithPassword(ctx context.Context, email string) (*models.User, string, error) {
 	query := `
-		SELECT id, email, password_hash, name, role, is_active, last_login_at, created_at, updated_at
+		SELECT id, email, password_hash, name, role, is_active, last_login_at,
+		       oidc_provider_id, oidc_subject, oidc_groups, created_at, updated_at
 		FROM philotes.users
 		WHERE email = $1
 	`
@@ -166,6 +190,9 @@ func (r *UserRepository) GetByEmailWithPassword(ctx context.Context, email strin
 		&row.Role,
 		&row.IsActive,
 		&row.LastLoginAt,
+		&row.OIDCProviderID,
+		&row.OIDCSubject,
+		pq.Array(&row.OIDCGroups),
 		&row.CreatedAt,
 		&row.UpdatedAt,
 	)
@@ -176,13 +203,14 @@ func (r *UserRepository) GetByEmailWithPassword(ctx context.Context, email strin
 		return nil, "", fmt.Errorf("failed to get user: %w", err)
 	}
 
-	return row.toModel(), row.PasswordHash, nil
+	return row.toModel(), row.PasswordHash.String, nil
 }
 
 // List retrieves all users.
 func (r *UserRepository) List(ctx context.Context) ([]models.User, error) {
 	query := `
-		SELECT id, email, password_hash, name, role, is_active, last_login_at, created_at, updated_at
+		SELECT id, email, password_hash, name, role, is_active, last_login_at,
+		       oidc_provider_id, oidc_subject, oidc_groups, created_at, updated_at
 		FROM philotes.users
 		ORDER BY created_at DESC
 	`
@@ -204,6 +232,9 @@ func (r *UserRepository) List(ctx context.Context) ([]models.User, error) {
 			&row.Role,
 			&row.IsActive,
 			&row.LastLoginAt,
+			&row.OIDCProviderID,
+			&row.OIDCSubject,
+			pq.Array(&row.OIDCGroups),
 			&row.CreatedAt,
 			&row.UpdatedAt,
 		)
@@ -355,4 +386,159 @@ func (r *UserRepository) HasAdminUser(ctx context.Context) (bool, error) {
 	}
 
 	return exists, nil
+}
+
+// --- OIDC User Operations ---
+
+// GetByOIDCSubject retrieves a user by OIDC provider ID and subject.
+func (r *UserRepository) GetByOIDCSubject(ctx context.Context, providerID uuid.UUID, subject string) (*models.User, error) {
+	query := `
+		SELECT id, email, password_hash, name, role, is_active, last_login_at,
+		       oidc_provider_id, oidc_subject, oidc_groups, created_at, updated_at
+		FROM philotes.users
+		WHERE oidc_provider_id = $1 AND oidc_subject = $2
+	`
+
+	var row userRow
+	err := r.db.QueryRowContext(ctx, query, providerID, subject).Scan(
+		&row.ID,
+		&row.Email,
+		&row.PasswordHash,
+		&row.Name,
+		&row.Role,
+		&row.IsActive,
+		&row.LastLoginAt,
+		&row.OIDCProviderID,
+		&row.OIDCSubject,
+		pq.Array(&row.OIDCGroups),
+		&row.CreatedAt,
+		&row.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrUserNotFound
+		}
+		return nil, fmt.Errorf("failed to get user by oidc subject: %w", err)
+	}
+
+	return row.toModel(), nil
+}
+
+// CreateOIDCUser creates a new user from OIDC authentication.
+func (r *UserRepository) CreateOIDCUser(ctx context.Context, email, name string, role models.UserRole, providerID uuid.UUID, subject string, groups []string) (*models.User, error) {
+	query := `
+		INSERT INTO philotes.users (email, name, role, oidc_provider_id, oidc_subject, oidc_groups)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING id, email, password_hash, name, role, is_active, last_login_at,
+		          oidc_provider_id, oidc_subject, oidc_groups, created_at, updated_at
+	`
+
+	var row userRow
+	err := r.db.QueryRowContext(ctx, query, email, nullString(name), role, providerID, subject, pq.Array(groups)).Scan(
+		&row.ID,
+		&row.Email,
+		&row.PasswordHash,
+		&row.Name,
+		&row.Role,
+		&row.IsActive,
+		&row.LastLoginAt,
+		&row.OIDCProviderID,
+		&row.OIDCSubject,
+		pq.Array(&row.OIDCGroups),
+		&row.CreatedAt,
+		&row.UpdatedAt,
+	)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return nil, ErrUserEmailExists
+		}
+		return nil, fmt.Errorf("failed to create oidc user: %w", err)
+	}
+
+	return row.toModel(), nil
+}
+
+// UpdateOIDCInfo updates a user's OIDC-related information.
+func (r *UserRepository) UpdateOIDCInfo(ctx context.Context, id uuid.UUID, providerID *uuid.UUID, subject string, groups []string) error {
+	query := `
+		UPDATE philotes.users
+		SET oidc_provider_id = $1, oidc_subject = $2, oidc_groups = $3, updated_at = NOW()
+		WHERE id = $4
+	`
+
+	var providerIDStr interface{}
+	if providerID != nil {
+		providerIDStr = *providerID
+	}
+
+	result, err := r.db.ExecContext(ctx, query, providerIDStr, nullString(subject), pq.Array(groups), id)
+	if err != nil {
+		return fmt.Errorf("failed to update oidc info: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return ErrUserNotFound
+	}
+
+	return nil
+}
+
+// LinkOIDCProvider links an existing user to an OIDC provider.
+func (r *UserRepository) LinkOIDCProvider(ctx context.Context, userID, providerID uuid.UUID, subject string, groups []string) error {
+	return r.UpdateOIDCInfo(ctx, userID, &providerID, subject, groups)
+}
+
+// UnlinkOIDCProvider unlinks a user from their OIDC provider.
+func (r *UserRepository) UnlinkOIDCProvider(ctx context.Context, userID uuid.UUID) error {
+	query := `
+		UPDATE philotes.users
+		SET oidc_provider_id = NULL, oidc_subject = NULL, oidc_groups = '{}', updated_at = NOW()
+		WHERE id = $1
+	`
+
+	result, err := r.db.ExecContext(ctx, query, userID)
+	if err != nil {
+		return fmt.Errorf("failed to unlink oidc provider: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return ErrUserNotFound
+	}
+
+	return nil
+}
+
+// UpdateOIDCGroups updates only the OIDC groups for a user.
+func (r *UserRepository) UpdateOIDCGroups(ctx context.Context, id uuid.UUID, groups []string) error {
+	query := `
+		UPDATE philotes.users
+		SET oidc_groups = $1, updated_at = NOW()
+		WHERE id = $2
+	`
+
+	result, err := r.db.ExecContext(ctx, query, pq.Array(groups), id)
+	if err != nil {
+		return fmt.Errorf("failed to update oidc groups: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return ErrUserNotFound
+	}
+
+	return nil
 }
