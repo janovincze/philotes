@@ -377,7 +377,7 @@ func (r *OIDCRepository) GetState(ctx context.Context, state string) (*models.OI
 	// Check if expired
 	if time.Now().After(oidcState.ExpiresAt) {
 		// Best-effort cleanup of expired state to avoid unbounded growth
-		_ = r.DeleteState(ctx, oidcState.State)
+		_ = r.DeleteState(ctx, oidcState.State) //nolint:errcheck // best-effort cleanup
 		return nil, ErrOIDCStateExpired
 	}
 

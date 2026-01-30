@@ -449,18 +449,18 @@ func (s *OIDCService) provisionUser(ctx context.Context, provider *models.OIDCPr
 
 	// Try to find user by email and link OIDC
 	if userInfo.Email != "" {
-		if existingUser, err := s.userRepo.GetByEmail(ctx, userInfo.Email); err == nil {
+		if emailUser, emailErr := s.userRepo.GetByEmail(ctx, userInfo.Email); emailErr == nil {
 			// Link OIDC to existing user
-			if err := s.userRepo.LinkOIDCProvider(ctx, existingUser.ID, provider.ID, userInfo.Subject, userInfo.Groups); err != nil {
-				return nil, fmt.Errorf("failed to link OIDC provider: %w", err)
+			if linkErr := s.userRepo.LinkOIDCProvider(ctx, emailUser.ID, provider.ID, userInfo.Subject, userInfo.Groups); linkErr != nil {
+				return nil, fmt.Errorf("failed to link OIDC provider: %w", linkErr)
 			}
-			s.logger.Info("linked OIDC to existing user", "user_id", existingUser.ID, "provider", provider.Name)
+			s.logger.Info("linked OIDC to existing user", "user_id", emailUser.ID, "provider", provider.Name)
 
-			if err := s.userRepo.UpdateLastLogin(ctx, existingUser.ID); err != nil {
-				s.logger.Warn("failed to update last login", "user_id", existingUser.ID, "error", err)
+			if loginErr := s.userRepo.UpdateLastLogin(ctx, emailUser.ID); loginErr != nil {
+				s.logger.Warn("failed to update last login", "user_id", emailUser.ID, "error", loginErr)
 			}
 
-			return existingUser, nil
+			return emailUser, nil
 		}
 	}
 
