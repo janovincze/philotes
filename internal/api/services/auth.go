@@ -22,6 +22,7 @@ var (
 	ErrInvalidCredentials = errors.New("invalid credentials")
 	ErrUserInactive       = errors.New("user account is inactive")
 	ErrInvalidToken       = errors.New("invalid or expired token")
+	ErrAdminAlreadyExists = errors.New("admin user already exists")
 )
 
 // AuthService provides authentication business logic.
@@ -283,6 +284,58 @@ func (s *AuthService) generateJWT(user *models.User, expiresAt time.Time) (strin
 	}
 
 	return tokenString, nil
+}
+
+// RegisterFirstAdmin registers the first admin user during onboarding.
+// This is only allowed if no admin user exists yet.
+func (s *AuthService) RegisterFirstAdmin(ctx context.Context, req *models.RegisterRequest, ipAddress, userAgent string) (*models.RegisterResponse, error) {
+	// Validate request
+	if fieldErrors := req.Validate(); len(fieldErrors) > 0 {
+		return nil, &ValidationError{Errors: fieldErrors}
+	}
+
+	// Check if admin already exists
+	hasAdmin, err := s.userRepo.HasAdminUser(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check admin existence: %w", err)
+	}
+	if hasAdmin {
+		return nil, ErrAdminAlreadyExists
+	}
+
+	// Create user request
+	createReq := &models.CreateUserRequest{
+		Email:    req.Email,
+		Password: req.Password,
+		Name:     req.Name,
+		Role:     models.RoleAdmin,
+	}
+
+	// Create the admin user
+	user, err := s.CreateUser(ctx, createReq)
+	if err != nil {
+		return nil, err
+	}
+
+	// Generate JWT token
+	expiresAt := time.Now().Add(s.cfg.JWTExpiration)
+	token, err := s.generateJWT(user, expiresAt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate token: %w", err)
+	}
+
+	// Log audit event
+	s.logAuditEvent(ctx, &user.ID, nil, models.AuditActionUserCreated, ipAddress, userAgent, map[string]interface{}{
+		"role":   "admin",
+		"reason": "first_admin_registration",
+	})
+
+	s.logger.Info("first admin registered", "user_id", user.ID, "email", user.Email)
+
+	return &models.RegisterResponse{
+		User:  user,
+		Token: token,
+	}, nil
 }
 
 // logAuditEvent logs an audit event asynchronously.

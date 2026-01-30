@@ -80,3 +80,12 @@ export function useStopPipeline() {
     },
   })
 }
+
+export function usePipelineStatus(id: string, enabled = true) {
+  return useQuery({
+    queryKey: ["pipelines", id, "status"],
+    queryFn: () => pipelinesApi.getStatus(id),
+    enabled: !!id && enabled,
+    refetchInterval: enabled ? 2000 : false, // Poll every 2 seconds when enabled
+  })
+}

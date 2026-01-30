@@ -343,3 +343,16 @@ func (r *UserRepository) ExistsByEmail(ctx context.Context, email string) (bool,
 
 	return exists, nil
 }
+
+// HasAdminUser checks if any active admin user exists in the system.
+func (r *UserRepository) HasAdminUser(ctx context.Context) (bool, error) {
+	query := `SELECT EXISTS(SELECT 1 FROM philotes.users WHERE role = 'admin' AND is_active = true)`
+
+	var exists bool
+	err := r.db.QueryRowContext(ctx, query).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("failed to check admin existence: %w", err)
+	}
+
+	return exists, nil
+}
