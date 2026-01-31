@@ -355,3 +355,88 @@ type MetricValue struct {
 	Value  float64
 	Time   time.Time
 }
+
+// WakeReason represents the reason for waking a scaled-to-zero policy.
+type WakeReason string
+
+const (
+	// WakeReasonManual indicates manual wake via API.
+	WakeReasonManual WakeReason = "manual"
+	// WakeReasonScheduled indicates scheduled wake.
+	WakeReasonScheduled WakeReason = "scheduled"
+	// WakeReasonWebhook indicates wake triggered by webhook.
+	WakeReasonWebhook WakeReason = "webhook"
+	// WakeReasonAPIRequest indicates wake triggered by API request.
+	WakeReasonAPIRequest WakeReason = "api_request"
+	// WakeReasonDatabaseActivity indicates wake triggered by source database activity.
+	WakeReasonDatabaseActivity WakeReason = "database_activity"
+)
+
+// IsValid checks if the wake reason is valid.
+func (r WakeReason) IsValid() bool {
+	switch r {
+	case WakeReasonManual, WakeReasonScheduled, WakeReasonWebhook, WakeReasonAPIRequest, WakeReasonDatabaseActivity:
+		return true
+	}
+	return false
+}
+
+// String returns the string representation of the wake reason.
+func (r WakeReason) String() string {
+	return string(r)
+}
+
+// IdleState represents the idle state of a scaling policy.
+type IdleState struct {
+	ID              uuid.UUID   `json:"id"`
+	PolicyID        uuid.UUID   `json:"policy_id"`
+	LastActivityAt  time.Time   `json:"last_activity_at"`
+	IdleSince       *time.Time  `json:"idle_since,omitempty"`
+	ScaledToZeroAt  *time.Time  `json:"scaled_to_zero_at,omitempty"`
+	LastWakeAt      *time.Time  `json:"last_wake_at,omitempty"`
+	WakeReason      *WakeReason `json:"wake_reason,omitempty"`
+	IsScaledToZero  bool        `json:"is_scaled_to_zero"`
+	CreatedAt       time.Time   `json:"created_at"`
+	UpdatedAt       time.Time   `json:"updated_at"`
+}
+
+// IdleDuration returns the duration since last activity.
+func (s *IdleState) IdleDuration() time.Duration {
+	return time.Since(s.LastActivityAt)
+}
+
+// ScaledToZeroDuration returns how long the policy has been scaled to zero.
+func (s *IdleState) ScaledToZeroDuration() time.Duration {
+	if s.ScaledToZeroAt == nil {
+		return 0
+	}
+	return time.Since(*s.ScaledToZeroAt)
+}
+
+// CostSavings represents daily cost savings from scale-to-zero.
+type CostSavings struct {
+	ID                    uuid.UUID `json:"id"`
+	PolicyID              uuid.UUID `json:"policy_id"`
+	Date                  time.Time `json:"date"`
+	IdleSeconds           int64     `json:"idle_seconds"`
+	ScaledToZeroSeconds   int64     `json:"scaled_to_zero_seconds"`
+	EstimatedSavingsCents int       `json:"estimated_savings_cents"`
+	HourlyCostCents       *int      `json:"hourly_cost_cents,omitempty"`
+	CreatedAt             time.Time `json:"created_at"`
+	UpdatedAt             time.Time `json:"updated_at"`
+}
+
+// EstimatedSavingsEuros returns the estimated savings in euros.
+func (c *CostSavings) EstimatedSavingsEuros() float64 {
+	return float64(c.EstimatedSavingsCents) / 100.0
+}
+
+// IdleHours returns idle seconds as hours.
+func (c *CostSavings) IdleHours() float64 {
+	return float64(c.IdleSeconds) / 3600.0
+}
+
+// ScaledToZeroHours returns scaled-to-zero seconds as hours.
+func (c *CostSavings) ScaledToZeroHours() float64 {
+	return float64(c.ScaledToZeroSeconds) / 3600.0
+}
