@@ -1,0 +1,74 @@
+{{- if and .Values.enabled .Values.keda.enabled }}
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{ include "trino.worker.name" . }}
+  labels:
+    {{- include "trino.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  scaleTargetRef:
+    name: {{ include "trino.worker.name" . }}
+  pollingInterval: {{ .Values.keda.pollingInterval }}
+  cooldownPeriod: {{ .Values.keda.cooldownPeriod }}
+  minReplicaCount: {{ .Values.keda.minReplicaCount }}
+  maxReplicaCount: {{ .Values.keda.maxReplicas }}
+  {{- if not (kindIs "invalid" .Values.keda.idleReplicaCount) }}
+  idleReplicaCount: {{ .Values.keda.idleReplicaCount }}
+  {{- end }}
+  {{- if .Values.keda.advanced }}
+  advanced:
+    {{- toYaml .Values.keda.advanced | nindent 4 }}
+  {{- end }}
+  triggers:
+    {{- /* Prometheus Queued Queries Trigger */}}
+    {{- if and .Values.keda.prometheus.enabled .Values.keda.prometheus.queuedQueriesTrigger.enabled }}
+    - type: prometheus
+      metadata:
+        serverAddress: {{ .Values.keda.prometheus.serverAddress | quote }}
+        metricName: {{ .Values.keda.prometheus.queuedQueriesTrigger.metricName | quote }}
+        query: {{ .Values.keda.prometheus.queuedQueriesTrigger.query | quote }}
+        threshold: {{ .Values.keda.prometheus.queuedQueriesTrigger.threshold | quote }}
+        {{- if .Values.keda.prometheus.queuedQueriesTrigger.activationThreshold }}
+        activationThreshold: {{ .Values.keda.prometheus.queuedQueriesTrigger.activationThreshold | quote }}
+        {{- end }}
+    {{- end }}
+    {{- /* Prometheus Running Queries Trigger */}}
+    {{- if and .Values.keda.prometheus.enabled .Values.keda.prometheus.runningQueriesTrigger.enabled }}
+    - type: prometheus
+      metadata:
+        serverAddress: {{ .Values.keda.prometheus.serverAddress | quote }}
+        metricName: {{ .Values.keda.prometheus.runningQueriesTrigger.metricName | quote }}
+        query: {{ .Values.keda.prometheus.runningQueriesTrigger.query | quote }}
+        threshold: {{ .Values.keda.prometheus.runningQueriesTrigger.threshold | quote }}
+        {{- if .Values.keda.prometheus.runningQueriesTrigger.activationThreshold }}
+        activationThreshold: {{ .Values.keda.prometheus.runningQueriesTrigger.activationThreshold | quote }}
+        {{- end }}
+    {{- end }}
+    {{- /* Prometheus Latency Trigger */}}
+    {{- if and .Values.keda.prometheus.enabled .Values.keda.prometheus.latencyTrigger.enabled }}
+    - type: prometheus
+      metadata:
+        serverAddress: {{ .Values.keda.prometheus.serverAddress | quote }}
+        metricName: {{ .Values.keda.prometheus.latencyTrigger.metricName | quote }}
+        query: {{ .Values.keda.prometheus.latencyTrigger.query | quote }}
+        threshold: {{ .Values.keda.prometheus.latencyTrigger.threshold | quote }}
+        {{- if .Values.keda.prometheus.latencyTrigger.activationThreshold }}
+        activationThreshold: {{ .Values.keda.prometheus.latencyTrigger.activationThreshold | quote }}
+        {{- end }}
+    {{- end }}
+    {{- /* CPU Trigger */}}
+    {{- if .Values.keda.cpu.enabled }}
+    - type: cpu
+      metricType: {{ .Values.keda.cpu.metricType }}
+      metadata:
+        value: {{ .Values.keda.cpu.value | quote }}
+    {{- end }}
+    {{- /* Memory Trigger */}}
+    {{- if .Values.keda.memory.enabled }}
+    - type: memory
+      metricType: {{ .Values.keda.memory.metricType }}
+      metadata:
+        value: {{ .Values.keda.memory.value | quote }}
+    {{- end }}
+{{- end }}
