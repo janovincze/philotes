@@ -98,17 +98,17 @@ func (m *PostgresManager) Write(ctx context.Context, events []cdc.Event) error {
 		}
 
 		_, err = stmt.ExecContext(ctx,
-			event.ID,           // source_id (using event ID as source identifier)
-			event.Schema,       // schema_name
-			event.Table,        // table_name
-			event.Operation,    // operation
-			event.LSN,          // lsn
+			event.ID,            // source_id (using event ID as source identifier)
+			event.Schema,        // schema_name
+			event.Table,         // table_name
+			event.Operation,     // operation
+			event.LSN,           // lsn
 			event.TransactionID, // transaction_id
-			keyColumnsJSON,     // key_columns
-			beforeDataJSON,     // before_data
-			afterDataJSON,      // after_data
-			event.Timestamp,    // event_time
-			metadataJSON,       // metadata
+			keyColumnsJSON,      // key_columns
+			beforeDataJSON,      // before_data
+			afterDataJSON,       // after_data
+			event.Timestamp,     // event_time
+			metadataJSON,        // metadata
 		)
 		if err != nil {
 			return fmt.Errorf("insert event: %w", err)

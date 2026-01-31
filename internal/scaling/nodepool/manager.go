@@ -245,16 +245,16 @@ func (m *Manager) CancelOperation(ctx context.Context, operationID uuid.UUID) er
 		return fmt.Errorf("cannot cancel operation in %s status", op.Status)
 	}
 
-	if err := m.repo.UpdateOperationStatus(ctx, operationID, OperationStatusCancelled, nil, "cancelled by user"); err != nil {
+	if err := m.repo.UpdateOperationStatus(ctx, operationID, OperationStatusCanceled, nil, "canceled by user"); err != nil {
 		return err
 	}
 
-	m.logger.Info("cancelled operation", "operation_id", operationID)
+	m.logger.Info("canceled operation", "operation_id", operationID)
 	return nil
 }
 
 // GetPoolStatus returns the status of a node pool.
-func (m *Manager) GetPoolStatus(ctx context.Context, poolID uuid.UUID) (*NodePoolStatus, error) {
+func (m *Manager) GetPoolStatus(ctx context.Context, poolID uuid.UUID) (*PoolStatus, error) {
 	pool, err := m.repo.GetPool(ctx, poolID)
 	if err != nil {
 		return nil, err
@@ -276,7 +276,7 @@ func (m *Manager) GetPoolStatus(ctx context.Context, poolID uuid.UUID) (*NodePoo
 		}
 	}
 
-	return &NodePoolStatus{
+	return &PoolStatus{
 		ID:           pool.ID,
 		Name:         pool.Name,
 		Provider:     pool.Provider,
@@ -292,13 +292,13 @@ func (m *Manager) GetPoolStatus(ctx context.Context, poolID uuid.UUID) (*NodePoo
 }
 
 // GetAllPoolStatuses returns status for all node pools.
-func (m *Manager) GetAllPoolStatuses(ctx context.Context) ([]NodePoolStatus, error) {
+func (m *Manager) GetAllPoolStatuses(ctx context.Context) ([]PoolStatus, error) {
 	pools, err := m.repo.ListPools(ctx, false)
 	if err != nil {
 		return nil, err
 	}
 
-	var statuses []NodePoolStatus
+	var statuses []PoolStatus
 	for _, pool := range pools {
 		status, statusErr := m.GetPoolStatus(ctx, pool.ID)
 		if statusErr != nil {

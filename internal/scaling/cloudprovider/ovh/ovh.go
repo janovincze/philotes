@@ -63,19 +63,19 @@ func (p *Provider) CreateServer(ctx context.Context, opts cloudprovider.CreateSe
 	// OVH Public Cloud instance creation
 	// POST /cloud/project/{serviceName}/instance
 	type createRequest struct {
-		FlavorID       string `json:"flavorId"`
-		ImageID        string `json:"imageId"`
-		Name           string `json:"name"`
-		Region         string `json:"region"`
-		SSHKeyID       string `json:"sshKeyId,omitempty"`
-		UserData       string `json:"userData,omitempty"`
+		FlavorID string `json:"flavorId"`
+		ImageID  string `json:"imageId"`
+		Name     string `json:"name"`
+		Region   string `json:"region"`
+		SSHKeyID string `json:"sshKeyId,omitempty"`
+		UserData string `json:"userData,omitempty"`
 	}
 
 	type instanceResponse struct {
-		ID        string `json:"id"`
-		Name      string `json:"name"`
-		Status    string `json:"status"`
-		Region    string `json:"region"`
+		ID          string `json:"id"`
+		Name        string `json:"name"`
+		Status      string `json:"status"`
+		Region      string `json:"region"`
 		IPAddresses []struct {
 			IP      string `json:"ip"`
 			Type    string `json:"type"`
@@ -141,11 +141,11 @@ func (p *Provider) DeleteServer(ctx context.Context, serverID string) error {
 // GetServer retrieves a server by ID.
 func (p *Provider) GetServer(ctx context.Context, serverID string) (*cloudprovider.Server, error) {
 	type instanceResponse struct {
-		ID        string `json:"id"`
-		Name      string `json:"name"`
-		Status    string `json:"status"`
-		Region    string `json:"region"`
-		Flavor    struct {
+		ID     string `json:"id"`
+		Name   string `json:"name"`
+		Status string `json:"status"`
+		Region string `json:"region"`
+		Flavor struct {
 			ID string `json:"id"`
 		} `json:"flavor"`
 		IPAddresses []struct {
@@ -185,11 +185,11 @@ func (p *Provider) GetServer(ctx context.Context, serverID string) (*cloudprovid
 // ListServers lists servers matching the given labels.
 func (p *Provider) ListServers(ctx context.Context, labels map[string]string) ([]cloudprovider.Server, error) {
 	type instanceResponse struct {
-		ID        string `json:"id"`
-		Name      string `json:"name"`
-		Status    string `json:"status"`
-		Region    string `json:"region"`
-		Flavor    struct {
+		ID     string `json:"id"`
+		Name   string `json:"name"`
+		Status string `json:"status"`
+		Region string `json:"region"`
+		Flavor struct {
 			ID string `json:"id"`
 		} `json:"flavor"`
 		IPAddresses []struct {
@@ -249,13 +249,13 @@ func (p *Provider) GetInstanceType(ctx context.Context, typeName string, region 
 // ListInstanceTypes lists available instance types.
 func (p *Provider) ListInstanceTypes(ctx context.Context, region string) ([]cloudprovider.InstanceType, error) {
 	type flavorResponse struct {
-		ID         string  `json:"id"`
-		Name       string  `json:"name"`
-		VCPUs      int     `json:"vcpus"`
-		RAM        int     `json:"ram"`
-		Disk       int     `json:"disk"`
-		Region     string  `json:"region"`
-		PlanCodes  struct {
+		ID        string `json:"id"`
+		Name      string `json:"name"`
+		VCPUs     int    `json:"vcpus"`
+		RAM       int    `json:"ram"`
+		Disk      int    `json:"disk"`
+		Region    string `json:"region"`
+		PlanCodes struct {
 			Hourly string `json:"hourly"`
 		} `json:"planCodes"`
 	}

@@ -31,24 +31,24 @@ func NewMonitor(client *kubernetes.Clientset, logger *slog.Logger) *Monitor {
 
 // PendingPodsSummary summarizes pending pods in the cluster.
 type PendingPodsSummary struct {
-	TotalPending     int                     `json:"total_pending"`
-	Unschedulable    int                     `json:"unschedulable"`
-	WaitingForResources int                  `json:"waiting_for_resources"`
-	ResourceRequests ResourceRequests        `json:"resource_requests"`
-	OldestPending    *time.Time              `json:"oldest_pending,omitempty"`
-	ByReason         map[string]int          `json:"by_reason"`
-	TopPods          []PendingPodInfo        `json:"top_pods,omitempty"`
+	TotalPending        int              `json:"total_pending"`
+	Unschedulable       int              `json:"unschedulable"`
+	WaitingForResources int              `json:"waiting_for_resources"`
+	ResourceRequests    ResourceRequests `json:"resource_requests"`
+	OldestPending       *time.Time       `json:"oldest_pending,omitempty"`
+	ByReason            map[string]int   `json:"by_reason"`
+	TopPods             []PendingPodInfo `json:"top_pods,omitempty"`
 }
 
 // PendingPodInfo contains information about a pending pod.
 type PendingPodInfo struct {
-	Name        string           `json:"name"`
-	Namespace   string           `json:"namespace"`
-	Age         time.Duration    `json:"age"`
-	Reason      string           `json:"reason,omitempty"`
-	Message     string           `json:"message,omitempty"`
-	CPURequest  resource.Quantity `json:"cpu_request"`
-	MemRequest  resource.Quantity `json:"memory_request"`
+	Name       string            `json:"name"`
+	Namespace  string            `json:"namespace"`
+	Age        time.Duration     `json:"age"`
+	Reason     string            `json:"reason,omitempty"`
+	Message    string            `json:"message,omitempty"`
+	CPURequest resource.Quantity `json:"cpu_request"`
+	MemRequest resource.Quantity `json:"memory_request"`
 }
 
 // ResourceRequests represents total resource requests from pending pods.

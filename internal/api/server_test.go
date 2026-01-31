@@ -183,7 +183,6 @@ func TestServer_RequestID(t *testing.T) {
 	}
 }
 
-
 func newTestServer(t *testing.T) *Server {
 	t.Helper()
 

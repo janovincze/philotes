@@ -225,10 +225,10 @@ type SilenceListResponse struct {
 
 // CreateChannelRequest represents a request to create a notification channel.
 type CreateChannelRequest struct {
-	Name    string                `json:"name" binding:"required,min=1,max=255"`
-	Type    alerting.ChannelType  `json:"type" binding:"required"`
-	Config  map[string]any        `json:"config" binding:"required"`
-	Enabled *bool                 `json:"enabled,omitempty"`
+	Name    string               `json:"name" binding:"required,min=1,max=255"`
+	Type    alerting.ChannelType `json:"type" binding:"required"`
+	Config  map[string]any       `json:"config" binding:"required"`
+	Enabled *bool                `json:"enabled,omitempty"`
 }
 
 // Validate validates the create channel request.
@@ -411,11 +411,11 @@ type TestChannelResponse struct {
 
 // AlertSummaryResponse provides a summary of alert statistics.
 type AlertSummaryResponse struct {
-	TotalRules         int `json:"total_rules"`
-	EnabledRules       int `json:"enabled_rules"`
-	FiringAlerts       int `json:"firing_alerts"`
-	ResolvedAlerts     int `json:"resolved_alerts"`
-	ActiveSilences     int `json:"active_silences"`
-	TotalChannels      int `json:"total_channels"`
-	EnabledChannels    int `json:"enabled_channels"`
+	TotalRules      int `json:"total_rules"`
+	EnabledRules    int `json:"enabled_rules"`
+	FiringAlerts    int `json:"firing_alerts"`
+	ResolvedAlerts  int `json:"resolved_alerts"`
+	ActiveSilences  int `json:"active_silences"`
+	TotalChannels   int `json:"total_channels"`
+	EnabledChannels int `json:"enabled_channels"`
 }

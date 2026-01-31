@@ -26,17 +26,17 @@ const (
 
 // Pipeline represents a CDC pipeline in the system.
 type Pipeline struct {
-	ID           uuid.UUID         `json:"id"`
-	Name         string            `json:"name"`
-	SourceID     uuid.UUID         `json:"source_id"`
-	Status       PipelineStatus    `json:"status"`
-	Config       map[string]any    `json:"config,omitempty"`
-	ErrorMessage string            `json:"error_message,omitempty"`
-	Tables       []TableMapping    `json:"tables,omitempty"`
-	CreatedAt    time.Time         `json:"created_at"`
-	UpdatedAt    time.Time         `json:"updated_at"`
-	StartedAt    *time.Time        `json:"started_at,omitempty"`
-	StoppedAt    *time.Time        `json:"stopped_at,omitempty"`
+	ID           uuid.UUID      `json:"id"`
+	Name         string         `json:"name"`
+	SourceID     uuid.UUID      `json:"source_id"`
+	Status       PipelineStatus `json:"status"`
+	Config       map[string]any `json:"config,omitempty"`
+	ErrorMessage string         `json:"error_message,omitempty"`
+	Tables       []TableMapping `json:"tables,omitempty"`
+	CreatedAt    time.Time      `json:"created_at"`
+	UpdatedAt    time.Time      `json:"updated_at"`
+	StartedAt    *time.Time     `json:"started_at,omitempty"`
+	StoppedAt    *time.Time     `json:"stopped_at,omitempty"`
 }
 
 // TableMapping represents a table configuration for a pipeline.

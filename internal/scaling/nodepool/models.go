@@ -73,14 +73,14 @@ const (
 	OperationStatusInProgress OperationStatus = "in_progress"
 	OperationStatusCompleted  OperationStatus = "completed"
 	OperationStatusFailed     OperationStatus = "failed"
-	OperationStatusCancelled  OperationStatus = "cancelled"
+	OperationStatusCanceled   OperationStatus = "canceled"
 )
 
 // IsValid checks if the operation status is valid.
 func (s OperationStatus) IsValid() bool {
 	switch s {
 	case OperationStatusPending, OperationStatusInProgress,
-		OperationStatusCompleted, OperationStatusFailed, OperationStatusCancelled:
+		OperationStatusCompleted, OperationStatusFailed, OperationStatusCanceled:
 		return true
 	}
 	return false
@@ -89,7 +89,7 @@ func (s OperationStatus) IsValid() bool {
 // IsTerminal returns true if the operation is in a terminal state.
 func (s OperationStatus) IsTerminal() bool {
 	switch s {
-	case OperationStatusCompleted, OperationStatusFailed, OperationStatusCancelled:
+	case OperationStatusCompleted, OperationStatusFailed, OperationStatusCanceled:
 		return true
 	}
 	return false
@@ -244,22 +244,22 @@ type InstanceTypePricing struct {
 
 // ClusterCapacity represents the current capacity of the cluster.
 type ClusterCapacity struct {
-	TotalNodes         int                `json:"total_nodes"`
-	ReadyNodes         int                `json:"ready_nodes"`
-	TotalCPUCores      int                `json:"total_cpu_cores"`
-	TotalMemoryMB      int                `json:"total_memory_mb"`
-	AllocatableCPU     int                `json:"allocatable_cpu_cores"`
-	AllocatableMemory  int                `json:"allocatable_memory_mb"`
-	UsedCPUPercent     float64            `json:"used_cpu_percent"`
-	UsedMemoryPercent  float64            `json:"used_memory_percent"`
-	PendingPods        int                `json:"pending_pods"`
-	UnschedulablePods  int                `json:"unschedulable_pods"`
-	EstimatedHourlyCost float64           `json:"estimated_hourly_cost"`
-	NodePools          []NodePoolStatus   `json:"node_pools"`
+	TotalNodes          int          `json:"total_nodes"`
+	ReadyNodes          int          `json:"ready_nodes"`
+	TotalCPUCores       int          `json:"total_cpu_cores"`
+	TotalMemoryMB       int          `json:"total_memory_mb"`
+	AllocatableCPU      int          `json:"allocatable_cpu_cores"`
+	AllocatableMemory   int          `json:"allocatable_memory_mb"`
+	UsedCPUPercent      float64      `json:"used_cpu_percent"`
+	UsedMemoryPercent   float64      `json:"used_memory_percent"`
+	PendingPods         int          `json:"pending_pods"`
+	UnschedulablePods   int          `json:"unschedulable_pods"`
+	EstimatedHourlyCost float64      `json:"estimated_hourly_cost"`
+	NodePools           []PoolStatus `json:"node_pools"`
 }
 
-// NodePoolStatus represents the status summary of a node pool.
-type NodePoolStatus struct {
+// PoolStatus represents the status summary of a node pool.
+type PoolStatus struct {
 	ID           uuid.UUID `json:"id"`
 	Name         string    `json:"name"`
 	Provider     Provider  `json:"provider"`

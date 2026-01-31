@@ -35,17 +35,18 @@ func NewClient(cfg Config, logger *slog.Logger) (*Client, error) {
 	var restConfig *rest.Config
 	var err error
 
-	if cfg.InCluster {
+	switch {
+	case cfg.InCluster:
 		restConfig, err = rest.InClusterConfig()
 		if err != nil {
 			return nil, fmt.Errorf("failed to get in-cluster config: %w", err)
 		}
-	} else if cfg.Kubeconfig != "" {
+	case cfg.Kubeconfig != "":
 		restConfig, err = clientcmd.BuildConfigFromFlags("", cfg.Kubeconfig)
 		if err != nil {
 			return nil, fmt.Errorf("failed to build config from kubeconfig: %w", err)
 		}
-	} else {
+	default:
 		// Try default kubeconfig location
 		kubeconfig := filepath.Join(os.Getenv("HOME"), ".kube", "config")
 		if _, statErr := os.Stat(kubeconfig); statErr == nil {
@@ -211,12 +212,12 @@ func (c *Client) GetUnschedulablePods(ctx context.Context) ([]corev1.Pod, error)
 	}
 
 	var unschedulable []corev1.Pod
-	for _, pod := range pendingPods {
-		for _, condition := range pod.Status.Conditions {
-			if condition.Type == corev1.PodScheduled &&
-				condition.Status == corev1.ConditionFalse &&
-				condition.Reason == corev1.PodReasonUnschedulable {
-				unschedulable = append(unschedulable, pod)
+	for i := range pendingPods {
+		for j := range pendingPods[i].Status.Conditions {
+			if pendingPods[i].Status.Conditions[j].Type == corev1.PodScheduled &&
+				pendingPods[i].Status.Conditions[j].Status == corev1.ConditionFalse &&
+				pendingPods[i].Status.Conditions[j].Reason == corev1.PodReasonUnschedulable {
+				unschedulable = append(unschedulable, pendingPods[i])
 				break
 			}
 		}
@@ -285,13 +286,13 @@ func (c *Client) GetClusterCapacity(ctx context.Context) (*ClusterCapacity, erro
 
 	capacity := &ClusterCapacity{}
 
-	for _, node := range nodes {
+	for i := range nodes {
 		capacity.TotalNodes++
 
 		isReady := false
-		for _, condition := range node.Status.Conditions {
-			if condition.Type == corev1.NodeReady {
-				isReady = condition.Status == corev1.ConditionTrue
+		for j := range nodes[i].Status.Conditions {
+			if nodes[i].Status.Conditions[j].Type == corev1.NodeReady {
+				isReady = nodes[i].Status.Conditions[j].Status == corev1.ConditionTrue
 				break
 			}
 		}
@@ -300,15 +301,15 @@ func (c *Client) GetClusterCapacity(ctx context.Context) (*ClusterCapacity, erro
 			capacity.ReadyNodes++
 		}
 
-		if !node.Spec.Unschedulable {
+		if !nodes[i].Spec.Unschedulable {
 			capacity.SchedulableNodes++
 		}
 
-		capacity.TotalCPUCores += node.Status.Capacity.Cpu().MilliValue() / 1000
-		capacity.TotalMemoryMB += node.Status.Capacity.Memory().Value() / (1024 * 1024)
-		capacity.AllocatableCPU += node.Status.Allocatable.Cpu().MilliValue() / 1000
-		capacity.AllocatableMemory += node.Status.Allocatable.Memory().Value() / (1024 * 1024)
-		capacity.TotalPods += node.Status.Allocatable.Pods().Value()
+		capacity.TotalCPUCores += nodes[i].Status.Capacity.Cpu().MilliValue() / 1000
+		capacity.TotalMemoryMB += nodes[i].Status.Capacity.Memory().Value() / (1024 * 1024)
+		capacity.AllocatableCPU += nodes[i].Status.Allocatable.Cpu().MilliValue() / 1000
+		capacity.AllocatableMemory += nodes[i].Status.Allocatable.Memory().Value() / (1024 * 1024)
+		capacity.TotalPods += nodes[i].Status.Allocatable.Pods().Value()
 	}
 
 	return capacity, nil

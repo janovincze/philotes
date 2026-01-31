@@ -149,7 +149,11 @@ func (p *Provider) ListServers(ctx context.Context, labels map[string]string) ([
 
 		for _, inst := range instances {
 			// Filter by labels
-			if matchesLabels(inst.Labels, labels) {
+			var instLabels map[string]string
+			if inst.Labels != nil {
+				instLabels = *inst.Labels
+			}
+			if matchesLabels(instLabels, labels) {
 				result = append(result, *p.toServer(inst, zone))
 			}
 		}
@@ -159,7 +163,7 @@ func (p *Provider) ListServers(ctx context.Context, labels map[string]string) ([
 }
 
 // GetInstanceType retrieves an instance type by name.
-func (p *Provider) GetInstanceType(ctx context.Context, typeName string, region string) (*cloudprovider.InstanceType, error) {
+func (p *Provider) GetInstanceType(ctx context.Context, typeName, region string) (*cloudprovider.InstanceType, error) {
 	instanceType, err := p.client.GetInstanceType(ctx, region, typeName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get instance type: %w", err)
@@ -169,8 +173,8 @@ func (p *Provider) GetInstanceType(ctx context.Context, typeName string, region 
 		Name:        *instanceType.ID,
 		CPUCores:    int(*instanceType.CPUs),
 		MemoryMB:    int(*instanceType.Memory / (1024 * 1024)), // Convert bytes to MB
-		DiskGB:      0, // Exoscale uses separate volumes
-		HourlyCost:  0, // Would need pricing API
+		DiskGB:      0,                                         // Exoscale uses separate volumes
+		HourlyCost:  0,                                         // Would need pricing API
 		SpotSupport: false,
 	}, nil
 }
@@ -257,13 +261,13 @@ func mapStatus(state string) cloudprovider.ServerStatus {
 }
 
 // matchesLabels checks if instance labels contain all required labels.
-func matchesLabels(instLabels *map[string]string, required map[string]string) bool {
+func matchesLabels(instLabels map[string]string, required map[string]string) bool {
 	if instLabels == nil {
 		return len(required) == 0
 	}
 
 	for k, v := range required {
-		if (*instLabels)[k] != v {
+		if instLabels[k] != v {
 			return false
 		}
 	}

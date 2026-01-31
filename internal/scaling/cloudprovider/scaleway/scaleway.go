@@ -16,11 +16,11 @@ import (
 
 // Provider implements cloudprovider.NodeProvider for Scaleway.
 type Provider struct {
-	client    *scw.Client
+	client      *scw.Client
 	instanceAPI *instance.API
-	logger    *slog.Logger
-	config    cloudprovider.ProviderConfig
-	projectID string
+	logger      *slog.Logger
+	config      cloudprovider.ProviderConfig
+	projectID   string
 }
 
 // New creates a new Scaleway provider.
@@ -149,8 +149,9 @@ func (p *Provider) DeleteServer(ctx context.Context, serverID string) error {
 		return err
 	}
 
-	// First power off the server
-	_, _ = p.instanceAPI.ServerAction(&instance.ServerActionRequest{
+	// First power off the server (best-effort, ignore errors)
+	//nolint:errcheck // intentional: power off before delete is best-effort
+	p.instanceAPI.ServerAction(&instance.ServerActionRequest{
 		Zone:     zone,
 		ServerID: id,
 		Action:   instance.ServerActionPoweroff,

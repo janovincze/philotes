@@ -21,15 +21,15 @@ var (
 type ServerStatus string
 
 const (
-	ServerStatusCreating   ServerStatus = "creating"
-	ServerStatusStarting   ServerStatus = "starting"
-	ServerStatusRunning    ServerStatus = "running"
-	ServerStatusStopping   ServerStatus = "stopping"
-	ServerStatusStopped    ServerStatus = "stopped"
-	ServerStatusDeleting   ServerStatus = "deleting"
-	ServerStatusDeleted    ServerStatus = "deleted"
-	ServerStatusError      ServerStatus = "error"
-	ServerStatusUnknown    ServerStatus = "unknown"
+	ServerStatusCreating ServerStatus = "creating"
+	ServerStatusStarting ServerStatus = "starting"
+	ServerStatusRunning  ServerStatus = "running"
+	ServerStatusStopping ServerStatus = "stopping"
+	ServerStatusStopped  ServerStatus = "stopped"
+	ServerStatusDeleting ServerStatus = "deleting"
+	ServerStatusDeleted  ServerStatus = "deleted"
+	ServerStatusError    ServerStatus = "error"
+	ServerStatusUnknown  ServerStatus = "unknown"
 )
 
 // IsRunning returns true if the server is running.
@@ -44,15 +44,15 @@ func (s ServerStatus) IsTerminated() bool {
 
 // Server represents a cloud provider server instance.
 type Server struct {
-	ID         string            `json:"id"`
-	Name       string            `json:"name"`
-	Status     ServerStatus      `json:"status"`
-	PublicIP   string            `json:"public_ip,omitempty"`
-	PrivateIP  string            `json:"private_ip,omitempty"`
-	Region     string            `json:"region"`
-	Type       string            `json:"type"`
-	Labels     map[string]string `json:"labels,omitempty"`
-	CreatedAt  time.Time         `json:"created_at"`
+	ID        string            `json:"id"`
+	Name      string            `json:"name"`
+	Status    ServerStatus      `json:"status"`
+	PublicIP  string            `json:"public_ip,omitempty"`
+	PrivateIP string            `json:"private_ip,omitempty"`
+	Region    string            `json:"region"`
+	Type      string            `json:"type"`
+	Labels    map[string]string `json:"labels,omitempty"`
+	CreatedAt time.Time         `json:"created_at"`
 }
 
 // InstanceType represents a cloud provider instance type.
@@ -177,12 +177,12 @@ func (r *Registry) List() []string {
 
 // UserDataTemplate is a helper for generating cloud-init user data.
 type UserDataTemplate struct {
-	K3sVersion      string
-	K3sToken        string
-	ControlPlaneIP  string
-	NodeLabels      map[string]string
-	NodeTaints      []string
-	IsControlPlane  bool
+	K3sVersion     string
+	K3sToken       string
+	ControlPlaneIP string
+	NodeLabels     map[string]string
+	NodeTaints     []string
+	IsControlPlane bool
 }
 
 // GenerateK3sWorkerUserData generates cloud-init user data for a K3s worker node.
@@ -211,10 +211,10 @@ curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="%s" K3S_URL="https://%s:6443
 		t.K3sVersion, t.ControlPlaneIP, t.K3sToken)
 
 	if labelsArg != "" {
-		userData += fmt.Sprintf(` --node-label="%s"`, labelsArg)
+		userData += fmt.Sprintf(" --node-label=%q", labelsArg)
 	}
 	if taintsArg != "" {
-		userData += fmt.Sprintf(` --node-taint="%s"`, taintsArg)
+		userData += fmt.Sprintf(" --node-taint=%q", taintsArg)
 	}
 
 	return userData

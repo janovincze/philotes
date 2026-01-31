@@ -17,12 +17,12 @@ import (
 
 // NodeExecutor implements the Executor interface for infrastructure node scaling.
 type NodeExecutor struct {
-	poolRepo     *nodepool.Repository
-	providers    *cloudprovider.Registry
-	k8sClient    *kubernetes.Client
-	drainer      *kubernetes.Drainer
-	monitor      *kubernetes.Monitor
-	logger       *slog.Logger
+	poolRepo  *nodepool.Repository
+	providers *cloudprovider.Registry
+	k8sClient *kubernetes.Client
+	drainer   *kubernetes.Drainer
+	monitor   *kubernetes.Monitor
+	logger    *slog.Logger
 
 	// Configuration
 	nodeReadyTimeout time.Duration
@@ -234,7 +234,7 @@ func (e *NodeExecutor) Scale(ctx context.Context, targetType TargetType, targetI
 	}
 
 	// Update operation status
-	finalCount, _ := e.GetCurrentReplicas(ctx, targetType, targetID)
+	finalCount, _ := e.GetCurrentReplicas(ctx, targetType, targetID) //nolint:errcheck // best-effort count for status update
 	if scalingErr != nil {
 		updateErr := e.poolRepo.UpdateOperationStatus(ctx, op.ID, nodepool.OperationStatusFailed, &finalCount, scalingErr.Error())
 		if updateErr != nil {

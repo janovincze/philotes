@@ -234,13 +234,13 @@ type NodePoolListResponse struct {
 
 // NodePoolStatusResponse wraps node pool status for API responses.
 type NodePoolStatusResponse struct {
-	Status *nodepool.NodePoolStatus `json:"status"`
+	Status *nodepool.PoolStatus `json:"status"`
 }
 
 // NodePoolStatusListResponse wraps a list of node pool statuses.
 type NodePoolStatusListResponse struct {
-	Statuses   []nodepool.NodePoolStatus `json:"statuses"`
-	TotalCount int                       `json:"total_count"`
+	Statuses   []nodepool.PoolStatus `json:"statuses"`
+	TotalCount int                   `json:"total_count"`
 }
 
 // NodeResponse wraps a node for API responses.
@@ -267,29 +267,29 @@ type ScalingOperationListResponse struct {
 
 // ClusterCapacityResponse represents cluster capacity for API responses.
 type ClusterCapacityResponse struct {
-	TotalNodes          int                       `json:"total_nodes"`
-	ReadyNodes          int                       `json:"ready_nodes"`
-	TotalCPUCores       int64                     `json:"total_cpu_cores"`
-	TotalMemoryMB       int64                     `json:"total_memory_mb"`
-	AllocatableCPU      int64                     `json:"allocatable_cpu_cores"`
-	AllocatableMemory   int64                     `json:"allocatable_memory_mb"`
-	UsedCPUPercent      float64                   `json:"used_cpu_percent"`
-	UsedMemoryPercent   float64                   `json:"used_memory_percent"`
-	PendingPods         int                       `json:"pending_pods"`
-	UnschedulablePods   int                       `json:"unschedulable_pods"`
-	EstimatedHourlyCost float64                   `json:"estimated_hourly_cost"`
-	NodePools           []nodepool.NodePoolStatus `json:"node_pools"`
+	TotalNodes          int                   `json:"total_nodes"`
+	ReadyNodes          int                   `json:"ready_nodes"`
+	TotalCPUCores       int64                 `json:"total_cpu_cores"`
+	TotalMemoryMB       int64                 `json:"total_memory_mb"`
+	AllocatableCPU      int64                 `json:"allocatable_cpu_cores"`
+	AllocatableMemory   int64                 `json:"allocatable_memory_mb"`
+	UsedCPUPercent      float64               `json:"used_cpu_percent"`
+	UsedMemoryPercent   float64               `json:"used_memory_percent"`
+	PendingPods         int                   `json:"pending_pods"`
+	UnschedulablePods   int                   `json:"unschedulable_pods"`
+	EstimatedHourlyCost float64               `json:"estimated_hourly_cost"`
+	NodePools           []nodepool.PoolStatus `json:"node_pools"`
 }
 
 // PendingPodsResponse represents pending pods summary for API responses.
 type PendingPodsResponse struct {
-	TotalPending        int               `json:"total_pending"`
-	Unschedulable       int               `json:"unschedulable"`
-	WaitingForResources int               `json:"waiting_for_resources"`
-	OldestPending       *time.Time        `json:"oldest_pending,omitempty"`
-	ByReason            map[string]int    `json:"by_reason"`
-	CPURequested        int64             `json:"cpu_requested_millicores"`
-	MemoryRequested     int64             `json:"memory_requested_mb"`
+	TotalPending        int            `json:"total_pending"`
+	Unschedulable       int            `json:"unschedulable"`
+	WaitingForResources int            `json:"waiting_for_resources"`
+	OldestPending       *time.Time     `json:"oldest_pending,omitempty"`
+	ByReason            map[string]int `json:"by_reason"`
+	CPURequested        int64          `json:"cpu_requested_millicores"`
+	MemoryRequested     int64          `json:"memory_requested_mb"`
 }
 
 // InstanceTypePricingResponse represents pricing for an instance type.
@@ -314,13 +314,13 @@ type DrainNodeRequest struct {
 
 // ScaleResponse represents the result of a scale operation.
 type ScaleResponse struct {
-	OperationID     uuid.UUID `json:"operation_id"`
-	Pool            string    `json:"pool"`
-	PreviousCount   int       `json:"previous_count"`
-	TargetCount     int       `json:"target_count"`
-	Action          string    `json:"action"`
-	DryRun          bool      `json:"dry_run"`
-	EstimatedCostChange *float64 `json:"estimated_cost_change,omitempty"`
+	OperationID         uuid.UUID `json:"operation_id"`
+	Pool                string    `json:"pool"`
+	PreviousCount       int       `json:"previous_count"`
+	TargetCount         int       `json:"target_count"`
+	Action              string    `json:"action"`
+	DryRun              bool      `json:"dry_run"`
+	EstimatedCostChange *float64  `json:"estimated_cost_change,omitempty"`
 }
 
 // helper function

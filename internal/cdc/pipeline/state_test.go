@@ -36,10 +36,10 @@ func TestStateMachine_InitialState(t *testing.T) {
 
 func TestStateMachine_ValidTransitions(t *testing.T) {
 	tests := []struct {
-		name     string
-		from     State
-		to       State
-		wantErr  bool
+		name    string
+		from    State
+		to      State
+		wantErr bool
 	}{
 		{"starting to running", StateStarting, StateRunning, false},
 		{"starting to failed", StateStarting, StateFailed, false},

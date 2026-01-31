@@ -58,7 +58,7 @@ func (p *Provider) authenticate(clientID, clientSecret, apiUser, apiPassword str
 	data := fmt.Sprintf("client_id=%s&client_secret=%s&username=%s&password=%s&grant_type=password",
 		clientID, clientSecret, apiUser, apiPassword)
 
-	req, err := http.NewRequest(http.MethodPost, "https://auth.contabo.com/auth/realms/contabo/protocol/openid-connect/token",
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, "https://auth.contabo.com/auth/realms/contabo/protocol/openid-connect/token",
 		bytes.NewBufferString(data))
 	if err != nil {
 		return "", err
@@ -72,7 +72,7 @@ func (p *Provider) authenticate(clientID, clientSecret, apiUser, apiPassword str
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, _ := io.ReadAll(resp.Body) //nolint:errcheck // best-effort error body read
 		return "", fmt.Errorf("authentication failed: %s", string(body))
 	}
 
@@ -142,7 +142,7 @@ func (p *Provider) CreateServer(ctx context.Context, opts cloudprovider.CreateSe
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
-		respBody, _ := io.ReadAll(resp.Body)
+		respBody, _ := io.ReadAll(resp.Body) //nolint:errcheck // best-effort error body read
 		return nil, fmt.Errorf("failed to create server: %s", string(respBody))
 	}
 
@@ -202,7 +202,7 @@ func (p *Provider) DeleteServer(ctx context.Context, serverID string) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
-		body, _ := io.ReadAll(resp.Body)
+		body, _ := io.ReadAll(resp.Body) //nolint:errcheck // best-effort error body read
 		return fmt.Errorf("failed to delete server: %s", string(body))
 	}
 
@@ -229,7 +229,7 @@ func (p *Provider) GetServer(ctx context.Context, serverID string) (*cloudprovid
 		return nil, cloudprovider.ErrServerNotFound
 	}
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, _ := io.ReadAll(resp.Body) //nolint:errcheck // best-effort error body read
 		return nil, fmt.Errorf("failed to get server: %s", string(body))
 	}
 
@@ -285,7 +285,7 @@ func (p *Provider) ListServers(ctx context.Context, labels map[string]string) ([
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, _ := io.ReadAll(resp.Body) //nolint:errcheck // best-effort error body read
 		return nil, fmt.Errorf("failed to list servers: %s", string(body))
 	}
 
@@ -327,7 +327,7 @@ func (p *Provider) ListServers(ctx context.Context, labels map[string]string) ([
 }
 
 // GetInstanceType retrieves an instance type by name.
-func (p *Provider) GetInstanceType(ctx context.Context, typeName string, region string) (*cloudprovider.InstanceType, error) {
+func (p *Provider) GetInstanceType(ctx context.Context, typeName, region string) (*cloudprovider.InstanceType, error) {
 	// Contabo product types are fixed, return hardcoded values
 	types := getContaboInstanceTypes()
 	for _, t := range types {

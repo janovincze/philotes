@@ -125,10 +125,10 @@ func (h *NodePoolHandler) UpdatePool(c *gin.Context) {
 	}
 
 	var req models.UpdateNodePoolRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if bindErr := c.ShouldBindJSON(&req); bindErr != nil {
 		models.RespondWithError(c, models.NewBadRequestError(
 			c.Request.URL.Path,
-			"invalid request body: "+err.Error(),
+			"invalid request body: "+bindErr.Error(),
 		))
 		return
 	}
@@ -223,10 +223,10 @@ func (h *NodePoolHandler) ScalePool(c *gin.Context) {
 	}
 
 	var req models.ScaleNodePoolRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if bindErr := c.ShouldBindJSON(&req); bindErr != nil {
 		models.RespondWithError(c, models.NewBadRequestError(
 			c.Request.URL.Path,
-			"invalid request body: "+err.Error(),
+			"invalid request body: "+bindErr.Error(),
 		))
 		return
 	}
@@ -309,7 +309,7 @@ func (h *NodePoolHandler) DrainNode(c *gin.Context) {
 	}
 
 	var req models.DrainNodeRequest
-	_ = c.ShouldBindJSON(&req) // Optional body
+	_ = c.ShouldBindJSON(&req) //nolint:errcheck // optional body, ignore errors
 
 	if err := h.service.DrainNode(c.Request.Context(), nodeID, &req); err != nil {
 		respondWithServiceError(c, err)
@@ -438,4 +438,3 @@ func (h *NodePoolHandler) GetPendingPods(c *gin.Context) {
 
 	c.JSON(http.StatusOK, pending)
 }
-

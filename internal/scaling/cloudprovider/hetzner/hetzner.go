@@ -215,7 +215,7 @@ func (p *Provider) ListServers(ctx context.Context, labels map[string]string) ([
 }
 
 // GetInstanceType retrieves an instance type by name.
-func (p *Provider) GetInstanceType(ctx context.Context, typeName string, region string) (*cloudprovider.InstanceType, error) {
+func (p *Provider) GetInstanceType(ctx context.Context, typeName, region string) (*cloudprovider.InstanceType, error) {
 	serverType, _, err := p.client.ServerType.GetByName(ctx, typeName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get server type: %w", err)
@@ -226,10 +226,10 @@ func (p *Provider) GetInstanceType(ctx context.Context, typeName string, region 
 
 	// Find pricing for the specified location
 	var hourlyCost float64
-	for _, pricing := range serverType.Pricings {
-		if pricing.Location.Name == region {
+	for i := range serverType.Pricings {
+		if serverType.Pricings[i].Location.Name == region {
 			// Parse the hourly price (Hetzner returns it as a string)
-			fmt.Sscanf(pricing.Hourly.Gross, "%f", &hourlyCost)
+			_, _ = fmt.Sscanf(serverType.Pricings[i].Hourly.Gross, "%f", &hourlyCost) //nolint:errcheck // best-effort parse
 			break
 		}
 	}
@@ -255,9 +255,9 @@ func (p *Provider) ListInstanceTypes(ctx context.Context, region string) ([]clou
 	for _, st := range serverTypes {
 		// Find pricing for the specified location
 		var hourlyCost float64
-		for _, pricing := range st.Pricings {
-			if region == "" || pricing.Location.Name == region {
-				fmt.Sscanf(pricing.Hourly.Gross, "%f", &hourlyCost)
+		for i := range st.Pricings {
+			if region == "" || st.Pricings[i].Location.Name == region {
+				_, _ = fmt.Sscanf(st.Pricings[i].Hourly.Gross, "%f", &hourlyCost) //nolint:errcheck // best-effort parse
 				break
 			}
 		}

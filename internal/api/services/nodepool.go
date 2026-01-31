@@ -154,7 +154,7 @@ func (s *NodePoolService) DisablePool(ctx context.Context, id uuid.UUID) error {
 }
 
 // GetPoolStatus gets the status of a node pool.
-func (s *NodePoolService) GetPoolStatus(ctx context.Context, id uuid.UUID) (*nodepool.NodePoolStatus, error) {
+func (s *NodePoolService) GetPoolStatus(ctx context.Context, id uuid.UUID) (*nodepool.PoolStatus, error) {
 	status, err := s.manager.GetPoolStatus(ctx, id)
 	if err != nil {
 		if err == nodepool.ErrNotFound {
@@ -166,13 +166,13 @@ func (s *NodePoolService) GetPoolStatus(ctx context.Context, id uuid.UUID) (*nod
 }
 
 // GetAllPoolStatuses gets status for all node pools.
-func (s *NodePoolService) GetAllPoolStatuses(ctx context.Context) ([]nodepool.NodePoolStatus, error) {
+func (s *NodePoolService) GetAllPoolStatuses(ctx context.Context) ([]nodepool.PoolStatus, error) {
 	statuses, err := s.manager.GetAllPoolStatuses(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get pool statuses: %w", err)
 	}
 	if statuses == nil {
-		statuses = []nodepool.NodePoolStatus{}
+		statuses = []nodepool.PoolStatus{}
 	}
 	return statuses, nil
 }
