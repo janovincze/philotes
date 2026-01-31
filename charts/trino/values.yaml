@@ -215,6 +215,9 @@ extraVolumes: []
 extraVolumeMounts: []
 
 # KEDA configuration for query-based auto-scaling
+# NOTE: KEDA and HPA are mutually exclusive. When keda.enabled=true,
+# the standard HPA (worker.autoscaling) is automatically disabled.
+# Do not enable both simultaneously as they will conflict.
 keda:
   # Enable KEDA ScaledObject (disables HPA when enabled)
   enabled: false
@@ -236,11 +239,15 @@ keda:
   idleReplicaCount: null
 
   # Prometheus triggers
+  # IMPORTANT: These metrics must be exposed by Trino's JMX exporter or a Prometheus
+  # exporter. Ensure the ServiceMonitor is enabled (metrics.serviceMonitor.enabled=true)
+  # and that Prometheus is scraping the Trino coordinator's /v1/jmx/mbean endpoint.
   prometheus:
     enabled: true
     serverAddress: "http://prometheus:9090"
 
     # Scale up when queries are queued
+    # Metric source: Trino JMX - trino.server:name=Query,type=QueryManager
     queuedQueriesTrigger:
       enabled: true
       metricName: "trino_queued_queries"

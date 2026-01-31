@@ -335,7 +335,11 @@ func (s *QueryScalingService) DeletePolicy(ctx context.Context, id uuid.UUID) er
 		return fmt.Errorf("failed to delete policy: %w", err)
 	}
 
-	rowsAffected, _ := result.RowsAffected()
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		s.logger.Error("failed to get rows affected", "error", err, "id", id)
+		return fmt.Errorf("failed to check deletion result: %w", err)
+	}
 	if rowsAffected == 0 {
 		return &NotFoundError{Resource: "query scaling policy", ID: id.String()}
 	}
@@ -418,8 +422,9 @@ func (s *QueryScalingService) GetHistory(ctx context.Context, policyID *uuid.UUI
 		}
 
 		if policyID.Valid {
-			id, _ := uuid.Parse(policyID.String)
-			entry.PolicyID = &id
+			if parsedID, parseErr := uuid.Parse(policyID.String); parseErr == nil {
+				entry.PolicyID = &parsedID
+			}
 		}
 		if triggerReason.Valid {
 			entry.TriggerReason = triggerReason.String

@@ -190,7 +190,9 @@ func (e *Evaluator) evaluateScaleDown(policy *Policy, metrics *Metrics, currentR
 		return nil
 	}
 
-	// Scale down when queries are below half the thresholds
+	// Scale down when queries are below half the thresholds.
+	// Note: Integer division is intentional - we use floor division to ensure
+	// significant load reduction before scaling down (e.g., threshold 5 -> scale down at < 2).
 	queuedBelowThreshold := metrics.QueuedQueries < policy.QueuedQueriesThreshold/2
 	runningBelowThreshold := metrics.RunningQueries < policy.RunningQueriesThreshold/2
 

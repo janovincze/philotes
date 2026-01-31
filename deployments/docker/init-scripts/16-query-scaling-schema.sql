@@ -36,6 +36,8 @@ CREATE TABLE IF NOT EXISTS query_scaling_policies (
 );
 
 -- Query scaling action history
+-- Note: ON DELETE CASCADE is intentional - history records are removed when policy is deleted.
+-- For audit requirements, export history before deleting policies.
 CREATE TABLE IF NOT EXISTS query_scaling_history (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     policy_id UUID REFERENCES query_scaling_policies(id) ON DELETE CASCADE,
