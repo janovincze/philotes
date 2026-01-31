@@ -29,14 +29,14 @@ type SecretProvider interface {
 
 // VaultSecretProvider retrieves secrets from HashiCorp Vault.
 type VaultSecretProvider struct {
-	client      *Client
-	paths       SecretPaths
-	logger      *slog.Logger
-	mu          sync.RWMutex
-	cache       secretCache
+	client          *Client
+	paths           SecretPaths
+	logger          *slog.Logger
+	mu              sync.RWMutex
+	cache           secretCache
 	refreshInterval time.Duration
-	cancelCtx   context.Context
-	cancel      context.CancelFunc
+	cancelCtx       context.Context
+	cancel          context.CancelFunc
 }
 
 type secretCache struct {

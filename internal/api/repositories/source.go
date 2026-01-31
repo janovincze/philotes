@@ -16,9 +16,9 @@ import (
 
 // Common repository errors.
 var (
-	ErrSourceNotFound      = errors.New("source not found")
-	ErrSourceNameExists    = errors.New("source with this name already exists")
-	ErrSourceHasPipelines  = errors.New("source has associated pipelines")
+	ErrSourceNotFound     = errors.New("source not found")
+	ErrSourceNameExists   = errors.New("source with this name already exists")
+	ErrSourceHasPipelines = errors.New("source has associated pipelines")
 )
 
 // SourceRepository handles database operations for sources.
@@ -386,4 +386,3 @@ func isUniqueViolation(err error) bool {
 	return strings.Contains(errStr, "23505") ||
 		strings.Contains(errStr, "duplicate key value violates unique constraint")
 }
-

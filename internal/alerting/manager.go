@@ -25,10 +25,10 @@ type Manager struct {
 	mu            sync.RWMutex
 
 	// Control channels
-	stopCh   chan struct{}
+	stopCh    chan struct{}
 	stoppedCh chan struct{}
-	running  bool
-	runMu    sync.Mutex
+	running   bool
+	runMu     sync.Mutex
 }
 
 // NewManager creates a new alert manager.

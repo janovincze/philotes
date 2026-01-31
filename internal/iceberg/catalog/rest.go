@@ -302,18 +302,18 @@ type restPartitionField struct {
 type loadTableResponse struct {
 	MetadataLocation string `json:"metadata-location"`
 	Metadata         struct {
-		FormatVersion     int               `json:"format-version"`
-		TableUUID         string            `json:"table-uuid"`
-		Location          string            `json:"location"`
-		LastUpdatedMs     int64             `json:"last-updated-ms"`
-		LastColumnID      int               `json:"last-column-id"`
-		Schemas           []restSchema      `json:"schemas"`
-		CurrentSchemaID   int               `json:"current-schema-id"`
+		FormatVersion     int                 `json:"format-version"`
+		TableUUID         string              `json:"table-uuid"`
+		Location          string              `json:"location"`
+		LastUpdatedMs     int64               `json:"last-updated-ms"`
+		LastColumnID      int                 `json:"last-column-id"`
+		Schemas           []restSchema        `json:"schemas"`
+		CurrentSchemaID   int                 `json:"current-schema-id"`
 		PartitionSpecs    []restPartitionSpec `json:"partition-specs"`
-		DefaultSpecID     int               `json:"default-spec-id"`
-		LastPartitionID   int               `json:"last-partition-id"`
-		Properties        map[string]string `json:"properties"`
-		CurrentSnapshotID int64             `json:"current-snapshot-id"`
+		DefaultSpecID     int                 `json:"default-spec-id"`
+		LastPartitionID   int                 `json:"last-partition-id"`
+		Properties        map[string]string   `json:"properties"`
+		CurrentSnapshotID int64               `json:"current-snapshot-id"`
 	} `json:"metadata"`
 }
 

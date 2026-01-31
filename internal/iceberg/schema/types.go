@@ -10,15 +10,15 @@ import (
 // PostgresTypeMapping maps PostgreSQL types to Iceberg types.
 var PostgresTypeMapping = map[string]iceberg.Type{
 	// Integer types
-	"smallint":   iceberg.TypeInt,
-	"int2":       iceberg.TypeInt,
-	"integer":    iceberg.TypeInt,
-	"int":        iceberg.TypeInt,
-	"int4":       iceberg.TypeInt,
-	"bigint":     iceberg.TypeLong,
-	"int8":       iceberg.TypeLong,
-	"serial":     iceberg.TypeInt,
-	"bigserial":  iceberg.TypeLong,
+	"smallint":  iceberg.TypeInt,
+	"int2":      iceberg.TypeInt,
+	"integer":   iceberg.TypeInt,
+	"int":       iceberg.TypeInt,
+	"int4":      iceberg.TypeInt,
+	"bigint":    iceberg.TypeLong,
+	"int8":      iceberg.TypeLong,
+	"serial":    iceberg.TypeInt,
+	"bigserial": iceberg.TypeLong,
 
 	// Floating point types
 	"real":             iceberg.TypeFloat,

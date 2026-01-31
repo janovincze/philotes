@@ -203,7 +203,6 @@ func TestUpdateSourceRequest_Validate(t *testing.T) {
 	}
 }
 
-
 // Integration tests would require a real database connection
 // and are typically run separately with docker-compose
 

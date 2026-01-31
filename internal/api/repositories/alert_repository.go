@@ -18,14 +18,14 @@ import (
 
 // Alert repository errors.
 var (
-	ErrAlertRuleNotFound       = errors.New("alert rule not found")
-	ErrAlertRuleNameExists     = errors.New("alert rule with this name already exists")
-	ErrAlertInstanceNotFound   = errors.New("alert instance not found")
-	ErrSilenceNotFound         = errors.New("silence not found")
-	ErrChannelNotFound         = errors.New("notification channel not found")
-	ErrChannelNameExists       = errors.New("notification channel with this name already exists")
-	ErrRouteNotFound           = errors.New("alert route not found")
-	ErrRouteExists             = errors.New("alert route already exists for this rule and channel")
+	ErrAlertRuleNotFound     = errors.New("alert rule not found")
+	ErrAlertRuleNameExists   = errors.New("alert rule with this name already exists")
+	ErrAlertInstanceNotFound = errors.New("alert instance not found")
+	ErrSilenceNotFound       = errors.New("silence not found")
+	ErrChannelNotFound       = errors.New("notification channel not found")
+	ErrChannelNameExists     = errors.New("notification channel with this name already exists")
+	ErrRouteNotFound         = errors.New("alert route not found")
+	ErrRouteExists           = errors.New("alert route already exists for this rule and channel")
 )
 
 // AlertRepository handles database operations for alerting.
