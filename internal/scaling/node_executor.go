@@ -378,7 +378,7 @@ func (e *NodeExecutor) scaleDown(ctx context.Context, pool *nodepool.NodePool, c
 		}
 	}
 
-	var removedNodeIDs []uuid.UUID
+	removedNodeIDs := make([]uuid.UUID, 0, len(nodeNames))
 
 	for _, nodeName := range nodeNames {
 		// Get node from database
@@ -503,20 +503,22 @@ func (e *NodeExecutor) waitForNodesToBeReady(ctx context.Context, pool *nodepool
 				continue
 			}
 
-			for _, k8sNode := range nodes {
+			for i := range nodes {
 				// Match by IP
-				for _, addr := range k8sNode.Status.Addresses {
+				matched := false
+				for j := range nodes[i].Status.Addresses {
+					addr := &nodes[i].Status.Addresses[j]
 					if (addr.Type == "InternalIP" && addr.Address == node.PrivateIP) ||
 						(addr.Type == "ExternalIP" && addr.Address == node.PublicIP) {
 
 						// Found the node, check if ready
-						isReady, readyErr := e.k8sClient.IsNodeReady(ctx, k8sNode.Name)
+						isReady, readyErr := e.k8sClient.IsNodeReady(ctx, nodes[i].Name)
 						if readyErr != nil {
 							continue
 						}
 
 						// Update node name
-						node.NodeName = k8sNode.Name
+						node.NodeName = nodes[i].Name
 						updateErr := e.poolRepo.UpdateNode(ctx, node)
 						if updateErr != nil {
 							e.logger.Warn("failed to update node name", "error", updateErr)
@@ -529,12 +531,16 @@ func (e *NodeExecutor) waitForNodesToBeReady(ctx context.Context, pool *nodepool
 							}
 							e.logger.Info("node is ready",
 								"node_id", nodeID,
-								"k8s_name", k8sNode.Name,
+								"k8s_name", nodes[i].Name,
 							)
 							nodeReady = true
+							matched = true
 							break
 						}
 					}
+				}
+				if matched {
+					break
 				}
 			}
 
@@ -565,10 +571,10 @@ func (e *NodeExecutor) getTotalActiveNodes(ctx context.Context) (int, error) {
 	}
 
 	total := 0
-	for _, pool := range pools {
-		count, countErr := e.poolRepo.CountActiveNodesForPool(ctx, pool.ID)
+	for i := range pools {
+		count, countErr := e.poolRepo.CountActiveNodesForPool(ctx, pools[i].ID)
 		if countErr != nil {
-			e.logger.Warn("failed to count nodes for pool", "pool", pool.Name, "error", countErr)
+			e.logger.Warn("failed to count nodes for pool", "pool", pools[i].Name, "error", countErr)
 			continue
 		}
 		total += count

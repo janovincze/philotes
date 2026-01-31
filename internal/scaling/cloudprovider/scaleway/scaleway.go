@@ -77,7 +77,7 @@ func (p *Provider) CreateServer(ctx context.Context, opts cloudprovider.CreateSe
 	}
 
 	// Build tags from labels
-	var tags []string
+	tags := make([]string, 0, len(p.config.DefaultLabels)+len(opts.Labels))
 	for k, v := range p.config.DefaultLabels {
 		tags = append(tags, fmt.Sprintf("%s=%s", k, v))
 	}
@@ -197,7 +197,7 @@ func (p *Provider) GetServer(ctx context.Context, serverID string) (*cloudprovid
 // ListServers lists servers matching the given labels.
 func (p *Provider) ListServers(ctx context.Context, labels map[string]string) ([]cloudprovider.Server, error) {
 	// Build tags filter
-	var tags []string
+	tags := make([]string, 0, len(labels))
 	for k, v := range labels {
 		tags = append(tags, fmt.Sprintf("%s=%s", k, v))
 	}
@@ -230,7 +230,7 @@ func (p *Provider) ListServers(ctx context.Context, labels map[string]string) ([
 }
 
 // GetInstanceType retrieves an instance type by name.
-func (p *Provider) GetInstanceType(ctx context.Context, typeName string, region string) (*cloudprovider.InstanceType, error) {
+func (p *Provider) GetInstanceType(ctx context.Context, typeName, region string) (*cloudprovider.InstanceType, error) {
 	// Use cached instance types since the Scaleway SDK API for server types is complex
 	types := getKnownInstanceTypes()
 	for _, t := range types {

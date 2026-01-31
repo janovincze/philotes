@@ -297,10 +297,10 @@ func (s *NodePoolService) GetClusterCapacity(ctx context.Context) (*models.Clust
 	// Calculate totals from pool statuses
 	var totalNodes, readyNodes int
 	var totalHourlyCost float64
-	for _, status := range statuses {
-		totalNodes += status.CurrentNodes
-		readyNodes += status.ReadyNodes
-		totalHourlyCost += status.HourlyCost
+	for i := range statuses {
+		totalNodes += statuses[i].CurrentNodes
+		readyNodes += statuses[i].ReadyNodes
+		totalHourlyCost += statuses[i].HourlyCost
 	}
 
 	// Get utilization data from monitor

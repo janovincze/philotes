@@ -400,7 +400,7 @@ func (h *NodePoolHandler) CancelOperation(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "operation cancelled"})
+	c.JSON(http.StatusOK, gin.H{"message": "operation canceled"})
 }
 
 // GetClusterCapacity returns cluster capacity summary.

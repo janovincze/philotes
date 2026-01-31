@@ -71,17 +71,18 @@ func (m *Monitor) GetPendingPodsSummary(ctx context.Context) (*PendingPodsSummar
 		ByReason: make(map[string]int),
 	}
 
-	var pendingPods []PendingPodInfo
+	pendingPods := make([]PendingPodInfo, 0, len(pods.Items))
 
-	for _, pod := range pods.Items {
+	for i := range pods.Items {
+		pod := &pods.Items[i]
 		summary.TotalPending++
 
 		// Calculate resource requests
-		for _, container := range pod.Spec.Containers {
-			if cpu := container.Resources.Requests.Cpu(); cpu != nil {
+		for j := range pod.Spec.Containers {
+			if cpu := pod.Spec.Containers[j].Resources.Requests.Cpu(); cpu != nil {
 				summary.ResourceRequests.CPUMillicores += cpu.MilliValue()
 			}
-			if mem := container.Resources.Requests.Memory(); mem != nil {
+			if mem := pod.Spec.Containers[j].Resources.Requests.Memory(); mem != nil {
 				summary.ResourceRequests.MemoryMB += mem.Value() / (1024 * 1024)
 			}
 		}
@@ -90,14 +91,14 @@ func (m *Monitor) GetPendingPodsSummary(ctx context.Context) (*PendingPodsSummar
 		// Check for unschedulable reason
 		reason := "Unknown"
 		message := ""
-		for _, condition := range pod.Status.Conditions {
-			if condition.Type == corev1.PodScheduled {
-				if condition.Status == corev1.ConditionFalse {
-					reason = condition.Reason
-					message = condition.Message
-					if condition.Reason == corev1.PodReasonUnschedulable {
+		for j := range pod.Status.Conditions {
+			if pod.Status.Conditions[j].Type == corev1.PodScheduled {
+				if pod.Status.Conditions[j].Status == corev1.ConditionFalse {
+					reason = pod.Status.Conditions[j].Reason
+					message = pod.Status.Conditions[j].Message
+					if pod.Status.Conditions[j].Reason == corev1.PodReasonUnschedulable {
 						summary.Unschedulable++
-						if isResourceRelated(condition.Message) {
+						if isResourceRelated(pod.Status.Conditions[j].Message) {
 							summary.WaitingForResources++
 						}
 					}
@@ -116,11 +117,11 @@ func (m *Monitor) GetPendingPodsSummary(ctx context.Context) (*PendingPodsSummar
 
 		// Collect pod info
 		var cpuReq, memReq resource.Quantity
-		for _, container := range pod.Spec.Containers {
-			if cpu := container.Resources.Requests.Cpu(); cpu != nil {
+		for j := range pod.Spec.Containers {
+			if cpu := pod.Spec.Containers[j].Resources.Requests.Cpu(); cpu != nil {
 				cpuReq.Add(*cpu)
 			}
-			if mem := container.Resources.Requests.Memory(); mem != nil {
+			if mem := pod.Spec.Containers[j].Resources.Requests.Memory(); mem != nil {
 				memReq.Add(*mem)
 			}
 		}
@@ -180,17 +181,17 @@ func (m *Monitor) GetNodeUtilization(ctx context.Context, nodeName string) (*Nod
 	var cpuRequested, memRequested int64
 	podCount := 0
 
-	for _, pod := range pods.Items {
-		if pod.Status.Phase != corev1.PodRunning && pod.Status.Phase != corev1.PodPending {
+	for i := range pods.Items {
+		if pods.Items[i].Status.Phase != corev1.PodRunning && pods.Items[i].Status.Phase != corev1.PodPending {
 			continue
 		}
 		podCount++
 
-		for _, container := range pod.Spec.Containers {
-			if cpu := container.Resources.Requests.Cpu(); cpu != nil {
+		for j := range pods.Items[i].Spec.Containers {
+			if cpu := pods.Items[i].Spec.Containers[j].Resources.Requests.Cpu(); cpu != nil {
 				cpuRequested += cpu.MilliValue()
 			}
-			if mem := container.Resources.Requests.Memory(); mem != nil {
+			if mem := pods.Items[i].Spec.Containers[j].Resources.Requests.Memory(); mem != nil {
 				memRequested += mem.Value() / (1024 * 1024)
 			}
 		}
@@ -237,11 +238,11 @@ func (m *Monitor) GetAllNodeUtilization(ctx context.Context) ([]NodeUtilization,
 		return nil, fmt.Errorf("failed to list nodes: %w", err)
 	}
 
-	var result []NodeUtilization
-	for _, node := range nodes.Items {
-		util, utilErr := m.GetNodeUtilization(ctx, node.Name)
+	result := make([]NodeUtilization, 0, len(nodes.Items))
+	for i := range nodes.Items {
+		util, utilErr := m.GetNodeUtilization(ctx, nodes.Items[i].Name)
 		if utilErr != nil {
-			m.logger.Warn("failed to get utilization for node", "node", node.Name, "error", utilErr)
+			m.logger.Warn("failed to get utilization for node", "node", nodes.Items[i].Name, "error", utilErr)
 			continue
 		}
 		result = append(result, *util)
@@ -307,9 +308,10 @@ func (m *Monitor) SelectNodesForScaleDown(ctx context.Context, poolLabels map[st
 		util  *NodeUtilization
 	}
 
-	var candidates []nodeScore
+	candidates := make([]nodeScore, 0, len(nodes.Items))
 
-	for _, node := range nodes.Items {
+	for i := range nodes.Items {
+		node := &nodes.Items[i]
 		// Check exclusion labels
 		excluded := false
 		for k, v := range criteria.ExcludeLabels {

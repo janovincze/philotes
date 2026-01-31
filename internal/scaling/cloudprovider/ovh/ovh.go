@@ -205,7 +205,7 @@ func (p *Provider) ListServers(ctx context.Context, labels map[string]string) ([
 		return nil, fmt.Errorf("failed to list servers: %w", err)
 	}
 
-	var result []cloudprovider.Server
+	result := make([]cloudprovider.Server, 0, len(instances))
 	for _, inst := range instances {
 		var publicIP, privateIP string
 		for _, ip := range inst.IPAddresses {
@@ -231,7 +231,7 @@ func (p *Provider) ListServers(ctx context.Context, labels map[string]string) ([
 }
 
 // GetInstanceType retrieves an instance type by name.
-func (p *Provider) GetInstanceType(ctx context.Context, typeName string, region string) (*cloudprovider.InstanceType, error) {
+func (p *Provider) GetInstanceType(ctx context.Context, typeName, region string) (*cloudprovider.InstanceType, error) {
 	types, err := p.ListInstanceTypes(ctx, region)
 	if err != nil {
 		return nil, err
@@ -271,7 +271,7 @@ func (p *Provider) ListInstanceTypes(ctx context.Context, region string) ([]clou
 		return nil, fmt.Errorf("failed to list flavors: %w", err)
 	}
 
-	var result []cloudprovider.InstanceType
+	result := make([]cloudprovider.InstanceType, 0, len(flavors))
 	for _, f := range flavors {
 		result = append(result, cloudprovider.InstanceType{
 			Name:        f.ID,

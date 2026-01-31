@@ -311,7 +311,7 @@ func (p *Provider) ListServers(ctx context.Context, labels map[string]string) ([
 
 	// Contabo doesn't support labels, so we return all servers
 	// Filtering by name pattern could be done here if needed
-	var result []cloudprovider.Server
+	result := make([]cloudprovider.Server, 0, len(listResp.Data))
 	for _, inst := range listResp.Data {
 		result = append(result, cloudprovider.Server{
 			ID:       fmt.Sprintf("%d", inst.InstanceID),

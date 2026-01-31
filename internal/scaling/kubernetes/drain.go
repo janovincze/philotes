@@ -139,13 +139,13 @@ func (d *Drainer) DrainNode(ctx context.Context, nodeName string, opts DrainOpti
 	defer cancel()
 
 	// Evict pods
-	for _, pod := range pods {
-		if err := d.evictPod(drainCtx, &pod, opts); err != nil {
+	for i := range pods {
+		if err := d.evictPod(drainCtx, &pods[i], opts); err != nil {
 			if !opts.Force {
-				return fmt.Errorf("failed to evict pod %s/%s: %w", pod.Namespace, pod.Name, err)
+				return fmt.Errorf("failed to evict pod %s/%s: %w", pods[i].Namespace, pods[i].Name, err)
 			}
 			d.logger.Warn("failed to evict pod, continuing due to force flag",
-				"pod", pod.Name, "namespace", pod.Namespace, "error", err)
+				"pod", pods[i].Name, "namespace", pods[i].Namespace, "error", err)
 		}
 	}
 
@@ -174,8 +174,9 @@ func (d *Drainer) getPodsForDrain(ctx context.Context, nodeName string, opts Dra
 		return nil, fmt.Errorf("failed to list pods on node: %w", err)
 	}
 
-	var filteredPods []corev1.Pod
-	for _, pod := range pods.Items {
+	filteredPods := make([]corev1.Pod, 0, len(pods.Items))
+	for i := range pods.Items {
+		pod := &pods.Items[i]
 		// Skip pods that are already terminating
 		if pod.DeletionTimestamp != nil {
 			continue
@@ -187,13 +188,13 @@ func (d *Drainer) getPodsForDrain(ctx context.Context, nodeName string, opts Dra
 		}
 
 		// Skip DaemonSet pods if configured
-		if opts.IgnoreDaemonSets && isDaemonSetPod(&pod) {
+		if opts.IgnoreDaemonSets && isDaemonSetPod(pod) {
 			d.logger.Debug("skipping DaemonSet pod", "pod", pod.Name, "namespace", pod.Namespace)
 			continue
 		}
 
 		// Check for pods using emptyDir
-		if !opts.DeleteEmptyDirData && hasEmptyDir(&pod) {
+		if !opts.DeleteEmptyDirData && hasEmptyDir(pod) {
 			if !opts.Force {
 				return nil, fmt.Errorf("pod %s/%s uses emptyDir volume and DeleteEmptyDirData is false",
 					pod.Namespace, pod.Name)
@@ -203,12 +204,12 @@ func (d *Drainer) getPodsForDrain(ctx context.Context, nodeName string, opts Dra
 		}
 
 		// Check for unmanaged pods
-		if !opts.Force && !isManagedPod(&pod) {
+		if !opts.Force && !isManagedPod(pod) {
 			return nil, fmt.Errorf("pod %s/%s is not managed by a controller",
 				pod.Namespace, pod.Name)
 		}
 
-		filteredPods = append(filteredPods, pod)
+		filteredPods = append(filteredPods, pods.Items[i])
 	}
 
 	return filteredPods, nil
@@ -248,8 +249,8 @@ func (d *Drainer) evictPod(ctx context.Context, pod *corev1.Pod, opts DrainOptio
 // waitForPodsDeleted waits for all drained pods to be deleted.
 func (d *Drainer) waitForPodsDeleted(ctx context.Context, nodeName string, pods []corev1.Pod, opts DrainOptions) error {
 	podNames := make(map[string]string) // namespace/name -> ""
-	for _, pod := range pods {
-		podNames[fmt.Sprintf("%s/%s", pod.Namespace, pod.Name)] = ""
+	for i := range pods {
+		podNames[fmt.Sprintf("%s/%s", pods[i].Namespace, pods[i].Name)] = ""
 	}
 
 	return wait.PollUntilContextCancel(ctx, time.Second, true, func(ctx context.Context) (bool, error) {
@@ -299,8 +300,8 @@ func isManagedPod(pod *corev1.Pod) bool {
 
 // hasEmptyDir checks if a pod uses emptyDir volumes.
 func hasEmptyDir(pod *corev1.Pod) bool {
-	for _, vol := range pod.Spec.Volumes {
-		if vol.EmptyDir != nil {
+	for i := range pod.Spec.Volumes {
+		if pod.Spec.Volumes[i].EmptyDir != nil {
 			return true
 		}
 	}
@@ -321,13 +322,13 @@ func (d *Drainer) CountPodsOnNode(ctx context.Context, nodeName string) (int, er
 	}
 
 	count := 0
-	for _, pod := range pods.Items {
+	for i := range pods.Items {
 		// Skip DaemonSet pods
-		if isDaemonSetPod(&pod) {
+		if isDaemonSetPod(&pods.Items[i]) {
 			continue
 		}
 		// Skip terminated pods
-		if pod.DeletionTimestamp != nil {
+		if pods.Items[i].DeletionTimestamp != nil {
 			continue
 		}
 		count++

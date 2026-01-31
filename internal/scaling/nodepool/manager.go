@@ -267,12 +267,12 @@ func (m *Manager) GetPoolStatus(ctx context.Context, poolID uuid.UUID) (*PoolSta
 
 	readyCount := 0
 	var totalCost float64
-	for _, node := range nodes {
-		if node.Status == NodeStatusReady {
+	for i := range nodes {
+		if nodes[i].Status == NodeStatusReady {
 			readyCount++
 		}
-		if node.HourlyCost != nil {
-			totalCost += *node.HourlyCost
+		if nodes[i].HourlyCost != nil {
+			totalCost += *nodes[i].HourlyCost
 		}
 	}
 
@@ -298,11 +298,11 @@ func (m *Manager) GetAllPoolStatuses(ctx context.Context) ([]PoolStatus, error) 
 		return nil, err
 	}
 
-	var statuses []PoolStatus
-	for _, pool := range pools {
-		status, statusErr := m.GetPoolStatus(ctx, pool.ID)
+	statuses := make([]PoolStatus, 0, len(pools))
+	for i := range pools {
+		status, statusErr := m.GetPoolStatus(ctx, pools[i].ID)
 		if statusErr != nil {
-			m.logger.Warn("failed to get pool status", "pool", pool.Name, "error", statusErr)
+			m.logger.Warn("failed to get pool status", "pool", pools[i].Name, "error", statusErr)
 			continue
 		}
 		statuses = append(statuses, *status)
@@ -354,21 +354,21 @@ func (m *Manager) CleanupStaleOperations(ctx context.Context, maxAge time.Durati
 	cleaned := 0
 	cutoff := time.Now().Add(-maxAge)
 
-	for _, pool := range pools {
-		ops, opsErr := m.repo.ListOperationsForPool(ctx, pool.ID, 100)
+	for i := range pools {
+		ops, opsErr := m.repo.ListOperationsForPool(ctx, pools[i].ID, 100)
 		if opsErr != nil {
 			continue
 		}
 
-		for _, op := range ops {
-			if op.Status == OperationStatusInProgress && op.StartedAt.Before(cutoff) {
-				updateErr := m.repo.UpdateOperationStatus(ctx, op.ID, OperationStatusFailed, nil, "operation timed out")
+		for j := range ops {
+			if ops[j].Status == OperationStatusInProgress && ops[j].StartedAt.Before(cutoff) {
+				updateErr := m.repo.UpdateOperationStatus(ctx, ops[j].ID, OperationStatusFailed, nil, "operation timed out")
 				if updateErr == nil {
 					cleaned++
 					m.logger.Info("cleaned up stale operation",
-						"operation_id", op.ID,
-						"pool", pool.Name,
-						"started_at", op.StartedAt,
+						"operation_id", ops[j].ID,
+						"pool", pools[i].Name,
+						"started_at", ops[j].StartedAt,
 					)
 				}
 			}

@@ -186,7 +186,7 @@ func (p *Provider) ListInstanceTypes(ctx context.Context, region string) ([]clou
 		return nil, fmt.Errorf("failed to list instance types: %w", err)
 	}
 
-	var result []cloudprovider.InstanceType
+	result := make([]cloudprovider.InstanceType, 0, len(types))
 	for _, t := range types {
 		result = append(result, cloudprovider.InstanceType{
 			Name:        *t.ID,
@@ -261,7 +261,7 @@ func mapStatus(state string) cloudprovider.ServerStatus {
 }
 
 // matchesLabels checks if instance labels contain all required labels.
-func matchesLabels(instLabels map[string]string, required map[string]string) bool {
+func matchesLabels(instLabels, required map[string]string) bool {
 	if instLabels == nil {
 		return len(required) == 0
 	}
