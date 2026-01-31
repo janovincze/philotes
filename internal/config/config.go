@@ -58,6 +58,39 @@ type Config struct {
 
 	// Trino configuration for SQL query layer
 	Trino TrinoConfig
+
+	// QueryScaling configuration for query engine auto-scaling
+	QueryScaling QueryScalingConfig
+}
+
+// QueryScalingConfig holds query engine auto-scaling configuration.
+type QueryScalingConfig struct {
+	// Enabled enables query engine auto-scaling
+	Enabled bool
+
+	// PrometheusURL is the URL of the Prometheus server for metrics
+	PrometheusURL string
+
+	// EvaluationInterval is the interval between scaling evaluations
+	EvaluationInterval time.Duration
+
+	// DefaultCooldownSeconds is the default cooldown period between scaling actions
+	DefaultCooldownSeconds int
+
+	// DefaultMinReplicas is the default minimum replica count
+	DefaultMinReplicas int
+
+	// DefaultMaxReplicas is the default maximum replica count
+	DefaultMaxReplicas int
+
+	// DefaultQueuedQueriesThreshold is the default threshold for queued queries
+	DefaultQueuedQueriesThreshold int
+
+	// DefaultRunningQueriesThreshold is the default threshold for running queries
+	DefaultRunningQueriesThreshold int
+
+	// DefaultLatencyThreshold is the default latency threshold in seconds
+	DefaultLatencyThreshold int
 }
 
 // TrinoConfig holds Trino query engine configuration.
@@ -854,6 +887,18 @@ func Load() (*Config, error) {
 			Schema:              getEnv("PHILOTES_TRINO_SCHEMA", "philotes"),
 			QueryTimeout:        getDurationEnv("PHILOTES_TRINO_QUERY_TIMEOUT", 5*time.Minute),
 			HealthCheckInterval: getDurationEnv("PHILOTES_TRINO_HEALTH_CHECK_INTERVAL", 30*time.Second),
+		},
+
+		QueryScaling: QueryScalingConfig{
+			Enabled:                        getBoolEnv("PHILOTES_QUERY_SCALING_ENABLED", false),
+			PrometheusURL:                  getEnv("PHILOTES_PROMETHEUS_URL", "http://localhost:9090"),
+			EvaluationInterval:             getDurationEnv("PHILOTES_QUERY_SCALING_EVALUATION_INTERVAL", 30*time.Second),
+			DefaultCooldownSeconds:         getIntEnv("PHILOTES_QUERY_SCALING_DEFAULT_COOLDOWN", 300),
+			DefaultMinReplicas:             getIntEnv("PHILOTES_QUERY_SCALING_DEFAULT_MIN_REPLICAS", 1),
+			DefaultMaxReplicas:             getIntEnv("PHILOTES_QUERY_SCALING_DEFAULT_MAX_REPLICAS", 10),
+			DefaultQueuedQueriesThreshold:  getIntEnv("PHILOTES_QUERY_SCALING_QUEUED_THRESHOLD", 5),
+			DefaultRunningQueriesThreshold: getIntEnv("PHILOTES_QUERY_SCALING_RUNNING_THRESHOLD", 10),
+			DefaultLatencyThreshold:        getIntEnv("PHILOTES_QUERY_SCALING_LATENCY_THRESHOLD", 30),
 		},
 	}
 

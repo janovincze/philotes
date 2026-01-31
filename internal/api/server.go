@@ -39,6 +39,7 @@ type Server struct {
 	onboardingService     *services.OnboardingService
 	nodePoolService       *services.NodePoolService
 	queryService          *services.QueryService
+	queryScalingService   *services.QueryScalingService
 	httpServer            *http.Server
 	router                *gin.Engine
 }
@@ -95,6 +96,9 @@ type ServerConfig struct {
 
 	// QueryService is the query service for Trino query layer operations.
 	QueryService *services.QueryService
+
+	// QueryScalingService is the query scaling service for query engine auto-scaling.
+	QueryScalingService *services.QueryScalingService
 
 	// CORSConfig is the CORS configuration.
 	CORSConfig middleware.CORSConfig
@@ -163,6 +167,7 @@ func NewServer(serverCfg ServerConfig) *Server {
 		onboardingService:     serverCfg.OnboardingService,
 		nodePoolService:       serverCfg.NodePoolService,
 		queryService:          serverCfg.QueryService,
+		queryScalingService:   serverCfg.QueryScalingService,
 		router:                router,
 	}
 
@@ -332,6 +337,12 @@ func (s *Server) registerRoutes() {
 			protected := v1.Group("")
 			protected.Use(requireAuth)
 			queryHandler.RegisterRoutes(protected)
+		}
+
+		// Query scaling endpoints (protected when auth is enabled)
+		if s.queryScalingService != nil {
+			queryScalingHandler := handlers.NewQueryScalingHandler(s.queryScalingService, s.logger)
+			queryScalingHandler.RegisterRoutes(v1, requireAuth)
 		}
 
 		// Installer endpoints

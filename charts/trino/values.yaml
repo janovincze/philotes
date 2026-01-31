@@ -213,3 +213,81 @@ extraVolumes: []
 
 # Extra volume mounts
 extraVolumeMounts: []
+
+# KEDA configuration for query-based auto-scaling
+keda:
+  # Enable KEDA ScaledObject (disables HPA when enabled)
+  enabled: false
+
+  # Polling interval in seconds
+  pollingInterval: 30
+
+  # Cooldown period in seconds after scaling down before scaling down again
+  cooldownPeriod: 300
+
+  # Minimum replica count
+  minReplicaCount: 1
+
+  # Maximum replica count
+  maxReplicas: 10
+
+  # Idle replica count (set to 0 for scale-to-zero support)
+  # Leave unset or use null to disable scale-to-zero
+  idleReplicaCount: null
+
+  # Prometheus triggers
+  prometheus:
+    enabled: true
+    serverAddress: "http://prometheus:9090"
+
+    # Scale up when queries are queued
+    queuedQueriesTrigger:
+      enabled: true
+      metricName: "trino_queued_queries"
+      query: "trino_queued_queries"
+      threshold: "5"
+      # Wake from zero when any query is queued
+      activationThreshold: "1"
+
+    # Scale up when running queries exceed threshold
+    runningQueriesTrigger:
+      enabled: true
+      metricName: "trino_running_queries"
+      query: "trino_running_queries"
+      threshold: "10"
+
+    # Scale based on query latency (p95)
+    latencyTrigger:
+      enabled: false
+      metricName: "trino_query_execution_time_p95"
+      query: "histogram_quantile(0.95, sum(rate(trino_query_execution_time_bucket[5m])) by (le))"
+      threshold: "30"
+
+  # CPU-based scaling trigger
+  cpu:
+    enabled: false
+    metricType: Utilization
+    value: "70"
+
+  # Memory-based scaling trigger
+  memory:
+    enabled: false
+    metricType: Utilization
+    value: "80"
+
+  # Advanced HPA configuration
+  advanced:
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleDown:
+          stabilizationWindowSeconds: 300
+          policies:
+            - type: Percent
+              value: 50
+              periodSeconds: 60
+        scaleUp:
+          stabilizationWindowSeconds: 0
+          policies:
+            - type: Pods
+              value: 2
+              periodSeconds: 30
