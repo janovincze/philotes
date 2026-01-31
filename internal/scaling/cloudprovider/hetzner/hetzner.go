@@ -324,7 +324,7 @@ func (p *Provider) toServer(s *hcloud.Server) *cloudprovider.Server {
 		Status:    mapStatus(s.Status),
 		PublicIP:  publicIP,
 		PrivateIP: privateIP,
-		Region:    s.Datacenter.Location.Name,
+		Region:    s.Location.Name,
 		Type:      s.ServerType.Name,
 		Labels:    s.Labels,
 		CreatedAt: s.Created,

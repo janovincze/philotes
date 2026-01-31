@@ -284,8 +284,8 @@ func (p *Provider) IsServerReady(ctx context.Context, serverID string) (bool, er
 func (p *Provider) toServer(s *instance.Server, zone scw.Zone) *cloudprovider.Server {
 	var publicIP, privateIP string
 
-	if s.PublicIP != nil {
-		publicIP = s.PublicIP.Address.String()
+	if len(s.PublicIPs) > 0 && s.PublicIPs[0].Address != nil {
+		publicIP = s.PublicIPs[0].Address.String()
 	}
 	if s.PrivateIP != nil {
 		privateIP = *s.PrivateIP
