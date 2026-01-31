@@ -107,7 +107,7 @@ type SavingsSummaryResponse struct {
 // PolicySavingsPreview represents a preview of savings for a policy.
 type PolicySavingsPreview struct {
 	PolicyID     uuid.UUID `json:"policy_id"`
-	PolicyName   string    `json:"policy_name"`
+	PolicyName   string    `json:"policy_name,omitempty"`
 	IdleHours    float64   `json:"idle_hours"`
 	SavingsEuros float64   `json:"savings_euros"`
 }
