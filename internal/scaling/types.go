@@ -388,16 +388,16 @@ func (r WakeReason) String() string {
 
 // IdleState represents the idle state of a scaling policy.
 type IdleState struct {
-	ID              uuid.UUID   `json:"id"`
-	PolicyID        uuid.UUID   `json:"policy_id"`
-	LastActivityAt  time.Time   `json:"last_activity_at"`
-	IdleSince       *time.Time  `json:"idle_since,omitempty"`
-	ScaledToZeroAt  *time.Time  `json:"scaled_to_zero_at,omitempty"`
-	LastWakeAt      *time.Time  `json:"last_wake_at,omitempty"`
-	WakeReason      *WakeReason `json:"wake_reason,omitempty"`
-	IsScaledToZero  bool        `json:"is_scaled_to_zero"`
-	CreatedAt       time.Time   `json:"created_at"`
-	UpdatedAt       time.Time   `json:"updated_at"`
+	ID             uuid.UUID   `json:"id"`
+	PolicyID       uuid.UUID   `json:"policy_id"`
+	LastActivityAt time.Time   `json:"last_activity_at"`
+	IdleSince      *time.Time  `json:"idle_since,omitempty"`
+	ScaledToZeroAt *time.Time  `json:"scaled_to_zero_at,omitempty"`
+	LastWakeAt     *time.Time  `json:"last_wake_at,omitempty"`
+	WakeReason     *WakeReason `json:"wake_reason,omitempty"`
+	IsScaledToZero bool        `json:"is_scaled_to_zero"`
+	CreatedAt      time.Time   `json:"created_at"`
+	UpdatedAt      time.Time   `json:"updated_at"`
 }
 
 // IdleDuration returns the duration since last activity.

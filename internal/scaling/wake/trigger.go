@@ -35,7 +35,7 @@ type Trigger struct {
 	logger         *slog.Logger
 
 	mu              sync.RWMutex
-	pendingWakes    map[uuid.UUID]*WakeOperation
+	pendingWakes    map[uuid.UUID]*Operation
 	coldStartConfig ColdStartConfig
 }
 
@@ -60,35 +60,35 @@ func DefaultColdStartConfig() ColdStartConfig {
 	}
 }
 
-// WakeOperation represents a pending wake operation.
-type WakeOperation struct {
-	PolicyID      uuid.UUID
-	Reason        scaling.WakeReason
-	RequestedAt   time.Time
-	StartedAt     *time.Time
-	CompletedAt   *time.Time
+// Operation represents a pending wake operation.
+type Operation struct {
+	PolicyID       uuid.UUID
+	Reason         scaling.WakeReason
+	RequestedAt    time.Time
+	StartedAt      *time.Time
+	CompletedAt    *time.Time
 	TargetReplicas int
-	Status        WakeStatus
-	Error         string
+	Status         Status
+	Error          string
 }
 
-// WakeStatus represents the status of a wake operation.
-type WakeStatus string
+// Status represents the status of a wake operation.
+type Status string
 
 const (
-	WakeStatusPending    WakeStatus = "pending"
-	WakeStatusInProgress WakeStatus = "in_progress"
-	WakeStatusCompleted  WakeStatus = "completed"
-	WakeStatusFailed     WakeStatus = "failed"
+	StatusPending    Status = "pending"
+	StatusInProgress Status = "in_progress"
+	StatusCompleted  Status = "completed"
+	StatusFailed     Status = "failed"
 )
 
-// WakeResult represents the result of a wake operation.
-type WakeResult struct {
+// Result represents the result of a wake operation.
+type Result struct {
 	PolicyID              uuid.UUID          `json:"policy_id"`
 	PreviousReplicas      int                `json:"previous_replicas"`
 	TargetReplicas        int                `json:"target_replicas"`
 	Reason                scaling.WakeReason `json:"reason"`
-	Status                WakeStatus         `json:"status"`
+	Status                Status             `json:"status"`
 	EstimatedReadySeconds int                `json:"estimated_ready_seconds,omitempty"`
 	Message               string             `json:"message"`
 	Error                 string             `json:"error,omitempty"`
@@ -111,13 +111,13 @@ func NewTrigger(
 		executor:        executor,
 		policyProvider:  policyProvider,
 		logger:          logger.With("component", "wake-trigger"),
-		pendingWakes:    make(map[uuid.UUID]*WakeOperation),
+		pendingWakes:    make(map[uuid.UUID]*Operation),
 		coldStartConfig: cfg,
 	}
 }
 
 // Wake initiates a wake operation for a policy.
-func (t *Trigger) Wake(ctx context.Context, policyID uuid.UUID, reason scaling.WakeReason) (*WakeResult, error) {
+func (t *Trigger) Wake(ctx context.Context, policyID uuid.UUID, reason scaling.WakeReason) (*Result, error) {
 	t.logger.Info("initiating wake operation",
 		"policy_id", policyID,
 		"reason", reason,
@@ -140,12 +140,12 @@ func (t *Trigger) Wake(ctx context.Context, policyID uuid.UUID, reason scaling.W
 
 	// Check if already running
 	if state != nil && state.CurrentReplicas > 0 {
-		return &WakeResult{
+		return &Result{
 			PolicyID:         policyID,
 			PreviousReplicas: state.CurrentReplicas,
 			TargetReplicas:   state.CurrentReplicas,
 			Reason:           reason,
-			Status:           WakeStatusCompleted,
+			Status:           StatusCompleted,
 			Message:          "Policy is already running",
 		}, nil
 	}
@@ -158,13 +158,13 @@ func (t *Trigger) Wake(ctx context.Context, policyID uuid.UUID, reason scaling.W
 
 	// Create wake operation
 	now := time.Now()
-	op := &WakeOperation{
+	op := &Operation{
 		PolicyID:       policyID,
 		Reason:         reason,
 		RequestedAt:    now,
 		StartedAt:      &now,
 		TargetReplicas: targetReplicas,
-		Status:         WakeStatusInProgress,
+		Status:         StatusInProgress,
 	}
 
 	t.mu.Lock()
@@ -173,17 +173,17 @@ func (t *Trigger) Wake(ctx context.Context, policyID uuid.UUID, reason scaling.W
 
 	// Execute scaling
 	if err := t.executor.Scale(ctx, policy, targetReplicas); err != nil {
-		op.Status = WakeStatusFailed
+		op.Status = StatusFailed
 		op.Error = err.Error()
 		completed := time.Now()
 		op.CompletedAt = &completed
 
-		return &WakeResult{
+		return &Result{
 			PolicyID:         policyID,
 			PreviousReplicas: 0,
 			TargetReplicas:   targetReplicas,
 			Reason:           reason,
-			Status:           WakeStatusFailed,
+			Status:           StatusFailed,
 			Message:          "Failed to wake policy",
 			Error:            err.Error(),
 		}, err
@@ -221,7 +221,7 @@ func (t *Trigger) Wake(ctx context.Context, policyID uuid.UUID, reason scaling.W
 
 	// Update operation status
 	completed := time.Now()
-	op.Status = WakeStatusCompleted
+	op.Status = StatusCompleted
 	op.CompletedAt = &completed
 
 	t.mu.Lock()
@@ -234,32 +234,32 @@ func (t *Trigger) Wake(ctx context.Context, policyID uuid.UUID, reason scaling.W
 		"target_replicas", targetReplicas,
 	)
 
-	return &WakeResult{
+	return &Result{
 		PolicyID:              policyID,
 		PreviousReplicas:      0,
 		TargetReplicas:        targetReplicas,
 		Reason:                reason,
-		Status:                WakeStatusCompleted,
+		Status:                StatusCompleted,
 		EstimatedReadySeconds: int(t.coldStartConfig.Timeout.Seconds()),
 		Message:               "Wake initiated successfully",
 	}, nil
 }
 
 // WakeAll wakes all scaled-to-zero policies.
-func (t *Trigger) WakeAll(ctx context.Context, reason scaling.WakeReason) ([]WakeResult, error) {
+func (t *Trigger) WakeAll(ctx context.Context, reason scaling.WakeReason) ([]Result, error) {
 	policies, err := t.idleDetector.ListScaledToZeroPolicies(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list scaled-to-zero policies: %w", err)
 	}
 
-	results := make([]WakeResult, 0, len(policies))
+	results := make([]Result, 0, len(policies))
 	for _, policyID := range policies {
 		result, err := t.Wake(ctx, policyID, reason)
 		if err != nil {
-			results = append(results, WakeResult{
+			results = append(results, Result{
 				PolicyID: policyID,
 				Reason:   reason,
-				Status:   WakeStatusFailed,
+				Status:   StatusFailed,
 				Error:    err.Error(),
 			})
 		} else {
@@ -271,16 +271,16 @@ func (t *Trigger) WakeAll(ctx context.Context, reason scaling.WakeReason) ([]Wak
 }
 
 // WakeMultiple wakes specific policies.
-func (t *Trigger) WakeMultiple(ctx context.Context, policyIDs []uuid.UUID, reason scaling.WakeReason) ([]WakeResult, error) {
-	results := make([]WakeResult, 0, len(policyIDs))
+func (t *Trigger) WakeMultiple(ctx context.Context, policyIDs []uuid.UUID, reason scaling.WakeReason) ([]Result, error) {
+	results := make([]Result, 0, len(policyIDs))
 
 	for _, policyID := range policyIDs {
 		result, err := t.Wake(ctx, policyID, reason)
 		if err != nil {
-			results = append(results, WakeResult{
+			results = append(results, Result{
 				PolicyID: policyID,
 				Reason:   reason,
-				Status:   WakeStatusFailed,
+				Status:   StatusFailed,
 				Error:    err.Error(),
 			})
 		} else {
@@ -292,7 +292,7 @@ func (t *Trigger) WakeMultiple(ctx context.Context, policyIDs []uuid.UUID, reaso
 }
 
 // GetPendingWake returns a pending wake operation if one exists.
-func (t *Trigger) GetPendingWake(policyID uuid.UUID) *WakeOperation {
+func (t *Trigger) GetPendingWake(policyID uuid.UUID) *Operation {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 	return t.pendingWakes[policyID]

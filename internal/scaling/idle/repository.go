@@ -180,7 +180,7 @@ func (r *PostgresRepository) UpdateIdleState(ctx context.Context, state *scaling
 		return fmt.Errorf("failed to update idle state: %w", err)
 	}
 
-	rowsAffected, _ := result.RowsAffected()
+	rowsAffected, _ := result.RowsAffected() //nolint:errcheck // error is not critical for update check
 	if rowsAffected == 0 {
 		// Create if doesn't exist
 		return r.CreateIdleState(ctx, state)

@@ -55,7 +55,7 @@ func (s *WakeService) WakePolicy(ctx context.Context, policyID uuid.UUID, reason
 
 // WakeAll wakes all scaled-to-zero policies or specific policies.
 func (s *WakeService) WakeAll(ctx context.Context, policyIDs []uuid.UUID, reason scaling.WakeReason) (*models.WakeAllResponse, error) {
-	var results []wake.WakeResult
+	var results []wake.Result
 	var err error
 
 	if len(policyIDs) > 0 {
@@ -74,13 +74,13 @@ func (s *WakeService) WakeAll(ctx context.Context, policyIDs []uuid.UUID, reason
 
 	for _, result := range results {
 		switch result.Status {
-		case wake.WakeStatusCompleted:
+		case wake.StatusCompleted:
 			if result.PreviousReplicas > 0 {
 				response.AlreadyRunning++
 			} else {
 				response.Woken++
 			}
-		case wake.WakeStatusFailed:
+		case wake.StatusFailed:
 			response.Failed++
 		}
 
