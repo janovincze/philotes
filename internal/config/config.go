@@ -465,6 +465,27 @@ type ScalingConfig struct {
 
 	// DryRun enables dry-run mode where scaling actions are logged but not executed
 	DryRun bool
+
+	// ScaleToZero holds scale-to-zero specific configuration
+	ScaleToZero ScaleToZeroConfig
+}
+
+// ScaleToZeroConfig holds scale-to-zero specific configuration.
+type ScaleToZeroConfig struct {
+	// DefaultIdleThreshold is the default idle duration before scaling to zero
+	DefaultIdleThreshold time.Duration
+
+	// DefaultKeepAliveWindow is the grace period to prevent flapping
+	DefaultKeepAliveWindow time.Duration
+
+	// ColdStartTimeout is the maximum time to wait for a cold start
+	ColdStartTimeout time.Duration
+
+	// IdleCheckInterval is how often to check idle state
+	IdleCheckInterval time.Duration
+
+	// EnableCostTracking enables cost savings tracking
+	EnableCostTracking bool
 }
 
 // NodeScalingConfig holds node auto-scaling configuration.
@@ -693,6 +714,13 @@ func Load() (*Config, error) {
 			PrometheusURL:          getEnv("PHILOTES_PROMETHEUS_URL", "http://localhost:9090"),
 			DefaultCooldownSeconds: getIntEnv("PHILOTES_SCALING_DEFAULT_COOLDOWN", 300),
 			DryRun:                 getBoolEnv("PHILOTES_SCALING_DRY_RUN", false),
+			ScaleToZero: ScaleToZeroConfig{
+				DefaultIdleThreshold:   getDurationEnv("PHILOTES_SCALE_TO_ZERO_IDLE_THRESHOLD", 30*time.Minute),
+				DefaultKeepAliveWindow: getDurationEnv("PHILOTES_SCALE_TO_ZERO_KEEP_ALIVE", 5*time.Minute),
+				ColdStartTimeout:       getDurationEnv("PHILOTES_SCALE_TO_ZERO_COLD_START_TIMEOUT", 2*time.Minute),
+				IdleCheckInterval:      getDurationEnv("PHILOTES_SCALE_TO_ZERO_CHECK_INTERVAL", 1*time.Minute),
+				EnableCostTracking:     getBoolEnv("PHILOTES_SCALE_TO_ZERO_COST_TRACKING", true),
+			},
 		},
 
 		NodeScaling: NodeScalingConfig{
