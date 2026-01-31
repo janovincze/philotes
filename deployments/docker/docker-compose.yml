@@ -144,6 +144,29 @@ services:
     depends_on:
       - prometheus
 
+  # Trino - SQL query engine for Iceberg data lake
+  trino:
+    image: trinodb/trino:457
+    container_name: philotes-trino
+    hostname: trino
+    ports:
+      - "8085:8080"
+    volumes:
+      - ./trino:/etc/trino:ro
+    environment:
+      - TRINO_ENVIRONMENT=development
+    depends_on:
+      minio:
+        condition: service_healthy
+      lakekeeper:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/info"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
   # HashiCorp Vault - Secrets management (dev mode for testing)
   vault:
     image: hashicorp/vault:1.15

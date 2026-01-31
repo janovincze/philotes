@@ -1,0 +1,39 @@
+{{- if .Values.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "trino.catalogs.configmap.name" . }}
+  labels:
+    {{- include "trino.labels" . | nindent 4 }}
+data:
+  {{- if .Values.catalogs.iceberg }}
+  iceberg.properties: |
+    connector.name={{ .Values.catalogs.iceberg.connector }}
+    iceberg.catalog.type={{ .Values.catalogs.iceberg.catalogType }}
+    iceberg.rest-catalog.uri={{ .Values.catalogs.iceberg.restCatalogUri }}
+    iceberg.rest-catalog.warehouse={{ .Values.catalogs.iceberg.warehouse }}
+    iceberg.file-format={{ .Values.catalogs.iceberg.fileFormat }}
+    iceberg.compression-codec={{ .Values.catalogs.iceberg.compressionCodec }}
+    fs.native-s3.enabled=true
+    s3.endpoint={{ .Values.catalogs.iceberg.s3.endpoint }}
+    s3.path-style-access={{ .Values.catalogs.iceberg.s3.pathStyleAccess }}
+    s3.region={{ .Values.catalogs.iceberg.s3.region }}
+    {{- if .Values.catalogs.iceberg.s3.existingSecret }}
+    # S3 credentials loaded from environment variables
+    {{- else if .Values.catalogs.iceberg.s3.accessKey }}
+    s3.aws-access-key={{ .Values.catalogs.iceberg.s3.accessKey }}
+    s3.aws-secret-key={{ .Values.catalogs.iceberg.s3.secretKey }}
+    {{- end }}
+    iceberg.max-partitions-per-writer=100
+    iceberg.target-max-file-size=128MB
+  {{- end }}
+  {{- range $name, $catalog := .Values.additionalCatalogs }}
+  {{ $name }}.properties: |
+    connector.name={{ $catalog.connector }}
+    {{- range $key, $value := $catalog }}
+    {{- if and (ne $key "connector") (ne $key "enabled") }}
+    {{ $key | replace "connection" "connection-" }}={{ $value }}
+    {{- end }}
+    {{- end }}
+  {{- end }}
+{{- end }}

@@ -1,0 +1,215 @@
+# Default values for Trino Helm chart
+
+# Enable/disable the Trino deployment
+enabled: true
+
+# Image configuration
+image:
+  repository: trinodb/trino
+  tag: "457"
+  pullPolicy: IfNotPresent
+
+# Image pull secrets
+imagePullSecrets: []
+
+# Override chart name
+nameOverride: ""
+fullnameOverride: ""
+
+# Coordinator configuration
+coordinator:
+  # Number of coordinator replicas (should be 1)
+  replicas: 1
+
+  # Resource requests and limits
+  resources:
+    requests:
+      memory: "2Gi"
+      cpu: "500m"
+    limits:
+      memory: "4Gi"
+      cpu: "2"
+
+  # Node selector
+  nodeSelector: {}
+
+  # Tolerations
+  tolerations: []
+
+  # Affinity
+  affinity: {}
+
+  # JVM configuration
+  jvm:
+    maxHeapSize: "2G"
+    gcMethod:
+      type: "UseG1GC"
+      g1:
+        heapRegionSize: "32M"
+
+  # Trino coordinator configuration
+  config:
+    # Query memory settings
+    queryMaxMemory: "1GB"
+    queryMaxMemoryPerNode: "512MB"
+
+    # Web UI
+    webUiEnabled: true
+
+# Worker configuration
+worker:
+  # Number of worker replicas
+  replicas: 2
+
+  # Autoscaling configuration
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+  # Resource requests and limits
+  resources:
+    requests:
+      memory: "4Gi"
+      cpu: "1"
+    limits:
+      memory: "8Gi"
+      cpu: "4"
+
+  # Node selector
+  nodeSelector: {}
+
+  # Tolerations
+  tolerations: []
+
+  # Affinity
+  affinity: {}
+
+  # JVM configuration
+  jvm:
+    maxHeapSize: "6G"
+    gcMethod:
+      type: "UseG1GC"
+      g1:
+        heapRegionSize: "32M"
+
+# Catalog configuration
+catalogs:
+  iceberg:
+    # Connector name
+    connector: iceberg
+    # Iceberg catalog type (rest, hive, glue, etc.)
+    catalogType: rest
+    # REST catalog URI (Lakekeeper)
+    restCatalogUri: "http://lakekeeper:8181"
+    # Warehouse name
+    warehouse: philotes
+    # File format
+    fileFormat: PARQUET
+    # Compression codec
+    compressionCodec: ZSTD
+    # S3 configuration
+    s3:
+      endpoint: "http://minio:9000"
+      pathStyleAccess: true
+      region: "us-east-1"
+      accessKey: ""
+      secretKey: ""
+      # Reference to existing secret for credentials
+      existingSecret: ""
+      accessKeyKey: "access-key"
+      secretKeyKey: "secret-key"
+
+# Additional catalogs (optional)
+additionalCatalogs: {}
+  # postgresql:
+  #   connector: postgresql
+  #   connectionUrl: jdbc:postgresql://host:5432/database
+  #   connectionUser: user
+  #   connectionPassword: password
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 8080
+  annotations: {}
+
+# Ingress configuration
+ingress:
+  enabled: false
+  className: "nginx"
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: trino.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  #  - secretName: trino-tls
+  #    hosts:
+  #      - trino.local
+
+# Authentication configuration
+auth:
+  # Enable password file authentication
+  enabled: false
+  # Password file content (htpasswd format)
+  passwordFile: ""
+  # Reference to existing secret
+  existingSecret: ""
+  passwordFileKey: "password.db"
+
+# Metrics configuration
+metrics:
+  enabled: true
+  # Prometheus ServiceMonitor
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    scrapeTimeout: 10s
+    labels: {}
+    namespace: ""
+
+# Pod security context
+securityContext:
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+
+# Container security context
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop:
+      - ALL
+
+# Pod annotations
+podAnnotations: {}
+
+# Service account
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# Network policy
+networkPolicy:
+  enabled: false
+  ingress: []
+  egress: []
+
+# Extra environment variables
+extraEnv: []
+  # - name: EXTRA_ENV
+  #   value: "value"
+
+# Extra volumes
+extraVolumes: []
+
+# Extra volume mounts
+extraVolumeMounts: []

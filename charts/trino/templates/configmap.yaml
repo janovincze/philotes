@@ -1,0 +1,72 @@
+{{- if .Values.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "trino.configmap.name" . }}
+  labels:
+    {{- include "trino.labels" . | nindent 4 }}
+data:
+  node.properties: |
+    node.environment={{ .Release.Namespace }}
+    node.data-dir=/data/trino
+
+  jvm-coordinator.config: |
+    -server
+    -Xmx{{ .Values.coordinator.jvm.maxHeapSize }}
+    -XX:InitialRAMPercentage=80
+    -XX:MaxRAMPercentage=80
+    -XX:G1HeapRegionSize={{ .Values.coordinator.jvm.gcMethod.g1.heapRegionSize }}
+    -XX:+{{ .Values.coordinator.jvm.gcMethod.type }}
+    -XX:+ExplicitGCInvokesConcurrent
+    -XX:+ExitOnOutOfMemoryError
+    -XX:+HeapDumpOnOutOfMemoryError
+    -XX:-OmitStackTraceInFastThrow
+    -XX:ReservedCodeCacheSize=512M
+    -XX:PerMethodRecompilationCutoff=10000
+    -XX:PerBytecodeRecompilationCutoff=10000
+    -Djdk.attach.allowAttachSelf=true
+    -Djdk.nio.maxCachedBufferSize=2000000
+    -Dfile.encoding=UTF-8
+    -XX:+UnlockDiagnosticVMOptions
+    -XX:+UseAESCTRIntrinsics
+
+  jvm-worker.config: |
+    -server
+    -Xmx{{ .Values.worker.jvm.maxHeapSize }}
+    -XX:InitialRAMPercentage=80
+    -XX:MaxRAMPercentage=80
+    -XX:G1HeapRegionSize={{ .Values.worker.jvm.gcMethod.g1.heapRegionSize }}
+    -XX:+{{ .Values.worker.jvm.gcMethod.type }}
+    -XX:+ExplicitGCInvokesConcurrent
+    -XX:+ExitOnOutOfMemoryError
+    -XX:+HeapDumpOnOutOfMemoryError
+    -XX:-OmitStackTraceInFastThrow
+    -XX:ReservedCodeCacheSize=512M
+    -XX:PerMethodRecompilationCutoff=10000
+    -XX:PerBytecodeRecompilationCutoff=10000
+    -Djdk.attach.allowAttachSelf=true
+    -Djdk.nio.maxCachedBufferSize=2000000
+    -Dfile.encoding=UTF-8
+    -XX:+UnlockDiagnosticVMOptions
+    -XX:+UseAESCTRIntrinsics
+
+  config-coordinator.properties: |
+    coordinator=true
+    node-scheduler.include-coordinator=false
+    http-server.http.port={{ .Values.service.port }}
+    discovery.uri={{ include "trino.discoveryUri" . }}
+    query.max-memory={{ .Values.coordinator.config.queryMaxMemory }}
+    query.max-memory-per-node={{ .Values.coordinator.config.queryMaxMemoryPerNode }}
+    web-ui.enabled={{ .Values.coordinator.config.webUiEnabled }}
+
+  config-worker.properties: |
+    coordinator=false
+    http-server.http.port={{ .Values.service.port }}
+    discovery.uri={{ include "trino.discoveryUri" . }}
+    query.max-memory={{ .Values.coordinator.config.queryMaxMemory }}
+    query.max-memory-per-node={{ .Values.coordinator.config.queryMaxMemoryPerNode }}
+
+  log.properties: |
+    io.trino=INFO
+    io.trino.plugin.iceberg=DEBUG
+{{- end }}

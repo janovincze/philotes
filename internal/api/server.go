@@ -38,6 +38,7 @@ type Server struct {
 	oidcService           *services.OIDCService
 	onboardingService     *services.OnboardingService
 	nodePoolService       *services.NodePoolService
+	queryService          *services.QueryService
 	httpServer            *http.Server
 	router                *gin.Engine
 }
@@ -91,6 +92,9 @@ type ServerConfig struct {
 
 	// NodePoolService is the node pool service for node scaling operations.
 	NodePoolService *services.NodePoolService
+
+	// QueryService is the query service for Trino query layer operations.
+	QueryService *services.QueryService
 
 	// CORSConfig is the CORS configuration.
 	CORSConfig middleware.CORSConfig
@@ -158,6 +162,7 @@ func NewServer(serverCfg ServerConfig) *Server {
 		oidcService:           serverCfg.OIDCService,
 		onboardingService:     serverCfg.OnboardingService,
 		nodePoolService:       serverCfg.NodePoolService,
+		queryService:          serverCfg.QueryService,
 		router:                router,
 	}
 
@@ -319,6 +324,14 @@ func (s *Server) registerRoutes() {
 		if s.nodePoolService != nil {
 			nodePoolHandler := handlers.NewNodePoolHandler(s.nodePoolService)
 			nodePoolHandler.RegisterRoutes(v1, requireAuth)
+		}
+
+		// Query layer endpoints (protected when auth is enabled)
+		if s.queryService != nil {
+			queryHandler := handlers.NewQueryHandler(s.queryService, s.logger)
+			protected := v1.Group("")
+			protected.Use(requireAuth)
+			queryHandler.RegisterRoutes(protected)
 		}
 
 		// Installer endpoints
