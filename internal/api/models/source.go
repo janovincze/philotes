@@ -22,6 +22,7 @@ const (
 // Source represents a CDC source database in the system.
 type Source struct {
 	ID              uuid.UUID    `json:"id"`
+	TenantID        *uuid.UUID   `json:"tenant_id,omitempty"`
 	Name            string       `json:"name"`
 	Type            string       `json:"type"`
 	Host            string       `json:"host"`

@@ -34,6 +34,7 @@ func NewSourceRepository(db *sql.DB) *SourceRepository {
 // sourceRow represents a database row for a source.
 type sourceRow struct {
 	ID              uuid.UUID
+	TenantID        sql.NullString
 	Name            string
 	Type            string
 	Host            string
@@ -51,7 +52,7 @@ type sourceRow struct {
 
 // toModel converts a database row to an API model.
 func (r *sourceRow) toModel() *models.Source {
-	return &models.Source{
+	source := &models.Source{
 		ID:              r.ID,
 		Name:            r.Name,
 		Type:            r.Type,
@@ -66,6 +67,12 @@ func (r *sourceRow) toModel() *models.Source {
 		CreatedAt:       r.CreatedAt,
 		UpdatedAt:       r.UpdatedAt,
 	}
+	if r.TenantID.Valid {
+		if tenantID, err := uuid.Parse(r.TenantID.String); err == nil {
+			source.TenantID = &tenantID
+		}
+	}
+	return source
 }
 
 // Create creates a new source in the database.
@@ -385,4 +392,144 @@ func isUniqueViolation(err error) bool {
 	// PostgreSQL unique violation error code is 23505
 	return strings.Contains(errStr, "23505") ||
 		strings.Contains(errStr, "duplicate key value violates unique constraint")
+}
+
+// --- Tenant-scoped operations ---
+
+// CreateWithTenant creates a new source with a tenant ID.
+func (r *SourceRepository) CreateWithTenant(ctx context.Context, req *models.CreateSourceRequest, tenantID uuid.UUID) (*models.Source, error) {
+	query := `
+		INSERT INTO philotes.sources (
+			tenant_id, name, type, host, port, database_name, username, password,
+			ssl_mode, slot_name, publication_name, status
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+		RETURNING id, tenant_id, name, type, host, port, database_name, username, password,
+			ssl_mode, slot_name, publication_name, status, created_at, updated_at
+	`
+
+	var row sourceRow
+	err := r.db.QueryRowContext(ctx, query,
+		tenantID,
+		req.Name,
+		req.Type,
+		req.Host,
+		req.Port,
+		req.DatabaseName,
+		req.Username,
+		req.Password,
+		req.SSLMode,
+		nullString(req.SlotName),
+		nullString(req.PublicationName),
+		models.SourceStatusInactive,
+	).Scan(
+		&row.ID,
+		&row.TenantID,
+		&row.Name,
+		&row.Type,
+		&row.Host,
+		&row.Port,
+		&row.DatabaseName,
+		&row.Username,
+		&row.Password,
+		&row.SSLMode,
+		&row.SlotName,
+		&row.PublicationName,
+		&row.Status,
+		&row.CreatedAt,
+		&row.UpdatedAt,
+	)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return nil, ErrSourceNameExists
+		}
+		return nil, fmt.Errorf("failed to create source: %w", err)
+	}
+
+	return row.toModel(), nil
+}
+
+// ListByTenant retrieves all sources for a specific tenant.
+func (r *SourceRepository) ListByTenant(ctx context.Context, tenantID uuid.UUID) ([]models.Source, error) {
+	query := `
+		SELECT id, tenant_id, name, type, host, port, database_name, username, password,
+			ssl_mode, slot_name, publication_name, status, created_at, updated_at
+		FROM philotes.sources
+		WHERE tenant_id = $1
+		ORDER BY created_at DESC
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, tenantID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list sources by tenant: %w", err)
+	}
+	defer rows.Close()
+
+	var sources []models.Source
+	for rows.Next() {
+		var row sourceRow
+		err := rows.Scan(
+			&row.ID,
+			&row.TenantID,
+			&row.Name,
+			&row.Type,
+			&row.Host,
+			&row.Port,
+			&row.DatabaseName,
+			&row.Username,
+			&row.Password,
+			&row.SSLMode,
+			&row.SlotName,
+			&row.PublicationName,
+			&row.Status,
+			&row.CreatedAt,
+			&row.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan source row: %w", err)
+		}
+		sources = append(sources, *row.toModel())
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate sources: %w", err)
+	}
+
+	return sources, nil
+}
+
+// GetByIDAndTenant retrieves a source by ID within a specific tenant.
+func (r *SourceRepository) GetByIDAndTenant(ctx context.Context, id, tenantID uuid.UUID) (*models.Source, error) {
+	query := `
+		SELECT id, tenant_id, name, type, host, port, database_name, username, password,
+			ssl_mode, slot_name, publication_name, status, created_at, updated_at
+		FROM philotes.sources
+		WHERE id = $1 AND tenant_id = $2
+	`
+
+	var row sourceRow
+	err := r.db.QueryRowContext(ctx, query, id, tenantID).Scan(
+		&row.ID,
+		&row.TenantID,
+		&row.Name,
+		&row.Type,
+		&row.Host,
+		&row.Port,
+		&row.DatabaseName,
+		&row.Username,
+		&row.Password,
+		&row.SSLMode,
+		&row.SlotName,
+		&row.PublicationName,
+		&row.Status,
+		&row.CreatedAt,
+		&row.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrSourceNotFound
+		}
+		return nil, fmt.Errorf("failed to get source: %w", err)
+	}
+
+	return row.toModel(), nil
 }
