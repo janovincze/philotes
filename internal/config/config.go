@@ -55,6 +55,36 @@ type Config struct {
 
 	// OIDC configuration for SSO authentication
 	OIDC OIDCConfig
+
+	// Trino configuration for SQL query layer
+	Trino TrinoConfig
+}
+
+// TrinoConfig holds Trino query engine configuration.
+type TrinoConfig struct {
+	// Enabled enables the Trino query layer
+	Enabled bool
+
+	// URL is the Trino coordinator URL
+	URL string
+
+	// Username for Trino authentication
+	Username string
+
+	// Password for Trino authentication
+	Password string
+
+	// Catalog is the default Iceberg catalog name in Trino
+	Catalog string
+
+	// Schema is the default schema name
+	Schema string
+
+	// QueryTimeout is the maximum time for queries
+	QueryTimeout time.Duration
+
+	// HealthCheckInterval is how often to check Trino health
+	HealthCheckInterval time.Duration
 }
 
 // OAuthConfig holds OAuth configuration for cloud providers.
@@ -813,6 +843,17 @@ func Load() (*Config, error) {
 			DefaultRole:     getEnv("PHILOTES_OIDC_DEFAULT_ROLE", "viewer"),
 			EncryptionKey:   getEnv("PHILOTES_OIDC_ENCRYPTION_KEY", ""),
 			StateExpiration: getDurationEnv("PHILOTES_OIDC_STATE_EXPIRATION", 10*time.Minute),
+		},
+
+		Trino: TrinoConfig{
+			Enabled:             getBoolEnv("PHILOTES_TRINO_ENABLED", false),
+			URL:                 getEnv("PHILOTES_TRINO_URL", "http://localhost:8085"),
+			Username:            getEnv("PHILOTES_TRINO_USERNAME", ""),
+			Password:            getEnv("PHILOTES_TRINO_PASSWORD", ""),
+			Catalog:             getEnv("PHILOTES_TRINO_CATALOG", "iceberg"),
+			Schema:              getEnv("PHILOTES_TRINO_SCHEMA", "philotes"),
+			QueryTimeout:        getDurationEnv("PHILOTES_TRINO_QUERY_TIMEOUT", 5*time.Minute),
+			HealthCheckInterval: getDurationEnv("PHILOTES_TRINO_HEALTH_CHECK_INTERVAL", 30*time.Second),
 		},
 	}
 

@@ -1,0 +1,18 @@
+apiVersion: v2
+name: trino
+description: A Helm chart for Trino SQL query engine with Iceberg integration
+type: application
+version: 0.1.0
+appVersion: "457"
+keywords:
+  - trino
+  - sql
+  - query
+  - iceberg
+  - analytics
+maintainers:
+  - name: Philotes Team
+    url: https://github.com/janovincze/philotes
+home: https://trino.io
+sources:
+  - https://github.com/trinodb/trino
