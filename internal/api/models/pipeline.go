@@ -27,6 +27,7 @@ const (
 // Pipeline represents a CDC pipeline in the system.
 type Pipeline struct {
 	ID           uuid.UUID      `json:"id"`
+	TenantID     *uuid.UUID     `json:"tenant_id,omitempty"`
 	Name         string         `json:"name"`
 	SourceID     uuid.UUID      `json:"source_id"`
 	Status       PipelineStatus `json:"status"`

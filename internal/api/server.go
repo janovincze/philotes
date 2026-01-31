@@ -40,6 +40,7 @@ type Server struct {
 	nodePoolService       *services.NodePoolService
 	queryService          *services.QueryService
 	queryScalingService   *services.QueryScalingService
+	tenantService         *services.TenantService
 	httpServer            *http.Server
 	router                *gin.Engine
 }
@@ -99,6 +100,9 @@ type ServerConfig struct {
 
 	// QueryScalingService is the query scaling service for query engine auto-scaling.
 	QueryScalingService *services.QueryScalingService
+
+	// TenantService is the tenant service for multi-tenancy operations.
+	TenantService *services.TenantService
 
 	// CORSConfig is the CORS configuration.
 	CORSConfig middleware.CORSConfig
@@ -168,6 +172,7 @@ func NewServer(serverCfg ServerConfig) *Server {
 		nodePoolService:       serverCfg.NodePoolService,
 		queryService:          serverCfg.QueryService,
 		queryScalingService:   serverCfg.QueryScalingService,
+		tenantService:         serverCfg.TenantService,
 		router:                router,
 	}
 
@@ -279,6 +284,12 @@ func (s *Server) registerRoutes() {
 		// OIDC SSO endpoints (registered by handler)
 		if oidcHandler != nil {
 			oidcHandler.Register(v1, requireAuth)
+		}
+
+		// Tenant endpoints (registered by handler)
+		if s.tenantService != nil {
+			tenantHandler := handlers.NewTenantHandler(s.tenantService)
+			tenantHandler.Register(v1, requireAuth)
 		}
 
 		// Source endpoints (protected when auth is enabled)

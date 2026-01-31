@@ -37,6 +37,7 @@ func NewPipelineRepository(db *sql.DB) *PipelineRepository {
 // pipelineRow represents a database row for a pipeline.
 type pipelineRow struct {
 	ID           uuid.UUID
+	TenantID     sql.NullString
 	Name         string
 	SourceID     uuid.UUID
 	Status       string
@@ -59,6 +60,11 @@ func (r *pipelineRow) toModel() *models.Pipeline {
 		UpdatedAt: r.UpdatedAt,
 	}
 
+	if r.TenantID.Valid {
+		if tenantID, err := uuid.Parse(r.TenantID.String); err == nil {
+			pipeline.TenantID = &tenantID
+		}
+	}
 	if r.Config != nil {
 		if err := json.Unmarshal(r.Config, &pipeline.Config); err != nil {
 			slog.Warn("failed to unmarshal pipeline config", "pipeline_id", r.ID, "error", err)
@@ -538,4 +544,165 @@ func isForeignKeyViolation(err error) bool {
 	}
 	// PostgreSQL foreign key violation error code is 23503
 	return strings.Contains(err.Error(), "23503")
+}
+
+// --- Tenant-scoped operations ---
+
+// CreateWithTenant creates a new pipeline with a tenant ID.
+func (r *PipelineRepository) CreateWithTenant(ctx context.Context, req *models.CreatePipelineRequest, tenantID uuid.UUID) (*models.Pipeline, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() {
+		// nolint:errcheck // Rollback error is intentionally ignored; if commit succeeded, rollback is a no-op
+		_ = tx.Rollback()
+	}()
+
+	// Insert pipeline
+	configJSON, err := json.Marshal(req.Config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal config: %w", err)
+	}
+
+	query := `
+		INSERT INTO philotes.pipelines (tenant_id, name, source_id, status, config)
+		VALUES ($1, $2, $3, $4, $5)
+		RETURNING id, tenant_id, name, source_id, status, config, error_message,
+			created_at, updated_at, started_at, stopped_at
+	`
+
+	var row pipelineRow
+	err = tx.QueryRowContext(ctx, query,
+		tenantID,
+		req.Name,
+		req.SourceID,
+		models.PipelineStatusStopped,
+		configJSON,
+	).Scan(
+		&row.ID,
+		&row.TenantID,
+		&row.Name,
+		&row.SourceID,
+		&row.Status,
+		&row.Config,
+		&row.ErrorMessage,
+		&row.CreatedAt,
+		&row.UpdatedAt,
+		&row.StartedAt,
+		&row.StoppedAt,
+	)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return nil, ErrPipelineNameExists
+		}
+		if isForeignKeyViolation(err) {
+			return nil, ErrSourceNotFound
+		}
+		return nil, fmt.Errorf("failed to create pipeline: %w", err)
+	}
+
+	pipeline := row.toModel()
+
+	// Insert table mappings
+	for _, tableReq := range req.Tables {
+		mapping, err := r.createTableMappingTx(ctx, tx, row.ID, &tableReq)
+		if err != nil {
+			return nil, err
+		}
+		pipeline.Tables = append(pipeline.Tables, *mapping)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return pipeline, nil
+}
+
+// ListByTenant retrieves all pipelines for a specific tenant.
+func (r *PipelineRepository) ListByTenant(ctx context.Context, tenantID uuid.UUID) ([]models.Pipeline, error) {
+	query := `
+		SELECT id, tenant_id, name, source_id, status, config, error_message,
+			created_at, updated_at, started_at, stopped_at
+		FROM philotes.pipelines
+		WHERE tenant_id = $1
+		ORDER BY created_at DESC
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, tenantID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list pipelines by tenant: %w", err)
+	}
+	defer rows.Close()
+
+	var pipelines []models.Pipeline
+	for rows.Next() {
+		var row pipelineRow
+		err := rows.Scan(
+			&row.ID,
+			&row.TenantID,
+			&row.Name,
+			&row.SourceID,
+			&row.Status,
+			&row.Config,
+			&row.ErrorMessage,
+			&row.CreatedAt,
+			&row.UpdatedAt,
+			&row.StartedAt,
+			&row.StoppedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan pipeline row: %w", err)
+		}
+		pipelines = append(pipelines, *row.toModel())
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate pipelines: %w", err)
+	}
+
+	return pipelines, nil
+}
+
+// GetByIDAndTenant retrieves a pipeline by ID within a specific tenant.
+func (r *PipelineRepository) GetByIDAndTenant(ctx context.Context, id, tenantID uuid.UUID) (*models.Pipeline, error) {
+	query := `
+		SELECT id, tenant_id, name, source_id, status, config, error_message,
+			created_at, updated_at, started_at, stopped_at
+		FROM philotes.pipelines
+		WHERE id = $1 AND tenant_id = $2
+	`
+
+	var row pipelineRow
+	err := r.db.QueryRowContext(ctx, query, id, tenantID).Scan(
+		&row.ID,
+		&row.TenantID,
+		&row.Name,
+		&row.SourceID,
+		&row.Status,
+		&row.Config,
+		&row.ErrorMessage,
+		&row.CreatedAt,
+		&row.UpdatedAt,
+		&row.StartedAt,
+		&row.StoppedAt,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrPipelineNotFound
+		}
+		return nil, fmt.Errorf("failed to get pipeline: %w", err)
+	}
+
+	pipeline := row.toModel()
+
+	// Load table mappings
+	tables, err := r.GetTableMappings(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	pipeline.Tables = tables
+
+	return pipeline, nil
 }

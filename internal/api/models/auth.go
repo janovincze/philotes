@@ -274,6 +274,11 @@ type AuthContext struct {
 	APIKey      *APIKey
 	Permissions []string
 	IsAPIKey    bool
+
+	// TenantID is the current tenant context (set by tenant middleware)
+	TenantID *uuid.UUID
+	// TenantRole is the user's role within the current tenant
+	TenantRole TenantRole
 }
 
 // HasPermission checks if the auth context has a specific permission.

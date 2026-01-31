@@ -61,6 +61,9 @@ type Config struct {
 
 	// QueryScaling configuration for query engine auto-scaling
 	QueryScaling QueryScalingConfig
+
+	// MultiTenancy configuration for RBAC and tenant isolation
+	MultiTenancy MultiTenancyConfig
 }
 
 // QueryScalingConfig holds query engine auto-scaling configuration.
@@ -91,6 +94,28 @@ type QueryScalingConfig struct {
 
 	// DefaultLatencyThreshold is the default latency threshold in seconds
 	DefaultLatencyThreshold int
+}
+
+// MultiTenancyConfig holds multi-tenancy and RBAC configuration.
+type MultiTenancyConfig struct {
+	// Enabled enables multi-tenancy mode
+	Enabled bool
+
+	// DefaultTenantID is the default tenant for single-tenant mode
+	// This is used when multi-tenancy is disabled
+	DefaultTenantID string
+
+	// AutoCreateTenant creates a personal tenant on first user signup
+	AutoCreateTenant bool
+
+	// AllowCrossTenantAccess allows super-admins to access all tenants
+	AllowCrossTenantAccess bool
+
+	// TenantHeader is the HTTP header used to specify tenant context
+	TenantHeader string
+
+	// AllowTenantInJWT allows tenant ID to be specified in JWT claims
+	AllowTenantInJWT bool
 }
 
 // TrinoConfig holds Trino query engine configuration.
@@ -899,6 +924,15 @@ func Load() (*Config, error) {
 			DefaultQueuedQueriesThreshold:  getIntEnv("PHILOTES_QUERY_SCALING_QUEUED_THRESHOLD", 5),
 			DefaultRunningQueriesThreshold: getIntEnv("PHILOTES_QUERY_SCALING_RUNNING_THRESHOLD", 10),
 			DefaultLatencyThreshold:        getIntEnv("PHILOTES_QUERY_SCALING_LATENCY_THRESHOLD", 30),
+		},
+
+		MultiTenancy: MultiTenancyConfig{
+			Enabled:                getBoolEnv("PHILOTES_MULTI_TENANCY_ENABLED", false),
+			DefaultTenantID:        getEnv("PHILOTES_MULTI_TENANCY_DEFAULT_TENANT_ID", "00000000-0000-0000-0000-000000000001"),
+			AutoCreateTenant:       getBoolEnv("PHILOTES_MULTI_TENANCY_AUTO_CREATE_TENANT", false),
+			AllowCrossTenantAccess: getBoolEnv("PHILOTES_MULTI_TENANCY_ALLOW_CROSS_TENANT", false),
+			TenantHeader:           getEnv("PHILOTES_MULTI_TENANCY_TENANT_HEADER", "X-Tenant-ID"),
+			AllowTenantInJWT:       getBoolEnv("PHILOTES_MULTI_TENANCY_ALLOW_TENANT_IN_JWT", true),
 		},
 	}
 
