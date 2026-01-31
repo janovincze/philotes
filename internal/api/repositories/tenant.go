@@ -585,6 +585,7 @@ func (r *TenantRepository) CreateWithOwner(ctx context.Context, name, slug strin
 	}
 	defer func() {
 		if err != nil {
+			// nolint:errcheck // Rollback error is intentionally ignored on failure path
 			_ = tx.Rollback()
 		}
 	}()

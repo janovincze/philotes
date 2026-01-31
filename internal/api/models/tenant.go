@@ -4,6 +4,7 @@ package models
 import (
 	"net/http"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -210,7 +211,7 @@ func (r *AddMemberRequest) Validate() []FieldError {
 		if invalid := ValidatePermissions(r.CustomPermissions); len(invalid) > 0 {
 			errors = append(errors, FieldError{
 				Field:   "custom_permissions",
-				Message: "invalid permissions: " + joinStrings(invalid, ", "),
+				Message: "invalid permissions: " + strings.Join(invalid, ", "),
 			})
 		}
 	}
@@ -240,7 +241,7 @@ func (r *UpdateMemberRequest) Validate() []FieldError {
 		if invalid := ValidatePermissions(*r.CustomPermissions); len(invalid) > 0 {
 			errors = append(errors, FieldError{
 				Field:   "custom_permissions",
-				Message: "invalid permissions: " + joinStrings(invalid, ", "),
+				Message: "invalid permissions: " + strings.Join(invalid, ", "),
 			})
 		}
 	}
@@ -265,7 +266,7 @@ func (r *CreateCustomRoleRequest) Validate() []FieldError {
 	} else if invalid := ValidatePermissions(r.Permissions); len(invalid) > 0 {
 		errors = append(errors, FieldError{
 			Field:   "permissions",
-			Message: "invalid permissions: " + joinStrings(invalid, ", "),
+			Message: "invalid permissions: " + strings.Join(invalid, ", "),
 		})
 	}
 	return errors
@@ -287,7 +288,7 @@ func (r *UpdateCustomRoleRequest) Validate() []FieldError {
 		} else if invalid := ValidatePermissions(*r.Permissions); len(invalid) > 0 {
 			errors = append(errors, FieldError{
 				Field:   "permissions",
-				Message: "invalid permissions: " + joinStrings(invalid, ", "),
+				Message: "invalid permissions: " + strings.Join(invalid, ", "),
 			})
 		}
 	}
@@ -436,28 +437,11 @@ func isValidTenantRole(role TenantRole) bool {
 	return false
 }
 
-// joinStrings joins a slice of strings with a separator.
-func joinStrings(strs []string, sep string) string {
-	if len(strs) == 0 {
-		return ""
-	}
-	result := strs[0]
-	for i := 1; i < len(strs); i++ {
-		result += sep + strs[i]
-	}
-	return result
-}
-
 // DefaultTenantID is the UUID for the default system tenant.
 const DefaultTenantID = "00000000-0000-0000-0000-000000000001"
 
 // GetDefaultTenantUUID returns the default tenant UUID.
 func GetDefaultTenantUUID() uuid.UUID {
-	// DefaultTenantID is a constant, so this parse will always succeed
-	id, err := uuid.Parse(DefaultTenantID)
-	if err != nil {
-		// Fallback to nil UUID if parsing fails (should never happen)
-		return uuid.Nil
-	}
-	return id
+	// DefaultTenantID is a constant; MustParse will panic if it is ever invalid.
+	return uuid.MustParse(DefaultTenantID)
 }

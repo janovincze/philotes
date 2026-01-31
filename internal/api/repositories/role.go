@@ -178,9 +178,8 @@ func (r *TenantRoleRepository) ListByTenant(ctx context.Context, tenantID uuid.U
 
 // Update updates a custom role in the database.
 func (r *TenantRoleRepository) Update(ctx context.Context, id uuid.UUID, req *models.UpdateCustomRoleRequest) (*models.TenantCustomRole, error) {
-	// First check if role exists
-	existingRole, err := r.GetByID(ctx, id)
-	if err != nil {
+	// Verify role exists before updating (returns ErrRoleNotFound if not)
+	if _, err := r.GetByID(ctx, id); err != nil {
 		return nil, err
 	}
 
@@ -208,17 +207,13 @@ func (r *TenantRoleRepository) Update(ctx context.Context, id uuid.UUID, req *mo
 	query += fmt.Sprintf(" WHERE id = $%d", argIdx)
 	args = append(args, id)
 
-	_, err = r.db.ExecContext(ctx, query, args...)
+	_, err := r.db.ExecContext(ctx, query, args...)
 	if err != nil {
 		if isUniqueViolation(err) {
 			return nil, ErrRoleNameExists
 		}
 		return nil, fmt.Errorf("failed to update role: %w", err)
 	}
-
-	// Note: Custom roles are referenced by the 'custom' role type in tenant_members
-	// with specific permissions. Role name changes don't affect member references.
-	_ = existingRole // Acknowledge existingRole is read even if we don't use it for updates
 
 	return r.GetByID(ctx, id)
 }

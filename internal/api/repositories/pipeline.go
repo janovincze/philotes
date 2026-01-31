@@ -555,6 +555,7 @@ func (r *PipelineRepository) CreateWithTenant(ctx context.Context, req *models.C
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer func() {
+		// nolint:errcheck // Rollback error is intentionally ignored; if commit succeeded, rollback is a no-op
 		_ = tx.Rollback()
 	}()
 
