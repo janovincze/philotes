@@ -37,6 +37,7 @@ type Server struct {
 	oauthService          *services.OAuthService
 	oidcService           *services.OIDCService
 	onboardingService     *services.OnboardingService
+	nodePoolService       *services.NodePoolService
 	httpServer            *http.Server
 	router                *gin.Engine
 }
@@ -87,6 +88,9 @@ type ServerConfig struct {
 
 	// OnboardingService is the onboarding service for post-installation wizard.
 	OnboardingService *services.OnboardingService
+
+	// NodePoolService is the node pool service for node scaling operations.
+	NodePoolService *services.NodePoolService
 
 	// CORSConfig is the CORS configuration.
 	CORSConfig middleware.CORSConfig
@@ -153,6 +157,7 @@ func NewServer(serverCfg ServerConfig) *Server {
 		oauthService:          serverCfg.OAuthService,
 		oidcService:           serverCfg.OIDCService,
 		onboardingService:     serverCfg.OnboardingService,
+		nodePoolService:       serverCfg.NodePoolService,
 		router:                router,
 	}
 
@@ -308,6 +313,12 @@ func (s *Server) registerRoutes() {
 			protected := v1.Group("")
 			protected.Use(requireAuth)
 			alertHandler.Register(protected)
+		}
+
+		// Node pool endpoints (protected when auth is enabled)
+		if s.nodePoolService != nil {
+			nodePoolHandler := handlers.NewNodePoolHandler(s.nodePoolService)
+			nodePoolHandler.RegisterRoutes(v1, requireAuth)
 		}
 
 		// Installer endpoints

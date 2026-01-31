@@ -41,6 +41,9 @@ type Config struct {
 	// Scaling configuration
 	Scaling ScalingConfig
 
+	// NodeScaling configuration for infrastructure node auto-scaling
+	NodeScaling NodeScalingConfig
+
 	// Auth configuration
 	Auth AuthConfig
 
@@ -464,6 +467,100 @@ type ScalingConfig struct {
 	DryRun bool
 }
 
+// NodeScalingConfig holds node auto-scaling configuration.
+type NodeScalingConfig struct {
+	// Enabled enables node auto-scaling
+	Enabled bool
+
+	// KubeconfigPath is the path to the kubeconfig file (leave empty for in-cluster config)
+	KubeconfigPath string
+
+	// NodeJoinTimeout is the timeout for waiting for a node to join the cluster
+	NodeJoinTimeout time.Duration
+
+	// NodeDrainTimeout is the timeout for draining a node
+	NodeDrainTimeout time.Duration
+
+	// NodeDrainGracePeriod is the grace period for pod eviction during drain
+	NodeDrainGracePeriod time.Duration
+
+	// DefaultMinNodes is the default minimum nodes for new pools
+	DefaultMinNodes int
+
+	// DefaultMaxNodes is the default maximum nodes for new pools
+	DefaultMaxNodes int
+
+	// DefaultImage is the default OS image for new nodes
+	DefaultImage string
+
+	// Hetzner cloud provider configuration
+	Hetzner HetznerProviderConfig
+
+	// Scaleway cloud provider configuration
+	Scaleway ScalewayProviderConfig
+
+	// OVH cloud provider configuration
+	OVH OVHProviderConfig
+
+	// Exoscale cloud provider configuration
+	Exoscale ExoscaleProviderConfig
+
+	// Contabo cloud provider configuration
+	Contabo ContaboProviderConfig
+}
+
+// HetznerProviderConfig holds Hetzner Cloud provider configuration.
+type HetznerProviderConfig struct {
+	// Token is the Hetzner Cloud API token
+	Token string
+}
+
+// ScalewayProviderConfig holds Scaleway provider configuration.
+type ScalewayProviderConfig struct {
+	// AccessKey is the Scaleway access key
+	AccessKey string
+	// SecretKey is the Scaleway secret key
+	SecretKey string
+	// OrganizationID is the Scaleway organization ID
+	OrganizationID string
+	// ProjectID is the default Scaleway project ID
+	ProjectID string
+}
+
+// OVHProviderConfig holds OVHcloud provider configuration.
+type OVHProviderConfig struct {
+	// Endpoint is the OVH API endpoint (ovh-eu, ovh-us, ovh-ca)
+	Endpoint string
+	// ApplicationKey is the OVH application key
+	ApplicationKey string
+	// ApplicationSecret is the OVH application secret
+	ApplicationSecret string
+	// ConsumerKey is the OVH consumer key
+	ConsumerKey string
+	// ServiceName is the OVH cloud project service name
+	ServiceName string
+}
+
+// ExoscaleProviderConfig holds Exoscale provider configuration.
+type ExoscaleProviderConfig struct {
+	// APIKey is the Exoscale API key
+	APIKey string
+	// APISecret is the Exoscale API secret
+	APISecret string
+}
+
+// ContaboProviderConfig holds Contabo provider configuration.
+type ContaboProviderConfig struct {
+	// ClientID is the Contabo OAuth client ID
+	ClientID string
+	// ClientSecret is the Contabo OAuth client secret
+	ClientSecret string
+	// Username is the Contabo account username
+	Username string
+	// Password is the Contabo account password
+	Password string
+}
+
 // AuthConfig holds authentication configuration.
 type AuthConfig struct {
 	// Enabled enables authentication (disabled by default for development)
@@ -596,6 +693,43 @@ func Load() (*Config, error) {
 			PrometheusURL:          getEnv("PHILOTES_PROMETHEUS_URL", "http://localhost:9090"),
 			DefaultCooldownSeconds: getIntEnv("PHILOTES_SCALING_DEFAULT_COOLDOWN", 300),
 			DryRun:                 getBoolEnv("PHILOTES_SCALING_DRY_RUN", false),
+		},
+
+		NodeScaling: NodeScalingConfig{
+			Enabled:              getBoolEnv("PHILOTES_NODE_SCALING_ENABLED", false),
+			KubeconfigPath:       getEnv("PHILOTES_KUBECONFIG", ""),
+			NodeJoinTimeout:      getDurationEnv("PHILOTES_NODE_JOIN_TIMEOUT", 10*time.Minute),
+			NodeDrainTimeout:     getDurationEnv("PHILOTES_NODE_DRAIN_TIMEOUT", 5*time.Minute),
+			NodeDrainGracePeriod: getDurationEnv("PHILOTES_NODE_DRAIN_GRACE_PERIOD", 30*time.Second),
+			DefaultMinNodes:      getIntEnv("PHILOTES_NODE_DEFAULT_MIN", 1),
+			DefaultMaxNodes:      getIntEnv("PHILOTES_NODE_DEFAULT_MAX", 10),
+			DefaultImage:         getEnv("PHILOTES_NODE_DEFAULT_IMAGE", "ubuntu-24.04"),
+			Hetzner: HetznerProviderConfig{
+				Token: getEnv("PHILOTES_HETZNER_TOKEN", ""),
+			},
+			Scaleway: ScalewayProviderConfig{
+				AccessKey:      getEnv("PHILOTES_SCALEWAY_ACCESS_KEY", ""),
+				SecretKey:      getEnv("PHILOTES_SCALEWAY_SECRET_KEY", ""),
+				OrganizationID: getEnv("PHILOTES_SCALEWAY_ORGANIZATION_ID", ""),
+				ProjectID:      getEnv("PHILOTES_SCALEWAY_PROJECT_ID", ""),
+			},
+			OVH: OVHProviderConfig{
+				Endpoint:          getEnv("PHILOTES_OVH_ENDPOINT", "ovh-eu"),
+				ApplicationKey:    getEnv("PHILOTES_OVH_APPLICATION_KEY", ""),
+				ApplicationSecret: getEnv("PHILOTES_OVH_APPLICATION_SECRET", ""),
+				ConsumerKey:       getEnv("PHILOTES_OVH_CONSUMER_KEY", ""),
+				ServiceName:       getEnv("PHILOTES_OVH_SERVICE_NAME", ""),
+			},
+			Exoscale: ExoscaleProviderConfig{
+				APIKey:    getEnv("PHILOTES_EXOSCALE_API_KEY", ""),
+				APISecret: getEnv("PHILOTES_EXOSCALE_API_SECRET", ""),
+			},
+			Contabo: ContaboProviderConfig{
+				ClientID:     getEnv("PHILOTES_CONTABO_CLIENT_ID", ""),
+				ClientSecret: getEnv("PHILOTES_CONTABO_CLIENT_SECRET", ""),
+				Username:     getEnv("PHILOTES_CONTABO_USERNAME", ""),
+				Password:     getEnv("PHILOTES_CONTABO_PASSWORD", ""),
+			},
 		},
 
 		Auth: AuthConfig{
