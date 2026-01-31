@@ -154,7 +154,10 @@ services:
     volumes:
       - ./trino:/etc/trino:ro
     environment:
-      - TRINO_ENVIRONMENT=development
+      TRINO_ENVIRONMENT: development
+      # S3/MinIO credentials for Iceberg catalog (matches MinIO dev defaults)
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
     depends_on:
       minio:
         condition: service_healthy

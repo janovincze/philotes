@@ -31,14 +31,12 @@ func NewQueryHandler(service *services.QueryService, logger *slog.Logger) *Query
 // RegisterRoutes registers the query layer routes.
 func (h *QueryHandler) RegisterRoutes(r *gin.RouterGroup) {
 	query := r.Group("/query")
-	{
-		query.GET("/status", h.GetStatus)
-		query.GET("/health", h.GetHealth)
-		query.GET("/catalogs", h.ListCatalogs)
-		query.GET("/catalogs/:catalog/schemas", h.ListSchemas)
-		query.GET("/catalogs/:catalog/schemas/:schema/tables", h.ListTables)
-		query.GET("/catalogs/:catalog/schemas/:schema/tables/:table", h.GetTableInfo)
-	}
+	query.GET("/status", h.GetStatus)
+	query.GET("/health", h.GetHealth)
+	query.GET("/catalogs", h.ListCatalogs)
+	query.GET("/catalogs/:catalog/schemas", h.ListSchemas)
+	query.GET("/catalogs/:catalog/schemas/:schema/tables", h.ListTables)
+	query.GET("/catalogs/:catalog/schemas/:schema/tables/:table", h.GetTableInfo)
 }
 
 // GetStatus godoc

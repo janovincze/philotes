@@ -8,12 +8,16 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"strings"
-	"time"
 
 	"github.com/janovincze/philotes/internal/api/models"
 	"github.com/janovincze/philotes/internal/config"
 )
+
+// identifierRegex validates SQL identifiers (catalog, schema, table names).
+// Only allows alphanumeric characters and underscores to prevent SQL injection.
+var identifierRegex = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
 
 // QueryService provides operations for the Trino query layer.
 type QueryService struct {
@@ -31,17 +35,28 @@ func NewQueryService(cfg config.TrinoConfig, logger *slog.Logger) *QueryService 
 	return &QueryService{
 		cfg: cfg,
 		httpClient: &http.Client{
-			Timeout: 10 * time.Second,
+			Timeout: cfg.QueryTimeout,
 		},
 		logger: logger.With("component", "query-service"),
 	}
+}
+
+// validateIdentifier validates a SQL identifier to prevent SQL injection.
+func validateIdentifier(name, identifierType string) error {
+	if name == "" {
+		return fmt.Errorf("%s name cannot be empty", identifierType)
+	}
+	if !identifierRegex.MatchString(name) {
+		return fmt.Errorf("invalid %s name: must contain only alphanumeric characters and underscores, and start with a letter or underscore", identifierType)
+	}
+	return nil
 }
 
 // GetStatus returns the current status of the query layer.
 func (s *QueryService) GetStatus(ctx context.Context) (*models.QueryLayerStatus, error) {
 	status := &models.QueryLayerStatus{
 		CoordinatorURL: s.cfg.URL,
-		CheckedAt:      time.Now(),
+		CheckedAt:      models.TimeNow(),
 	}
 
 	if !s.cfg.Enabled {
@@ -135,6 +150,11 @@ func (s *QueryService) ListSchemas(ctx context.Context, catalog string) (*models
 		return nil, fmt.Errorf("Trino query layer is not enabled")
 	}
 
+	// Validate catalog name to prevent SQL injection
+	if err := validateIdentifier(catalog, "catalog"); err != nil {
+		return nil, err
+	}
+
 	query := fmt.Sprintf("SHOW SCHEMAS FROM %s", catalog)
 	rows, err := s.executeQuery(ctx, query)
 	if err != nil {
@@ -162,6 +182,14 @@ func (s *QueryService) ListSchemas(ctx context.Context, catalog string) (*models
 func (s *QueryService) ListTables(ctx context.Context, catalog, schema string) (*models.TableListResponse, error) {
 	if !s.cfg.Enabled {
 		return nil, fmt.Errorf("Trino query layer is not enabled")
+	}
+
+	// Validate identifiers to prevent SQL injection
+	if err := validateIdentifier(catalog, "catalog"); err != nil {
+		return nil, err
+	}
+	if err := validateIdentifier(schema, "schema"); err != nil {
+		return nil, err
 	}
 
 	query := fmt.Sprintf("SHOW TABLES FROM %s.%s", catalog, schema)
@@ -194,6 +222,17 @@ func (s *QueryService) ListTables(ctx context.Context, catalog, schema string) (
 func (s *QueryService) GetTableInfo(ctx context.Context, catalog, schema, table string) (*models.TableInfoResponse, error) {
 	if !s.cfg.Enabled {
 		return nil, fmt.Errorf("Trino query layer is not enabled")
+	}
+
+	// Validate identifiers to prevent SQL injection
+	if err := validateIdentifier(catalog, "catalog"); err != nil {
+		return nil, err
+	}
+	if err := validateIdentifier(schema, "schema"); err != nil {
+		return nil, err
+	}
+	if err := validateIdentifier(table, "table"); err != nil {
+		return nil, err
 	}
 
 	query := fmt.Sprintf("DESCRIBE %s.%s.%s", catalog, schema, table)
@@ -229,7 +268,7 @@ func (s *QueryService) GetTableInfo(ctx context.Context, catalog, schema, table 
 func (s *QueryService) getClusterInfo(ctx context.Context) (*models.TrinoClusterInfo, error) {
 	url := strings.TrimSuffix(s.cfg.URL, "/") + "/v1/info"
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return nil, err
 	}
@@ -245,7 +284,10 @@ func (s *QueryService) getClusterInfo(ctx context.Context) (*models.TrinoCluster
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			return nil, fmt.Errorf("Trino returned status %d (failed to read body: %v)", resp.StatusCode, readErr)
+		}
 		return nil, fmt.Errorf("Trino returned status %d: %s", resp.StatusCode, string(body))
 	}
 
@@ -261,7 +303,7 @@ func (s *QueryService) getClusterInfo(ctx context.Context) (*models.TrinoCluster
 func (s *QueryService) getClusterStats(ctx context.Context) (*models.TrinoClusterStats, error) {
 	url := strings.TrimSuffix(s.cfg.URL, "/") + "/v1/cluster"
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return nil, err
 	}
@@ -317,7 +359,10 @@ func (s *QueryService) executeQuery(ctx context.Context, query string) ([][]inte
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			return nil, fmt.Errorf("query failed with status %d (failed to read body: %v)", resp.StatusCode, readErr)
+		}
 		return nil, fmt.Errorf("query failed with status %d: %s", resp.StatusCode, string(body))
 	}
 
@@ -343,7 +388,7 @@ func (s *QueryService) executeQuery(ctx context.Context, query string) ([][]inte
 
 	// Follow nextUri to get all results
 	for result.NextURI != "" {
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, result.NextURI, nil)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, result.NextURI, http.NoBody)
 		if err != nil {
 			return nil, err
 		}

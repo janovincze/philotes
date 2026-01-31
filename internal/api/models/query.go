@@ -3,6 +3,11 @@ package models
 
 import "time"
 
+// TimeNow returns the current time. This is a helper for testability.
+func TimeNow() time.Time {
+	return time.Now()
+}
+
 // QueryLayerStatus represents the status of the query layer.
 type QueryLayerStatus struct {
 	Available      bool             `json:"available"`
@@ -114,5 +119,5 @@ type TrinoClusterStats struct {
 	ReservedMemory   float64 `json:"reservedMemory"`
 	TotalInputRows   int64   `json:"totalInputRows"`
 	TotalInputBytes  int64   `json:"totalInputBytes"`
-	TotalCpuTimeSecs float64 `json:"totalCpuTimeSecs"`
+	TotalCPUTimeSecs float64 `json:"totalCpuTimeSecs"`
 }
