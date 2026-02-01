@@ -30,6 +30,7 @@ services:
       - "max_wal_senders=10"
 
   # PostgreSQL - Source database for CDC testing
+  # Pre-loaded with e-commerce sample data (customers, products, orders, order_items)
   postgres-source:
     image: postgres:16-alpine
     container_name: philotes-postgres-source
@@ -41,6 +42,7 @@ services:
       - "5433:5432"
     volumes:
       - postgres_source_data:/var/lib/postgresql/data
+      - ./init-scripts-source:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U source -d source"]
       interval: 5s
@@ -90,16 +92,31 @@ services:
       echo 'MinIO buckets initialized';
       "
 
+  # Lakekeeper - Database migration
+  lakekeeper-migrate:
+    image: quay.io/lakekeeper/catalog:latest
+    container_name: philotes-lakekeeper-migrate
+    command: ["migrate"]
+    environment:
+      LAKEKEEPER__PG_ENCRYPTION_KEY: "philotes-dev-encryption-key-32b"
+      LAKEKEEPER__PG_DATABASE_URL_READ: postgresql://philotes:philotes@postgres:5432/philotes
+      LAKEKEEPER__PG_DATABASE_URL_WRITE: postgresql://philotes:philotes@postgres:5432/philotes
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   # Lakekeeper - Iceberg REST Catalog
   lakekeeper:
-    image: lakekeeper/catalog:latest
+    image: quay.io/lakekeeper/catalog:latest
     container_name: philotes-lakekeeper
+    command: ["serve"]
     environment:
-      LAKEKEEPER__BASE_URI: http://lakekeeper:8181
-      LAKEKEEPER__PG__DATABASE_URL: postgresql://philotes:philotes@postgres:5432/philotes
-      LAKEKEEPER__PG__SCHEMA: lakekeeper
-      LAKEKEEPER__AUTHZ__ENABLED: "false"
-      LAKEKEEPER__OPENID__ENABLED: "false"
+      LAKEKEEPER__PG_ENCRYPTION_KEY: "philotes-dev-encryption-key-32b"
+      LAKEKEEPER__PG_DATABASE_URL_READ: postgresql://philotes:philotes@postgres:5432/philotes
+      LAKEKEEPER__PG_DATABASE_URL_WRITE: postgresql://philotes:philotes@postgres:5432/philotes
+      LAKEKEEPER__LISTEN_PORT: "8181"
+      LAKEKEEPER__AUTHZ_BACKEND: allowall
+      RUST_LOG: info
     ports:
       - "8181:8181"
     depends_on:
@@ -107,8 +124,10 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+      lakekeeper-migrate:
+        condition: service_completed_successfully
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8181/catalog/v1/config"]
+      test: ["CMD", "/home/nonroot/lakekeeper", "healthcheck"]
       interval: 10s
       timeout: 5s
       retries: 5

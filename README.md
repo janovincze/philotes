@@ -72,6 +72,10 @@ make run-api
 make test
 ```
 
+6. **Follow the Getting Started guide**
+
+For a complete walkthrough of setting up CDC pipelines, see the **[Getting Started Guide](docs/guides/getting-started.md)**.
+
 ### Default Credentials
 
 | Service | User | Password |
@@ -111,12 +115,14 @@ philotes/
 ```bash
 make help           # Show all available targets
 make build          # Build all binaries
-make test           # Run tests
+make test           # Run unit tests
+make test-e2e       # Run end-to-end tests
 make lint           # Run linter
 make fmt            # Format code
 make docker-up      # Start development environment
 make docker-down    # Stop development environment
 make docker-logs    # Show container logs
+make datagen        # Run data generator for CDC testing
 make check          # Run all checks (lint, vet, test)
 ```
 

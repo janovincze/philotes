@@ -1,7 +1,7 @@
 # Philotes Makefile
 # Run 'make help' to see all available targets
 
-.PHONY: help build test lint fmt clean run docker-up docker-down generate install-tools
+.PHONY: help build test test-e2e lint fmt clean run docker-up docker-down generate install-tools datagen
 
 # Go parameters
 GOCMD=go
@@ -79,6 +79,12 @@ test-coverage:
 	$(GOTEST) -v -race -coverprofile=coverage.out ./...
 	$(GOCMD) tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report: coverage.html"
+
+## test-e2e: Run end-to-end tests (requires docker-up and run-api)
+test-e2e:
+	@echo "Running E2E tests..."
+	@echo "Note: Ensure Docker environment is running (make docker-up) and API server is started"
+	$(GOTEST) -tags=e2e -v -timeout 10m ./tests/e2e/...
 
 ## lint: Run linter
 lint:
@@ -177,6 +183,11 @@ setup-hooks:
 
 ## check: Run all checks (lint, vet, test)
 check: lint vet test
+
+## datagen: Run data generator for testing CDC
+datagen:
+	@echo "Running data generator..."
+	$(GOCMD) run ./tools/datagen/main.go --rate 10 --mode mixed
 
 ## all: Build and test
 all: clean lint vet test build
