@@ -121,3 +121,68 @@ type TrinoClusterStats struct {
 	TotalInputBytes  int64   `json:"totalInputBytes"`
 	TotalCPUTimeSecs float64 `json:"totalCpuTimeSecs"`
 }
+
+// ExecuteQueryRequest represents a request to execute a SQL query.
+type ExecuteQueryRequest struct {
+	// Query is the SQL query to execute.
+	Query string `json:"query" binding:"required"`
+
+	// TimeoutSeconds is the maximum time to wait for query completion.
+	// Default is 30 seconds if not specified.
+	TimeoutSeconds int `json:"timeout_seconds,omitempty"`
+
+	// Catalog is the default catalog for the query (optional).
+	Catalog string `json:"catalog,omitempty"`
+
+	// Schema is the default schema for the query (optional).
+	Schema string `json:"schema,omitempty"`
+}
+
+// Validate validates the execute query request.
+func (r *ExecuteQueryRequest) Validate() []FieldError {
+	var errors []FieldError
+
+	if r.Query == "" {
+		errors = append(errors, FieldError{Field: "query", Message: "query is required"})
+	}
+
+	if r.TimeoutSeconds < 0 {
+		errors = append(errors, FieldError{Field: "timeout_seconds", Message: "timeout_seconds must be non-negative"})
+	}
+
+	return errors
+}
+
+// ApplyDefaults applies default values to the request.
+func (r *ExecuteQueryRequest) ApplyDefaults() {
+	if r.TimeoutSeconds == 0 {
+		r.TimeoutSeconds = 30
+	}
+}
+
+// QueryColumn represents a column in query results.
+type QueryColumn struct {
+	Name string `json:"name"`
+	Type string `json:"type"`
+}
+
+// ExecuteQueryResponse represents the response from query execution.
+type ExecuteQueryResponse struct {
+	// Columns describes the columns in the result set.
+	Columns []QueryColumn `json:"columns"`
+
+	// Data contains the query result rows.
+	Data [][]interface{} `json:"data"`
+
+	// RowCount is the number of rows returned.
+	RowCount int `json:"row_count"`
+
+	// ExecutionTimeMs is the query execution time in milliseconds.
+	ExecutionTimeMs int64 `json:"execution_time_ms"`
+
+	// QueryID is the Trino query ID for debugging.
+	QueryID string `json:"query_id,omitempty"`
+
+	// Warnings contains any warnings from the query.
+	Warnings []string `json:"warnings,omitempty"`
+}

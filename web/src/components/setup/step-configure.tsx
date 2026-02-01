@@ -3,11 +3,15 @@
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { ArrowLeft, ArrowRight, Settings, Lightbulb } from "lucide-react"
+import { ArrowLeft, ArrowRight, Settings, Lightbulb, Database, Zap, Circle } from "lucide-react"
+
+export type ReplicationMode = "buffered" | "streaming"
 
 interface StepConfigureProps {
   pipelineName: string
   onPipelineNameChange: (name: string) => void
+  replicationMode: ReplicationMode
+  onReplicationModeChange: (mode: ReplicationMode) => void
   sourceName: string
   selectedTablesCount: number
   onNext: () => void
@@ -17,6 +21,8 @@ interface StepConfigureProps {
 export function StepConfigure({
   pipelineName,
   onPipelineNameChange,
+  replicationMode,
+  onReplicationModeChange,
   sourceName,
   selectedTablesCount,
   onNext,
@@ -39,7 +45,7 @@ export function StepConfigure({
           <h2 className="text-xl font-semibold">Configure Your Pipeline</h2>
         </div>
         <p className="text-sm text-muted-foreground">
-          Give your pipeline a name. You can adjust additional settings later.
+          Give your pipeline a name and choose the replication mode.
         </p>
       </div>
 
@@ -78,6 +84,67 @@ export function StepConfigure({
             Suggestion: {suggestedName}
           </button>
         )}
+      </div>
+
+      {/* Replication Mode */}
+      <div className="space-y-3">
+        <Label>Replication Mode</Label>
+        <div className="grid gap-3">
+          <button
+            type="button"
+            onClick={() => onReplicationModeChange("buffered")}
+            className={`flex items-start gap-3 rounded-lg border p-4 text-left transition-colors ${
+              replicationMode === "buffered"
+                ? "border-primary bg-primary/5"
+                : "hover:bg-muted/50"
+            }`}
+          >
+            <div className={`mt-1 h-4 w-4 rounded-full border-2 flex items-center justify-center ${
+              replicationMode === "buffered" ? "border-primary" : "border-muted-foreground"
+            }`}>
+              {replicationMode === "buffered" && (
+                <Circle className="h-2 w-2 fill-primary text-primary" />
+              )}
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <Database className="h-4 w-4 text-primary" />
+                <span className="font-medium">Buffered (Recommended)</span>
+              </div>
+              <p className="text-sm text-muted-foreground mt-1">
+                Events are buffered in PostgreSQL before writing to Iceberg. Provides
+                better reliability and exactly-once delivery guarantees.
+              </p>
+            </div>
+          </button>
+          <button
+            type="button"
+            onClick={() => onReplicationModeChange("streaming")}
+            className={`flex items-start gap-3 rounded-lg border p-4 text-left transition-colors ${
+              replicationMode === "streaming"
+                ? "border-primary bg-primary/5"
+                : "hover:bg-muted/50"
+            }`}
+          >
+            <div className={`mt-1 h-4 w-4 rounded-full border-2 flex items-center justify-center ${
+              replicationMode === "streaming" ? "border-primary" : "border-muted-foreground"
+            }`}>
+              {replicationMode === "streaming" && (
+                <Circle className="h-2 w-2 fill-primary text-primary" />
+              )}
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <Zap className="h-4 w-4 text-yellow-500" />
+                <span className="font-medium">Streaming</span>
+              </div>
+              <p className="text-sm text-muted-foreground mt-1">
+                Events are written directly to Iceberg. Lower latency but may lose
+                events during failures. Best for non-critical workloads.
+              </p>
+            </div>
+          </button>
+        </div>
       </div>
 
       {/* Smart Defaults Info */}

@@ -128,6 +128,27 @@ func (h *PipelineHandler) Delete(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
+// PreflightCheck runs pre-flight checks before starting a pipeline.
+// GET /api/v1/pipelines/:id/preflight
+func (h *PipelineHandler) PreflightCheck(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		models.RespondWithError(c, models.NewBadRequestError(
+			c.Request.URL.Path,
+			"invalid pipeline ID format",
+		))
+		return
+	}
+
+	result, err := h.service.PreflightCheck(c.Request.Context(), id)
+	if err != nil {
+		respondWithServiceError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
+}
+
 // Start starts a pipeline.
 // POST /api/v1/pipelines/:id/start
 func (h *PipelineHandler) Start(c *gin.Context) {

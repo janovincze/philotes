@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { ArrowLeft, ArrowRight, GitBranch, CheckCircle2, AlertCircle, Loader2 } from "lucide-react"
 import { StepTables } from "@/components/setup/step-tables"
-import { StepConfigure } from "@/components/setup/step-configure"
+import { StepConfigure, type ReplicationMode } from "@/components/setup/step-configure"
 import { pipelinesApi } from "@/lib/api"
 import { toast } from "sonner"
 import type { Source, Pipeline, TableInfo } from "@/lib/api/types"
@@ -31,6 +31,7 @@ export function StepPipelineWrapper({
   const [availableTables, setAvailableTables] = useState<TableInfo[]>([])
   const [selectedTables, setSelectedTables] = useState<string[]>([])
   const [pipelineName, setPipelineName] = useState("")
+  const [replicationMode, setReplicationMode] = useState<ReplicationMode>("buffered")
   const [isCreating, setIsCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -209,6 +210,8 @@ export function StepPipelineWrapper({
         <StepConfigure
           pipelineName={pipelineName}
           onPipelineNameChange={setPipelineName}
+          replicationMode={replicationMode}
+          onReplicationModeChange={setReplicationMode}
           sourceName={source.name}
           selectedTablesCount={selectedTables.length}
           onNext={handleConfigureNext}
@@ -238,6 +241,8 @@ export function StepPipelineWrapper({
             <dd className="font-medium">{source.name}</dd>
             <dt className="text-muted-foreground">Tables:</dt>
             <dd className="font-medium">{selectedTables.length} selected</dd>
+            <dt className="text-muted-foreground">Replication Mode:</dt>
+            <dd className="font-medium capitalize">{replicationMode}</dd>
           </dl>
         </div>
 

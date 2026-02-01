@@ -172,3 +172,28 @@ func (r *AddTableMappingRequest) ApplyDefaults() {
 		r.Enabled = &enabled
 	}
 }
+
+// PreflightCheckResult represents the result of a single pre-flight check.
+type PreflightCheckResult struct {
+	Name    string `json:"name"`
+	Status  string `json:"status"` // "passed", "failed", "skipped"
+	Message string `json:"message,omitempty"`
+	Error   string `json:"error,omitempty"`
+}
+
+// PreflightCheckResponse represents the response from pre-flight checks.
+type PreflightCheckResponse struct {
+	Ready   bool                   `json:"ready"`
+	Checks  []PreflightCheckResult `json:"checks"`
+	Summary string                 `json:"summary,omitempty"`
+}
+
+// AllPassed returns true if all checks passed.
+func (r *PreflightCheckResponse) AllPassed() bool {
+	for _, check := range r.Checks {
+		if check.Status == "failed" {
+			return false
+		}
+	}
+	return true
+}

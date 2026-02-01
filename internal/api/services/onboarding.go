@@ -4,7 +4,9 @@ package services
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -26,6 +28,7 @@ type OnboardingService struct {
 	onboardingRepo *repositories.OnboardingRepository
 	userRepo       *repositories.UserRepository
 	healthManager  *health.Manager
+	queryService   *QueryService
 	logger         *slog.Logger
 }
 
@@ -34,6 +37,7 @@ func NewOnboardingService(
 	onboardingRepo *repositories.OnboardingRepository,
 	userRepo *repositories.UserRepository,
 	healthManager *health.Manager,
+	queryService *QueryService,
 	logger *slog.Logger,
 ) *OnboardingService {
 	if logger == nil {
@@ -44,6 +48,7 @@ func NewOnboardingService(
 		onboardingRepo: onboardingRepo,
 		userRepo:       userRepo,
 		healthManager:  healthManager,
+		queryService:   queryService,
 		logger:         logger.With("component", "onboarding-service"),
 	}
 }
@@ -228,7 +233,7 @@ func (s *OnboardingService) CheckAdminExists(ctx context.Context) (bool, error) 
 }
 
 // VerifyDataFlow verifies that data is flowing to Iceberg.
-// This is a placeholder implementation - full DuckDB integration would be added later.
+// It queries Trino to check if data exists in the specified table.
 func (s *OnboardingService) VerifyDataFlow(ctx context.Context, req *models.DataVerificationRequest) (*models.DataVerificationResponse, error) {
 	// Validate request
 	if errs := req.Validate(); len(errs) > 0 {
@@ -243,31 +248,150 @@ func (s *OnboardingService) VerifyDataFlow(ctx context.Context, req *models.Data
 
 	startTime := time.Now()
 
-	// For now, return a placeholder response
-	// In a full implementation, this would:
-	// 1. Connect to DuckDB
-	// 2. Load the Iceberg extension
-	// 3. Query the specified table
-	// 4. Return sample rows
 	s.logger.Info("verifying data flow",
 		"pipeline_id", req.PipelineID,
 		"table_name", req.TableName,
 		"max_wait_sec", maxWait,
 	)
 
-	// Placeholder: simulate verification
-	// TODO: Implement actual DuckDB query when query package is added
-	response := &models.DataVerificationResponse{
-		Success:     true,
-		RowCount:    0, // Would be populated from actual query
-		QueryTimeMs: time.Since(startTime).Milliseconds(),
+	// Check if query service is available
+	if s.queryService == nil {
+		return &models.DataVerificationResponse{
+			Success:      false,
+			RowCount:     0,
+			QueryTimeMs:  time.Since(startTime).Milliseconds(),
+			ErrorMessage: "query service not configured",
+		}, nil
 	}
 
-	// In actual implementation, if data not found after polling:
-	// response.Success = false
-	// response.ErrorMessage = "No data found in table after waiting"
+	// Parse table name (expected format: catalog.schema.table or schema.table)
+	catalog, schema, table := s.parseTableName(req.TableName)
 
-	return response, nil
+	// Poll for data with retries
+	pollInterval := 2 * time.Second
+	deadline := time.Now().Add(time.Duration(maxWait) * time.Second)
+
+	var lastErr error
+	for time.Now().Before(deadline) {
+		// Build count query
+		query := fmt.Sprintf("SELECT COUNT(*) as cnt FROM %s.%s.%s", catalog, schema, table)
+
+		queryReq := &models.ExecuteQueryRequest{
+			Query:          query,
+			TimeoutSeconds: 30,
+			Catalog:        catalog,
+			Schema:         schema,
+		}
+
+		result, err := s.queryService.ExecuteQuery(ctx, queryReq)
+		if err != nil {
+			lastErr = err
+			s.logger.Debug("data verification query failed, retrying",
+				"error", err,
+				"table", req.TableName,
+			)
+			time.Sleep(pollInterval)
+			continue
+		}
+
+		// Extract count from result
+		if len(result.Data) > 0 && len(result.Data[0]) > 0 {
+			count := s.extractCount(result.Data[0][0])
+			if count > 0 {
+				// Data found - get sample rows
+				sampleRows, err := s.getSampleRows(ctx, catalog, schema, table)
+				if err != nil {
+					s.logger.Warn("failed to get sample rows", "error", err)
+				}
+
+				return &models.DataVerificationResponse{
+					Success:     true,
+					RowCount:    count,
+					SampleRows:  sampleRows,
+					QueryTimeMs: time.Since(startTime).Milliseconds(),
+				}, nil
+			}
+		}
+
+		// No data yet, wait and retry
+		time.Sleep(pollInterval)
+	}
+
+	// Timeout - no data found
+	errMsg := "no data found in table after waiting"
+	if lastErr != nil {
+		errMsg = fmt.Sprintf("no data found: %v", lastErr)
+	}
+
+	return &models.DataVerificationResponse{
+		Success:      false,
+		RowCount:     0,
+		QueryTimeMs:  time.Since(startTime).Milliseconds(),
+		ErrorMessage: errMsg,
+	}, nil
+}
+
+// parseTableName parses a table name into catalog, schema, and table parts.
+// Supports formats: catalog.schema.table, schema.table, or just table.
+func (s *OnboardingService) parseTableName(tableName string) (catalog, schema, table string) {
+	parts := strings.Split(tableName, ".")
+	switch len(parts) {
+	case 3:
+		return parts[0], parts[1], parts[2]
+	case 2:
+		return "iceberg", parts[0], parts[1]
+	default:
+		return "iceberg", "cdc", tableName
+	}
+}
+
+// extractCount extracts an integer count from various interface types.
+func (s *OnboardingService) extractCount(val interface{}) int64 {
+	switch v := val.(type) {
+	case int64:
+		return v
+	case int:
+		return int64(v)
+	case float64:
+		return int64(v)
+	case string:
+		var count int64
+		fmt.Sscanf(v, "%d", &count)
+		return count
+	default:
+		return 0
+	}
+}
+
+// getSampleRows retrieves sample rows from the table.
+func (s *OnboardingService) getSampleRows(ctx context.Context, catalog, schema, table string) ([]map[string]interface{}, error) {
+	query := fmt.Sprintf("SELECT * FROM %s.%s.%s LIMIT 5", catalog, schema, table)
+
+	queryReq := &models.ExecuteQueryRequest{
+		Query:          query,
+		TimeoutSeconds: 30,
+		Catalog:        catalog,
+		Schema:         schema,
+	}
+
+	result, err := s.queryService.ExecuteQuery(ctx, queryReq)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert to sample rows format
+	sampleRows := make([]map[string]interface{}, 0, len(result.Data))
+	for _, row := range result.Data {
+		rowMap := make(map[string]interface{})
+		for i, col := range result.Columns {
+			if i < len(row) {
+				rowMap[col.Name] = row[i]
+			}
+		}
+		sampleRows = append(sampleRows, rowMap)
+	}
+
+	return sampleRows, nil
 }
 
 // GetOrCreateProgress gets existing progress or creates new one.

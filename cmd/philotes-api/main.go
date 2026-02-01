@@ -114,9 +114,19 @@ func main() {
 	apiKeyRepo := repositories.NewAPIKeyRepository(db)
 	auditRepo := repositories.NewAuditRepository(db)
 
+	// Create onboarding repository
+	onboardingRepo := repositories.NewOnboardingRepository(db)
+
 	// Create services
 	sourceService := services.NewSourceService(sourceRepo, logger)
 	pipelineService := services.NewPipelineService(pipelineRepo, sourceRepo, logger)
+
+	// Create query service for Trino integration
+	queryService := services.NewQueryService(cfg.Trino, logger)
+
+	// Wire up dependencies for pre-flight checks
+	pipelineService.SetSourceService(sourceService)
+	pipelineService.SetQueryService(queryService)
 
 	// Create auth services (only if auth is enabled or admin credentials are provided)
 	var authService *services.AuthService
@@ -161,15 +171,20 @@ func main() {
 		}))
 	}
 
+	// Create onboarding service with query service for data verification
+	onboardingService := services.NewOnboardingService(onboardingRepo, userRepo, healthManager, queryService, logger)
+
 	// Create server configuration
 	serverCfg := api.ServerConfig{
-		Config:          cfg,
-		Logger:          logger,
-		HealthManager:   healthManager,
-		SourceService:   sourceService,
-		PipelineService: pipelineService,
-		AuthService:     authService,
-		APIKeyService:   apiKeyService,
+		Config:            cfg,
+		Logger:            logger,
+		HealthManager:     healthManager,
+		SourceService:     sourceService,
+		PipelineService:   pipelineService,
+		AuthService:       authService,
+		APIKeyService:     apiKeyService,
+		OnboardingService: onboardingService,
+		QueryService:      queryService,
 		CORSConfig: middleware.CORSConfig{
 			AllowedOrigins:   cfg.API.CORSOrigins,
 			AllowCredentials: false,

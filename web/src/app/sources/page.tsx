@@ -1,12 +1,13 @@
 "use client"
 
+import { useState } from "react"
 import Link from "next/link"
-import { Database, Plus, CheckCircle, XCircle, AlertCircle } from "lucide-react"
+import { Database, Plus, CheckCircle, XCircle, AlertCircle, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useSources } from "@/lib/hooks/use-sources"
+import { useSources, useTestSourceConnection } from "@/lib/hooks/use-sources"
 import type { SourceStatus } from "@/lib/api/types"
 
 function SourceStatusBadge({ status }: { status: SourceStatus }) {
@@ -31,6 +32,19 @@ function SourceCard({
 }: {
   source: { id: string; name: string; host: string; port: number; database_name: string; status: SourceStatus }
 }) {
+  const testConnection = useTestSourceConnection()
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null)
+
+  const handleTestConnection = async () => {
+    setTestResult(null)
+    try {
+      const result = await testConnection.mutateAsync(source.id)
+      setTestResult({ success: result.success, message: result.message })
+    } catch {
+      setTestResult({ success: false, message: "Connection test failed" })
+    }
+  }
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-start justify-between space-y-0">
@@ -47,15 +61,37 @@ function SourceCard({
         </div>
         <SourceStatusBadge status={source.status} />
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-3">
         <div className="flex gap-2">
           <Button variant="outline" size="sm" asChild>
             <Link href={`/sources/${source.id}`}>View Details</Link>
           </Button>
-          <Button variant="outline" size="sm">
-            Test Connection
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleTestConnection}
+            disabled={testConnection.isPending}
+          >
+            {testConnection.isPending ? (
+              <>
+                <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                Testing...
+              </>
+            ) : (
+              "Test Connection"
+            )}
           </Button>
         </div>
+        {testResult && (
+          <div className={`text-xs flex items-center gap-1 ${testResult.success ? "text-green-600" : "text-destructive"}`}>
+            {testResult.success ? (
+              <CheckCircle className="h-3 w-3" />
+            ) : (
+              <XCircle className="h-3 w-3" />
+            )}
+            {testResult.message}
+          </div>
+        )}
       </CardContent>
     </Card>
   )

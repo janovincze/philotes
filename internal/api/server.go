@@ -314,6 +314,7 @@ func (s *Server) registerRoutes() {
 			pipelines.GET("/:id", pipelineHandler.Get)
 			pipelines.PUT("/:id", pipelineHandler.Update)
 			pipelines.DELETE("/:id", pipelineHandler.Delete)
+			pipelines.GET("/:id/preflight", pipelineHandler.PreflightCheck)
 			pipelines.POST("/:id/start", pipelineHandler.Start)
 			pipelines.POST("/:id/stop", pipelineHandler.Stop)
 			pipelines.GET("/:id/status", pipelineHandler.GetStatus)

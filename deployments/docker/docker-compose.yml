@@ -90,16 +90,39 @@ services:
       echo 'MinIO buckets initialized';
       "
 
+  # Lakekeeper - Database migrations
+  lakekeeper-migrate:
+    image: quay.io/lakekeeper/catalog:latest
+    container_name: philotes-lakekeeper-migrate
+    environment:
+      LAKEKEEPER__PG_HOST_W: postgres
+      LAKEKEEPER__PG_PORT: "5432"
+      LAKEKEEPER__PG_USER: philotes
+      LAKEKEEPER__PG_PASSWORD: philotes
+      LAKEKEEPER__PG_DATABASE: philotes
+      LAKEKEEPER__PG_SSL_MODE: disable
+      LAKEKEEPER__PG_ENCRYPTION_KEY: dev-encryption-key-32bytes!!
+    command: migrate
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   # Lakekeeper - Iceberg REST Catalog
   lakekeeper:
-    image: lakekeeper/catalog:latest
+    image: quay.io/lakekeeper/catalog:latest
     container_name: philotes-lakekeeper
     environment:
       LAKEKEEPER__BASE_URI: http://lakekeeper:8181
-      LAKEKEEPER__PG__DATABASE_URL: postgresql://philotes:philotes@postgres:5432/philotes
-      LAKEKEEPER__PG__SCHEMA: lakekeeper
-      LAKEKEEPER__AUTHZ__ENABLED: "false"
-      LAKEKEEPER__OPENID__ENABLED: "false"
+      LAKEKEEPER__LISTEN_PORT: "8181"
+      LAKEKEEPER__PG_HOST_W: postgres
+      LAKEKEEPER__PG_PORT: "5432"
+      LAKEKEEPER__PG_USER: philotes
+      LAKEKEEPER__PG_PASSWORD: philotes
+      LAKEKEEPER__PG_DATABASE: philotes
+      LAKEKEEPER__PG_SSL_MODE: disable
+      LAKEKEEPER__PG_ENCRYPTION_KEY: dev-encryption-key-32bytes!!
+      LAKEKEEPER__AUTHZ_BACKEND: allow-all
+    command: serve
     ports:
       - "8181:8181"
     depends_on:
@@ -107,8 +130,10 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+      lakekeeper-migrate:
+        condition: service_completed_successfully
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8181/catalog/v1/config"]
+      test: ["CMD", "/home/nonroot/lakekeeper", "healthcheck"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -137,7 +162,7 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: admin
       GF_USERS_ALLOW_SIGN_UP: "false"
     ports:
-      - "3000:3000"
+      - "3001:3000"
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/janovincze/philotes/internal/api/models"
 	"github.com/janovincze/philotes/internal/config"
@@ -262,6 +263,171 @@ func (s *QueryService) GetTableInfo(ctx context.Context, catalog, schema, table 
 		Type:    "TABLE",
 		Columns: columns,
 	}, nil
+}
+
+// ExecuteQuery executes an arbitrary SQL query and returns the results.
+func (s *QueryService) ExecuteQuery(ctx context.Context, req *models.ExecuteQueryRequest) (*models.ExecuteQueryResponse, error) {
+	if !s.cfg.Enabled {
+		return nil, fmt.Errorf("Trino query layer is not enabled")
+	}
+
+	if req == nil {
+		return nil, fmt.Errorf("request cannot be nil")
+	}
+
+	req.ApplyDefaults()
+
+	if errors := req.Validate(); len(errors) > 0 {
+		return nil, &ValidationError{Errors: errors}
+	}
+
+	startTime := time.Now()
+
+	// Execute the query
+	rows, columns, queryID, err := s.executeQueryWithMetadata(ctx, req.Query, req.Catalog, req.Schema)
+	if err != nil {
+		return nil, fmt.Errorf("query execution failed: %w", err)
+	}
+
+	executionTime := time.Since(startTime).Milliseconds()
+
+	return &models.ExecuteQueryResponse{
+		Columns:         columns,
+		Data:            rows,
+		RowCount:        len(rows),
+		ExecutionTimeMs: executionTime,
+		QueryID:         queryID,
+	}, nil
+}
+
+// executeQueryWithMetadata executes a query and returns results with column metadata.
+func (s *QueryService) executeQueryWithMetadata(ctx context.Context, query, catalog, schema string) ([][]interface{}, []models.QueryColumn, string, error) {
+	url := strings.TrimSuffix(s.cfg.URL, "/") + "/v1/statement"
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, strings.NewReader(query))
+	if err != nil {
+		return nil, nil, "", err
+	}
+
+	req.Header.Set("Content-Type", "text/plain")
+	req.Header.Set("X-Trino-User", s.cfg.Username)
+	if s.cfg.Username == "" {
+		req.Header.Set("X-Trino-User", "philotes")
+	}
+
+	// Use request-specific catalog/schema if provided, otherwise use config defaults
+	if catalog != "" {
+		req.Header.Set("X-Trino-Catalog", catalog)
+	} else if s.cfg.Catalog != "" {
+		req.Header.Set("X-Trino-Catalog", s.cfg.Catalog)
+	}
+
+	if schema != "" {
+		req.Header.Set("X-Trino-Schema", schema)
+	} else if s.cfg.Schema != "" {
+		req.Header.Set("X-Trino-Schema", s.cfg.Schema)
+	}
+
+	if s.cfg.Username != "" && s.cfg.Password != "" {
+		req.SetBasicAuth(s.cfg.Username, s.cfg.Password)
+	}
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return nil, nil, "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			return nil, nil, "", fmt.Errorf("query failed with status %d (failed to read body: %v)", resp.StatusCode, readErr)
+		}
+		return nil, nil, "", fmt.Errorf("query failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Parse initial response
+	var result struct {
+		ID      string `json:"id"`
+		NextURI string `json:"nextUri"`
+		Columns []struct {
+			Name string `json:"name"`
+			Type string `json:"type"`
+		} `json:"columns"`
+		Data  [][]interface{} `json:"data"`
+		Error *struct {
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, nil, "", fmt.Errorf("failed to decode query response: %w", err)
+	}
+
+	if result.Error != nil {
+		return nil, nil, result.ID, fmt.Errorf("query error: %s", result.Error.Message)
+	}
+
+	queryID := result.ID
+	allData := result.Data
+
+	// Convert columns to our model
+	columns := make([]models.QueryColumn, len(result.Columns))
+	for i, col := range result.Columns {
+		columns[i] = models.QueryColumn{
+			Name: col.Name,
+			Type: col.Type,
+		}
+	}
+
+	// Follow nextUri to get all results
+	for result.NextURI != "" {
+		nextReq, err := http.NewRequestWithContext(ctx, http.MethodGet, result.NextURI, http.NoBody)
+		if err != nil {
+			return nil, nil, queryID, err
+		}
+
+		if s.cfg.Username != "" && s.cfg.Password != "" {
+			nextReq.SetBasicAuth(s.cfg.Username, s.cfg.Password)
+		}
+
+		nextResp, err := s.httpClient.Do(nextReq)
+		if err != nil {
+			return nil, nil, queryID, err
+		}
+
+		if nextResp.StatusCode != http.StatusOK {
+			nextResp.Body.Close()
+			return nil, nil, queryID, fmt.Errorf("query continuation failed with status %d", nextResp.StatusCode)
+		}
+
+		if err := json.NewDecoder(nextResp.Body).Decode(&result); err != nil {
+			nextResp.Body.Close()
+			return nil, nil, queryID, fmt.Errorf("failed to decode query continuation: %w", err)
+		}
+		nextResp.Body.Close()
+
+		if result.Error != nil {
+			return nil, nil, queryID, fmt.Errorf("query error: %s", result.Error.Message)
+		}
+
+		// Capture columns if we didn't get them in the first response
+		if len(columns) == 0 && len(result.Columns) > 0 {
+			columns = make([]models.QueryColumn, len(result.Columns))
+			for i, col := range result.Columns {
+				columns[i] = models.QueryColumn{
+					Name: col.Name,
+					Type: col.Type,
+				}
+			}
+		}
+
+		if result.Data != nil {
+			allData = append(allData, result.Data...)
+		}
+	}
+
+	return allData, columns, queryID, nil
 }
 
 // getClusterInfo fetches Trino cluster info from /v1/info.

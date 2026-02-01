@@ -16,9 +16,11 @@ import (
 
 // PipelineService provides business logic for pipeline operations.
 type PipelineService struct {
-	repo       *repositories.PipelineRepository
-	sourceRepo *repositories.SourceRepository
-	logger     *slog.Logger
+	repo          *repositories.PipelineRepository
+	sourceRepo    *repositories.SourceRepository
+	sourceService *SourceService
+	queryService  *QueryService
+	logger        *slog.Logger
 }
 
 // NewPipelineService creates a new PipelineService.
@@ -32,6 +34,16 @@ func NewPipelineService(
 		sourceRepo: sourceRepo,
 		logger:     logger.With("component", "pipeline-service"),
 	}
+}
+
+// SetSourceService sets the source service for connection testing.
+func (s *PipelineService) SetSourceService(sourceService *SourceService) {
+	s.sourceService = sourceService
+}
+
+// SetQueryService sets the query service for catalog health checks.
+func (s *PipelineService) SetQueryService(queryService *QueryService) {
+	s.queryService = queryService
 }
 
 // Create creates a new pipeline.
@@ -155,6 +167,11 @@ func (s *PipelineService) Delete(ctx context.Context, id uuid.UUID) error {
 
 // Start starts a pipeline.
 func (s *PipelineService) Start(ctx context.Context, id uuid.UUID) error {
+	return s.StartWithOptions(ctx, id, true)
+}
+
+// StartWithOptions starts a pipeline with configurable options.
+func (s *PipelineService) StartWithOptions(ctx context.Context, id uuid.UUID, runPreflightChecks bool) error {
 	// Get pipeline
 	pipeline, err := s.repo.GetByID(ctx, id)
 	if err != nil {
@@ -167,6 +184,23 @@ func (s *PipelineService) Start(ctx context.Context, id uuid.UUID) error {
 	// Check if already running
 	if pipeline.Status == models.PipelineStatusRunning || pipeline.Status == models.PipelineStatusStarting {
 		return &ConflictError{Message: "pipeline is already running"}
+	}
+
+	// Run pre-flight checks if enabled
+	if runPreflightChecks {
+		preflightResult, err := s.PreflightCheck(ctx, id)
+		if err != nil {
+			return fmt.Errorf("preflight check failed: %w", err)
+		}
+
+		if !preflightResult.Ready {
+			// Update status to error with preflight failure message
+			errorMsg := fmt.Sprintf("Pre-flight checks failed: %s", preflightResult.Summary)
+			if err := s.repo.UpdateStatus(ctx, id, models.PipelineStatusError, errorMsg); err != nil {
+				s.logger.Warn("failed to update pipeline status after preflight failure", "error", err)
+			}
+			return &ConflictError{Message: errorMsg}
+		}
 	}
 
 	// Update status to starting
@@ -213,6 +247,179 @@ func (s *PipelineService) Stop(ctx context.Context, id uuid.UUID) error {
 
 	s.logger.Info("pipeline stopped", "id", id, "name", pipeline.Name)
 	return nil
+}
+
+// PreflightCheck runs pre-flight checks before starting a pipeline.
+func (s *PipelineService) PreflightCheck(ctx context.Context, id uuid.UUID) (*models.PreflightCheckResponse, error) {
+	// Get pipeline
+	pipeline, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, repositories.ErrPipelineNotFound) {
+			return nil, &NotFoundError{Resource: "pipeline", ID: id.String()}
+		}
+		return nil, fmt.Errorf("failed to get pipeline: %w", err)
+	}
+
+	response := &models.PreflightCheckResponse{
+		Ready:  true,
+		Checks: make([]models.PreflightCheckResult, 0),
+	}
+
+	// Check 1: Source connection
+	if s.sourceService != nil {
+		check := s.checkSourceConnection(ctx, pipeline.SourceID)
+		response.Checks = append(response.Checks, check)
+		if check.Status == "failed" {
+			response.Ready = false
+		}
+	} else {
+		response.Checks = append(response.Checks, models.PreflightCheckResult{
+			Name:    "source_connection",
+			Status:  "skipped",
+			Message: "Source service not configured",
+		})
+	}
+
+	// Check 2: Table mappings exist
+	check := s.checkTableMappings(pipeline)
+	response.Checks = append(response.Checks, check)
+	if check.Status == "failed" {
+		response.Ready = false
+	}
+
+	// Check 3: Query layer (Trino/Lakekeeper) is available
+	if s.queryService != nil {
+		check := s.checkQueryLayer(ctx)
+		response.Checks = append(response.Checks, check)
+		if check.Status == "failed" {
+			response.Ready = false
+		}
+	} else {
+		response.Checks = append(response.Checks, models.PreflightCheckResult{
+			Name:    "query_layer",
+			Status:  "skipped",
+			Message: "Query service not configured",
+		})
+	}
+
+	// Build summary
+	passedCount := 0
+	failedCount := 0
+	for _, c := range response.Checks {
+		switch c.Status {
+		case "passed":
+			passedCount++
+		case "failed":
+			failedCount++
+		}
+	}
+
+	if failedCount > 0 {
+		response.Summary = fmt.Sprintf("%d/%d checks failed", failedCount, len(response.Checks))
+	} else {
+		response.Summary = fmt.Sprintf("All %d checks passed", passedCount)
+	}
+
+	s.logger.Info("preflight checks completed",
+		"pipeline_id", id,
+		"ready", response.Ready,
+		"passed", passedCount,
+		"failed", failedCount,
+	)
+
+	return response, nil
+}
+
+// checkSourceConnection verifies the source database is reachable.
+func (s *PipelineService) checkSourceConnection(ctx context.Context, sourceID uuid.UUID) models.PreflightCheckResult {
+	result, err := s.sourceService.TestConnection(ctx, sourceID)
+	if err != nil {
+		return models.PreflightCheckResult{
+			Name:   "source_connection",
+			Status: "failed",
+			Error:  err.Error(),
+		}
+	}
+
+	if result.Success {
+		msg := "Connection successful"
+		if result.ServerInfo != "" {
+			msg = fmt.Sprintf("Connected (%s)", result.ServerInfo)
+		}
+		return models.PreflightCheckResult{
+			Name:    "source_connection",
+			Status:  "passed",
+			Message: msg,
+		}
+	}
+
+	errMsg := result.Message
+	if result.ErrorDetail != "" {
+		errMsg = result.ErrorDetail
+	}
+	return models.PreflightCheckResult{
+		Name:   "source_connection",
+		Status: "failed",
+		Error:  errMsg,
+	}
+}
+
+// checkTableMappings verifies at least one table mapping exists.
+func (s *PipelineService) checkTableMappings(pipeline *models.Pipeline) models.PreflightCheckResult {
+	if len(pipeline.Tables) == 0 {
+		return models.PreflightCheckResult{
+			Name:   "table_mappings",
+			Status: "failed",
+			Error:  "No table mappings configured",
+		}
+	}
+
+	enabledCount := 0
+	for _, t := range pipeline.Tables {
+		if t.Enabled {
+			enabledCount++
+		}
+	}
+
+	if enabledCount == 0 {
+		return models.PreflightCheckResult{
+			Name:   "table_mappings",
+			Status: "failed",
+			Error:  "No enabled table mappings",
+		}
+	}
+
+	return models.PreflightCheckResult{
+		Name:    "table_mappings",
+		Status:  "passed",
+		Message: fmt.Sprintf("%d table(s) configured", enabledCount),
+	}
+}
+
+// checkQueryLayer verifies the query layer (Trino) is available.
+func (s *PipelineService) checkQueryLayer(ctx context.Context) models.PreflightCheckResult {
+	health, err := s.queryService.GetHealth(ctx)
+	if err != nil {
+		return models.PreflightCheckResult{
+			Name:   "query_layer",
+			Status: "failed",
+			Error:  err.Error(),
+		}
+	}
+
+	if health.Status == "healthy" {
+		return models.PreflightCheckResult{
+			Name:    "query_layer",
+			Status:  "passed",
+			Message: "Trino query layer is available",
+		}
+	}
+
+	return models.PreflightCheckResult{
+		Name:   "query_layer",
+		Status: "failed",
+		Error:  health.Message,
+	}
 }
 
 // GetStatus gets the status of a pipeline.

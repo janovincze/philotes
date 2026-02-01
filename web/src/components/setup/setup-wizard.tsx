@@ -7,7 +7,7 @@ import { WizardProgress, type WizardStep } from "./wizard-progress"
 import { StepWelcome } from "./step-welcome"
 import { StepConnect } from "./step-connect"
 import { StepTables } from "./step-tables"
-import { StepConfigure } from "./step-configure"
+import { StepConfigure, type ReplicationMode } from "./step-configure"
 import { StepReview } from "./step-review"
 import { StepSuccess } from "./step-success"
 import type { Source, TableInfo } from "@/lib/api/types"
@@ -39,6 +39,7 @@ export interface WizardState {
   availableTables: TableInfo[]
   selectedTables: string[]
   pipelineName: string
+  replicationMode: ReplicationMode
   pipelineId: string | null
 }
 
@@ -62,6 +63,7 @@ export function SetupWizard() {
     availableTables: [],
     selectedTables: [],
     pipelineName: "",
+    replicationMode: "buffered",
     pipelineId: null,
   })
 
@@ -105,6 +107,10 @@ export function SetupWizard() {
     setState((prev) => ({ ...prev, pipelineName: name }))
   }, [])
 
+  const setReplicationMode = useCallback((mode: ReplicationMode) => {
+    setState((prev) => ({ ...prev, replicationMode: mode }))
+  }, [])
+
   const setPipelineId = useCallback((id: string) => {
     setState((prev) => ({ ...prev, pipelineId: id }))
   }, [])
@@ -124,6 +130,7 @@ export function SetupWizard() {
       availableTables: [],
       selectedTables: [],
       pipelineName: "",
+      replicationMode: "buffered",
       pipelineId: null,
     })
   }, [])
@@ -162,6 +169,8 @@ export function SetupWizard() {
           <StepConfigure
             pipelineName={state.pipelineName}
             onPipelineNameChange={setPipelineName}
+            replicationMode={state.replicationMode}
+            onReplicationModeChange={setReplicationMode}
             sourceName={state.sourceFormData.name}
             selectedTablesCount={state.selectedTables.length}
             onNext={nextStep}

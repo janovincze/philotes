@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { use } from "react"
 import Link from "next/link"
-import { ArrowLeft, GitBranch, Play, Square } from "lucide-react"
+import { ArrowLeft, GitBranch, Play, Square, BarChart3, ExternalLink } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -79,6 +79,17 @@ function PipelineHeader({
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" asChild>
+            <a
+              href={`http://localhost:3001/d/philotes-pipeline/pipeline-overview?var-pipeline=${pipeline.name}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <BarChart3 className="mr-2 h-4 w-4" />
+              Grafana
+              <ExternalLink className="ml-2 h-3 w-3" />
+            </a>
+          </Button>
           {isStopped && (
             <Button
               onClick={() => startPipeline.mutate(pipeline.id)}
