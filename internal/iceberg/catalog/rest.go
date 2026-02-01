@@ -36,6 +36,115 @@ func NewRESTCatalog(cfg Config, logger *slog.Logger) *RESTCatalog {
 	}
 }
 
+// EnsureWarehouse ensures the warehouse exists, creating it if necessary.
+func (c *RESTCatalog) EnsureWarehouse(ctx context.Context) error {
+	exists, err := c.WarehouseExists(ctx)
+	if err != nil {
+		return fmt.Errorf("check warehouse exists: %w", err)
+	}
+	if exists {
+		c.logger.Debug("warehouse already exists", "warehouse", c.config.Warehouse)
+		return nil
+	}
+
+	c.logger.Info("creating warehouse", "warehouse", c.config.Warehouse)
+
+	url := fmt.Sprintf("%s/management/v1/warehouse", c.config.CatalogURL)
+
+	// Build storage profile based on config
+	storageProfile := map[string]any{
+		"type":              c.config.Storage.Type,
+		"bucket":            c.config.Storage.Bucket,
+		"region":            c.config.Storage.Region,
+		"path-style-access": c.config.Storage.PathStyleAccess,
+	}
+	if c.config.Storage.Endpoint != "" {
+		storageProfile["endpoint"] = c.config.Storage.Endpoint
+	}
+
+	// Build storage credential
+	storageCredential := map[string]any{
+		"type":                  "s3",
+		"credential-type":       "access-key",
+		"aws-access-key-id":     c.config.Storage.AccessKeyID,
+		"aws-secret-access-key": c.config.Storage.SecretAccessKey,
+	}
+
+	body := createWarehouseRequest{
+		WarehouseName:     c.config.Warehouse,
+		ProjectID:         c.config.ProjectID,
+		StorageProfile:    storageProfile,
+		StorageCredential: storageCredential,
+	}
+
+	resp, err := c.doRequest(ctx, http.MethodPost, url, body)
+	if err != nil {
+		return fmt.Errorf("create warehouse request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusConflict {
+		// Warehouse already exists
+		c.logger.Debug("warehouse already exists (conflict)", "warehouse", c.config.Warehouse)
+		return nil
+	}
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		return c.parseError(resp)
+	}
+
+	c.logger.Info("warehouse created", "warehouse", c.config.Warehouse)
+	return nil
+}
+
+// WarehouseExists checks if the configured warehouse exists.
+func (c *RESTCatalog) WarehouseExists(ctx context.Context) (bool, error) {
+	warehouses, err := c.ListWarehouses(ctx)
+	if err != nil {
+		return false, err
+	}
+
+	for _, wh := range warehouses {
+		if wh.Name == c.config.Warehouse {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+// ListWarehouses lists all available warehouses.
+func (c *RESTCatalog) ListWarehouses(ctx context.Context) ([]Warehouse, error) {
+	url := fmt.Sprintf("%s/management/v1/warehouse", c.config.CatalogURL)
+
+	resp, err := c.doRequest(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("list warehouses request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, c.parseError(resp)
+	}
+
+	var result listWarehousesResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("decode warehouses response: %w", err)
+	}
+
+	warehouses := make([]Warehouse, len(result.Warehouses))
+	for i, wh := range result.Warehouses {
+		warehouses[i] = Warehouse{
+			ID:        wh.ID,
+			Name:      wh.Name,
+			ProjectID: wh.ProjectID,
+			Status:    wh.Status,
+		}
+	}
+
+	return warehouses, nil
+}
+
 // CreateNamespace creates a new namespace if it doesn't exist.
 func (c *RESTCatalog) CreateNamespace(ctx context.Context, namespace string, properties map[string]string) error {
 	// Check if namespace already exists
@@ -258,6 +367,25 @@ func (c *RESTCatalog) parseError(resp *http.Response) error {
 }
 
 // REST API request/response types
+
+// Warehouse management types
+type createWarehouseRequest struct {
+	WarehouseName     string         `json:"warehouse-name"`
+	ProjectID         string         `json:"project-id"`
+	StorageProfile    map[string]any `json:"storage-profile"`
+	StorageCredential map[string]any `json:"storage-credential"`
+}
+
+type listWarehousesResponse struct {
+	Warehouses []warehouseInfo `json:"warehouses"`
+}
+
+type warehouseInfo struct {
+	ID        string `json:"warehouse-id"`
+	Name      string `json:"warehouse-name"`
+	ProjectID string `json:"project-id"`
+	Status    string `json:"status"`
+}
 
 type namespaceRequest struct {
 	Namespace  []string          `json:"namespace"`

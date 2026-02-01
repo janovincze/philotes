@@ -71,8 +71,21 @@ func NewIcebergWriter(cfg Config, logger *slog.Logger) (*IcebergWriter, error) {
 		logger = slog.Default()
 	}
 
+	log := logger.With("component", "iceberg-writer")
+
 	// Create catalog client
-	cat := catalog.NewRESTCatalog(cfg.Catalog, logger)
+	cat := catalog.NewRESTCatalog(cfg.Catalog, log)
+
+	// Ensure warehouse exists before proceeding
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	if err := cat.EnsureWarehouse(ctx); err != nil {
+		log.Warn("failed to ensure warehouse exists, will retry on first write", "error", err)
+		// Don't fail startup - the warehouse might be created later or by another process
+	} else {
+		log.Info("warehouse ready", "warehouse", cfg.Catalog.Warehouse)
+	}
 
 	// Create S3 client
 	s3Client, err := NewMinIOClient(cfg.S3, logger)
@@ -85,7 +98,7 @@ func NewIcebergWriter(cfg Config, logger *slog.Logger) (*IcebergWriter, error) {
 		s3:            s3Client,
 		parquet:       NewParquetWriter(),
 		schemaBuilder: schema.NewBuilder(),
-		logger:        logger.With("component", "iceberg-writer"),
+		logger:        log,
 		config:        cfg,
 		tableSchemas:  make(map[string]iceberg.Schema),
 	}, nil

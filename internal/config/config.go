@@ -490,12 +490,18 @@ type IcebergConfig struct {
 
 	// Warehouse is the warehouse name
 	Warehouse string
+
+	// ProjectID is the Lakekeeper project ID for warehouse management
+	ProjectID string
 }
 
 // StorageConfig holds object storage configuration.
 type StorageConfig struct {
 	// Endpoint is the S3/MinIO endpoint
 	Endpoint string
+
+	// Region is the AWS/S3 region
+	Region string
 
 	// AccessKey is the access key
 	AccessKey string
@@ -773,10 +779,12 @@ func Load() (*Config, error) {
 		Iceberg: IcebergConfig{
 			CatalogURL: getEnv("PHILOTES_ICEBERG_CATALOG_URL", "http://localhost:8181"),
 			Warehouse:  getEnv("PHILOTES_ICEBERG_WAREHOUSE", "philotes"),
+			ProjectID:  getEnv("PHILOTES_ICEBERG_PROJECT_ID", "00000000-0000-0000-0000-000000000000"),
 		},
 
 		Storage: StorageConfig{
 			Endpoint:  getEnv("PHILOTES_STORAGE_ENDPOINT", "localhost:9000"),
+			Region:    getEnv("PHILOTES_STORAGE_REGION", "us-east-1"),
 			AccessKey: getEnv("PHILOTES_STORAGE_ACCESS_KEY", "minioadmin"),
 			SecretKey: getEnv("PHILOTES_STORAGE_SECRET_KEY", "minioadmin"),
 			Bucket:    getEnv("PHILOTES_STORAGE_BUCKET", "philotes"),

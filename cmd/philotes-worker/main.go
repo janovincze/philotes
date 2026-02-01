@@ -232,6 +232,16 @@ func run(ctx context.Context, cfg *config.Config, logger *slog.Logger) error {
 			Catalog: catalog.Config{
 				CatalogURL: cfg.Iceberg.CatalogURL,
 				Warehouse:  cfg.Iceberg.Warehouse,
+				ProjectID:  cfg.Iceberg.ProjectID,
+				Storage: catalog.StorageConfig{
+					Type:            "s3",
+					Bucket:          cfg.Storage.Bucket,
+					Endpoint:        cfg.Storage.Endpoint,
+					Region:          cfg.Storage.Region,
+					PathStyleAccess: true, // MinIO requires path-style access
+					AccessKeyID:     cfg.Storage.AccessKey,
+					SecretAccessKey: cfg.Storage.SecretKey,
+				},
 			},
 			S3: writer.S3Config{
 				Endpoint:  cfg.Storage.Endpoint,
