@@ -70,12 +70,12 @@ func TestCDCFullFlow(t *testing.T) {
 		}
 		RequireStatusCode(t, http.StatusCreated, status, body)
 
-		var source SourceResponse
-		if err := ParseJSON(body, &source); err != nil {
+		var sourceResp SourceResponse
+		if err := ParseJSON(body, &sourceResp); err != nil {
 			t.Fatalf("Failed to parse response: %v", err)
 		}
 
-		sourceID = source.ID
+		sourceID = sourceResp.Source.ID
 		t.Logf("Created source: %s", sourceID)
 	})
 
@@ -101,9 +101,8 @@ func TestCDCFullFlow(t *testing.T) {
 	// Step 3: Create Pipeline
 	t.Run("Step3_CreatePipeline", func(t *testing.T) {
 		pipelineReq := CreatePipelineRequest{
-			Name:            pipelineName,
-			SourceID:        sourceID,
-			DestinationType: "iceberg",
+			Name:     pipelineName,
+			SourceID: sourceID,
 			Config: map[string]interface{}{
 				"batch_size":             100,
 				"flush_interval_seconds": 5,
@@ -116,31 +115,28 @@ func TestCDCFullFlow(t *testing.T) {
 		}
 		RequireStatusCode(t, http.StatusCreated, status, body)
 
-		var pipeline PipelineResponse
-		if err := ParseJSON(body, &pipeline); err != nil {
+		var pipelineResp PipelineResponse
+		if err := ParseJSON(body, &pipelineResp); err != nil {
 			t.Fatalf("Failed to parse response: %v", err)
 		}
 
-		pipelineID = pipeline.ID
+		pipelineID = pipelineResp.Pipeline.ID
 		t.Logf("Created pipeline: %s", pipelineID)
 	})
 
 	// Step 4: Add Table Mappings
 	t.Run("Step4_AddTableMappings", func(t *testing.T) {
-		tables := []CreateTableMappingRequest{
+		enabled := true
+		tables := []AddTableMappingRequest{
 			{
-				SourceSchema:      "public",
-				SourceTable:       "customers",
-				DestinationSchema: "e2e_test",
-				DestinationTable:  "customers",
-				Enabled:           true,
+				Schema:  "public",
+				Table:   "customers",
+				Enabled: &enabled,
 			},
 			{
-				SourceSchema:      "public",
-				SourceTable:       "products",
-				DestinationSchema: "e2e_test",
-				DestinationTable:  "products",
-				Enabled:           true,
+				Schema:  "public",
+				Table:   "products",
+				Enabled: &enabled,
 			},
 		}
 
@@ -150,12 +146,10 @@ func TestCDCFullFlow(t *testing.T) {
 				mapping,
 			)
 			if err != nil {
-				t.Fatalf("Failed to add table mapping for %s: %v", mapping.SourceTable, err)
+				t.Fatalf("Failed to add table mapping for %s: %v", mapping.Table, err)
 			}
 			RequireStatusCode(t, http.StatusCreated, status, body)
-			t.Logf("Added table mapping: %s.%s -> %s.%s",
-				mapping.SourceSchema, mapping.SourceTable,
-				mapping.DestinationSchema, mapping.DestinationTable)
+			t.Logf("Added table mapping: %s.%s", mapping.Schema, mapping.Table)
 		}
 	})
 

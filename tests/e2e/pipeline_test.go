@@ -33,10 +33,11 @@ func TestPipelineCRUD(t *testing.T) {
 	}
 	RequireStatusCode(t, http.StatusCreated, status, body)
 
-	var source SourceResponse
-	if err := ParseJSON(body, &source); err != nil {
+	var sourceResp SourceResponse
+	if err := ParseJSON(body, &sourceResp); err != nil {
 		t.Fatalf("Failed to parse response: %v", err)
 	}
+	source := sourceResp.Source
 
 	// Cleanup source at the end
 	defer func() {
@@ -49,9 +50,8 @@ func TestPipelineCRUD(t *testing.T) {
 	// Create pipeline
 	t.Run("Create", func(t *testing.T) {
 		req := CreatePipelineRequest{
-			Name:            pipelineName,
-			SourceID:        source.ID,
-			DestinationType: "iceberg",
+			Name:     pipelineName,
+			SourceID: source.ID,
 			Config: map[string]interface{}{
 				"batch_size":             1000,
 				"flush_interval_seconds": 10,
@@ -64,10 +64,11 @@ func TestPipelineCRUD(t *testing.T) {
 		}
 		RequireStatusCode(t, http.StatusCreated, status, body)
 
-		var pipeline PipelineResponse
-		if err := ParseJSON(body, &pipeline); err != nil {
+		var pipelineResp PipelineResponse
+		if err := ParseJSON(body, &pipelineResp); err != nil {
 			t.Fatalf("Failed to parse response: %v", err)
 		}
+		pipeline := pipelineResp.Pipeline
 
 		if pipeline.ID == "" {
 			t.Fatal("Expected pipeline ID to be set")
@@ -94,8 +95,8 @@ func TestPipelineCRUD(t *testing.T) {
 				t.Fatalf("Failed to parse response: %v", err)
 			}
 
-			if retrieved.ID != pipeline.ID {
-				t.Errorf("Expected ID %s, got %s", pipeline.ID, retrieved.ID)
+			if retrieved.Pipeline.ID != pipeline.ID {
+				t.Errorf("Expected ID %s, got %s", pipeline.ID, retrieved.Pipeline.ID)
 			}
 		})
 
@@ -107,13 +108,13 @@ func TestPipelineCRUD(t *testing.T) {
 			}
 			RequireStatusCode(t, http.StatusOK, status, body)
 
-			var pipelines []PipelineResponse
-			if err := ParseJSON(body, &pipelines); err != nil {
+			var listResp PipelineListResponse
+			if err := ParseJSON(body, &listResp); err != nil {
 				t.Fatalf("Failed to parse response: %v", err)
 			}
 
 			found := false
-			for _, p := range pipelines {
+			for _, p := range listResp.Pipelines {
 				if p.ID == pipeline.ID {
 					found = true
 					break
@@ -141,8 +142,8 @@ func TestPipelineCRUD(t *testing.T) {
 				t.Fatalf("Failed to parse response: %v", err)
 			}
 
-			if updated.Name != pipelineName+"-updated" {
-				t.Errorf("Expected name %s, got %s", pipelineName+"-updated", updated.Name)
+			if updated.Pipeline.Name != pipelineName+"-updated" {
+				t.Errorf("Expected name %s, got %s", pipelineName+"-updated", updated.Pipeline.Name)
 			}
 		})
 
@@ -187,10 +188,11 @@ func TestPipelineTableMappings(t *testing.T) {
 	}
 	RequireStatusCode(t, http.StatusCreated, status, body)
 
-	var source SourceResponse
-	if err := ParseJSON(body, &source); err != nil {
+	var sourceResp SourceResponse
+	if err := ParseJSON(body, &sourceResp); err != nil {
 		t.Fatalf("Failed to parse response: %v", err)
 	}
+	source := sourceResp.Source
 	defer func() {
 		client.Delete("/api/v1/sources/" + source.ID)
 	}()
@@ -198,9 +200,8 @@ func TestPipelineTableMappings(t *testing.T) {
 	// Create pipeline
 	pipelineName := fmt.Sprintf("e2e-mapping-pipeline-%d", time.Now().UnixNano())
 	pipelineReq := CreatePipelineRequest{
-		Name:            pipelineName,
-		SourceID:        source.ID,
-		DestinationType: "iceberg",
+		Name:     pipelineName,
+		SourceID: source.ID,
 	}
 
 	body, status, err = client.Post("/api/v1/pipelines", pipelineReq)
@@ -209,21 +210,21 @@ func TestPipelineTableMappings(t *testing.T) {
 	}
 	RequireStatusCode(t, http.StatusCreated, status, body)
 
-	var pipeline PipelineResponse
-	if err := ParseJSON(body, &pipeline); err != nil {
+	var pipelineResp PipelineResponse
+	if err := ParseJSON(body, &pipelineResp); err != nil {
 		t.Fatalf("Failed to parse response: %v", err)
 	}
+	pipeline := pipelineResp.Pipeline
 	defer func() {
 		client.Delete("/api/v1/pipelines/" + pipeline.ID)
 	}()
 
 	t.Run("AddTableMapping", func(t *testing.T) {
-		mappingReq := CreateTableMappingRequest{
-			SourceSchema:      "public",
-			SourceTable:       "customers",
-			DestinationSchema: "e2e_test",
-			DestinationTable:  "customers",
-			Enabled:           true,
+		enabled := true
+		mappingReq := AddTableMappingRequest{
+			Schema:  "public",
+			Table:   "customers",
+			Enabled: &enabled,
 		}
 
 		body, status, err := client.Post(
@@ -235,7 +236,7 @@ func TestPipelineTableMappings(t *testing.T) {
 		}
 		RequireStatusCode(t, http.StatusCreated, status, body)
 
-		var mapping TableMappingResponse
+		var mapping TableMapping
 		if err := ParseJSON(body, &mapping); err != nil {
 			t.Fatalf("Failed to parse response: %v", err)
 		}
@@ -283,10 +284,11 @@ func TestPipelineStatus(t *testing.T) {
 	}
 	RequireStatusCode(t, http.StatusCreated, status, body)
 
-	var source SourceResponse
-	if err := ParseJSON(body, &source); err != nil {
+	var sourceResp SourceResponse
+	if err := ParseJSON(body, &sourceResp); err != nil {
 		t.Fatalf("Failed to parse response: %v", err)
 	}
+	source := sourceResp.Source
 	defer func() {
 		client.Delete("/api/v1/sources/" + source.ID)
 	}()
@@ -294,9 +296,8 @@ func TestPipelineStatus(t *testing.T) {
 	// Create pipeline
 	pipelineName := fmt.Sprintf("e2e-status-pipeline-%d", time.Now().UnixNano())
 	pipelineReq := CreatePipelineRequest{
-		Name:            pipelineName,
-		SourceID:        source.ID,
-		DestinationType: "iceberg",
+		Name:     pipelineName,
+		SourceID: source.ID,
 	}
 
 	body, status, err = client.Post("/api/v1/pipelines", pipelineReq)
@@ -305,10 +306,11 @@ func TestPipelineStatus(t *testing.T) {
 	}
 	RequireStatusCode(t, http.StatusCreated, status, body)
 
-	var pipeline PipelineResponse
-	if err := ParseJSON(body, &pipeline); err != nil {
+	var pipelineResp PipelineResponse
+	if err := ParseJSON(body, &pipelineResp); err != nil {
 		t.Fatalf("Failed to parse response: %v", err)
 	}
+	pipeline := pipelineResp.Pipeline
 	defer func() {
 		// Stop pipeline if running before deleting
 		client.Post(fmt.Sprintf("/api/v1/pipelines/%s/stop", pipeline.ID), nil)
@@ -360,10 +362,11 @@ func TestPipelineStartStop(t *testing.T) {
 	}
 	RequireStatusCode(t, http.StatusCreated, status, body)
 
-	var source SourceResponse
-	if err := ParseJSON(body, &source); err != nil {
+	var sourceResp SourceResponse
+	if err := ParseJSON(body, &sourceResp); err != nil {
 		t.Fatalf("Failed to parse response: %v", err)
 	}
+	source := sourceResp.Source
 	defer func() {
 		client.Delete("/api/v1/sources/" + source.ID)
 	}()
@@ -371,9 +374,8 @@ func TestPipelineStartStop(t *testing.T) {
 	// Create pipeline with table mapping
 	pipelineName := fmt.Sprintf("e2e-startstop-pipeline-%d", time.Now().UnixNano())
 	pipelineReq := CreatePipelineRequest{
-		Name:            pipelineName,
-		SourceID:        source.ID,
-		DestinationType: "iceberg",
+		Name:     pipelineName,
+		SourceID: source.ID,
 	}
 
 	body, status, err = client.Post("/api/v1/pipelines", pipelineReq)
@@ -382,22 +384,22 @@ func TestPipelineStartStop(t *testing.T) {
 	}
 	RequireStatusCode(t, http.StatusCreated, status, body)
 
-	var pipeline PipelineResponse
-	if err := ParseJSON(body, &pipeline); err != nil {
+	var pipelineResp PipelineResponse
+	if err := ParseJSON(body, &pipelineResp); err != nil {
 		t.Fatalf("Failed to parse response: %v", err)
 	}
+	pipeline := pipelineResp.Pipeline
 	defer func() {
 		client.Post(fmt.Sprintf("/api/v1/pipelines/%s/stop", pipeline.ID), nil)
 		client.Delete("/api/v1/pipelines/" + pipeline.ID)
 	}()
 
 	// Add a table mapping
-	mappingReq := CreateTableMappingRequest{
-		SourceSchema:      "public",
-		SourceTable:       "customers",
-		DestinationSchema: "e2e_test",
-		DestinationTable:  "customers",
-		Enabled:           true,
+	enabled := true
+	mappingReq := AddTableMappingRequest{
+		Schema:  "public",
+		Table:   "customers",
+		Enabled: &enabled,
 	}
 
 	_, status, err = client.Post(

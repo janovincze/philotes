@@ -56,6 +56,7 @@ Implemented complete E2E demonstration of Philotes CDC pipeline including:
 - [x] E2E tests compile with `-tags=e2e`
 - [x] Data generator compiles
 - [x] go vet passes on new code
+- [x] All E2E tests pass (17 tests)
 
 ## Docker Compose Fixes Applied
 
@@ -64,6 +65,15 @@ During implementation, fixed several issues:
 2. Added Lakekeeper migration service
 3. Fixed Lakekeeper healthcheck to use full binary path
 4. Removed duplicate Grafana provisioning files
+
+## E2E Test Fixes Applied
+
+Fixed issues discovered during test execution:
+1. Applied missing buffer database schema (`philotes.sources`, `pipelines`, `table_mappings` tables)
+2. Fixed test response parsing to match API wrapper format (`{"source": {...}}` instead of `{...}`)
+3. Updated `SourceResponse`, `PipelineResponse` to use wrapper structs
+4. Fixed `AddTableMappingRequest` to match API expected format (`schema`, `table` instead of `source_schema`, `source_table`)
+5. All 17 E2E tests now pass
 
 ## Test Commands
 

@@ -36,19 +36,20 @@ func TestSourceCRUD(t *testing.T) {
 		}
 		RequireStatusCode(t, http.StatusCreated, status, body)
 
-		var source SourceResponse
-		if err := ParseJSON(body, &source); err != nil {
+		var resp SourceResponse
+		if err := ParseJSON(body, &resp); err != nil {
 			t.Fatalf("Failed to parse response: %v", err)
 		}
 
-		if source.ID == "" {
+		if resp.Source.ID == "" {
 			t.Fatal("Expected source ID to be set")
 		}
-		if source.Name != sourceName {
-			t.Errorf("Expected name %s, got %s", sourceName, source.Name)
+		if resp.Source.Name != sourceName {
+			t.Errorf("Expected name %s, got %s", sourceName, resp.Source.Name)
 		}
 
 		// Store for later tests
+		source := resp.Source
 		t.Logf("Created source with ID: %s", source.ID)
 
 		// Test Get
@@ -64,8 +65,8 @@ func TestSourceCRUD(t *testing.T) {
 				t.Fatalf("Failed to parse response: %v", err)
 			}
 
-			if retrieved.ID != source.ID {
-				t.Errorf("Expected ID %s, got %s", source.ID, retrieved.ID)
+			if retrieved.Source.ID != source.ID {
+				t.Errorf("Expected ID %s, got %s", source.ID, retrieved.Source.ID)
 			}
 		})
 
@@ -77,14 +78,14 @@ func TestSourceCRUD(t *testing.T) {
 			}
 			RequireStatusCode(t, http.StatusOK, status, body)
 
-			var sources []SourceResponse
-			if err := ParseJSON(body, &sources); err != nil {
+			var listResp SourceListResponse
+			if err := ParseJSON(body, &listResp); err != nil {
 				t.Fatalf("Failed to parse response: %v", err)
 			}
 
 			// Should have at least our created source
 			found := false
-			for _, s := range sources {
+			for _, s := range listResp.Sources {
 				if s.ID == source.ID {
 					found = true
 					break
@@ -112,8 +113,8 @@ func TestSourceCRUD(t *testing.T) {
 				t.Fatalf("Failed to parse response: %v", err)
 			}
 
-			if updated.Name != sourceName+"-updated" {
-				t.Errorf("Expected name %s, got %s", sourceName+"-updated", updated.Name)
+			if updated.Source.Name != sourceName+"-updated" {
+				t.Errorf("Expected name %s, got %s", sourceName+"-updated", updated.Source.Name)
 			}
 		})
 
@@ -158,10 +159,11 @@ func TestSourceConnection(t *testing.T) {
 	}
 	RequireStatusCode(t, http.StatusCreated, status, body)
 
-	var source SourceResponse
-	if err := ParseJSON(body, &source); err != nil {
+	var resp SourceResponse
+	if err := ParseJSON(body, &resp); err != nil {
 		t.Fatalf("Failed to parse response: %v", err)
 	}
+	source := resp.Source
 
 	// Cleanup
 	defer func() {
@@ -210,10 +212,11 @@ func TestSourceDiscoverTables(t *testing.T) {
 	}
 	RequireStatusCode(t, http.StatusCreated, status, body)
 
-	var source SourceResponse
-	if err := ParseJSON(body, &source); err != nil {
+	var resp SourceResponse
+	if err := ParseJSON(body, &resp); err != nil {
 		t.Fatalf("Failed to parse response: %v", err)
 	}
+	source := resp.Source
 
 	// Cleanup
 	defer func() {
@@ -280,10 +283,11 @@ func TestSourceInvalidCredentials(t *testing.T) {
 	}
 	RequireStatusCode(t, http.StatusCreated, status, body)
 
-	var source SourceResponse
-	if err := ParseJSON(body, &source); err != nil {
+	var resp SourceResponse
+	if err := ParseJSON(body, &resp); err != nil {
 		t.Fatalf("Failed to parse response: %v", err)
 	}
+	source := resp.Source
 
 	// Cleanup
 	defer func() {

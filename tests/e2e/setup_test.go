@@ -219,8 +219,8 @@ type CreateSourceRequest struct {
 	PublicationName string `json:"publication_name"`
 }
 
-// SourceResponse represents a source in API responses
-type SourceResponse struct {
+// Source represents a source in API responses
+type Source struct {
 	ID              string    `json:"id"`
 	Name            string    `json:"name"`
 	Host            string    `json:"host"`
@@ -233,6 +233,17 @@ type SourceResponse struct {
 	UpdatedAt       time.Time `json:"updated_at"`
 }
 
+// SourceResponse wraps a source for API responses
+type SourceResponse struct {
+	Source Source `json:"source"`
+}
+
+// SourceListResponse wraps a list of sources for API responses
+type SourceListResponse struct {
+	Sources    []Source `json:"sources"`
+	TotalCount int      `json:"total_count"`
+}
+
 // CreatePipelineRequest represents a request to create a pipeline
 type CreatePipelineRequest struct {
 	Name            string                 `json:"name"`
@@ -241,8 +252,8 @@ type CreatePipelineRequest struct {
 	Config          map[string]interface{} `json:"config,omitempty"`
 }
 
-// PipelineResponse represents a pipeline in API responses
-type PipelineResponse struct {
+// Pipeline represents a pipeline in API responses
+type Pipeline struct {
 	ID              string                 `json:"id"`
 	Name            string                 `json:"name"`
 	SourceID        string                 `json:"source_id"`
@@ -253,6 +264,17 @@ type PipelineResponse struct {
 	UpdatedAt       time.Time              `json:"updated_at"`
 }
 
+// PipelineResponse wraps a pipeline for API responses
+type PipelineResponse struct {
+	Pipeline Pipeline `json:"pipeline"`
+}
+
+// PipelineListResponse wraps a list of pipelines for API responses
+type PipelineListResponse struct {
+	Pipelines  []Pipeline `json:"pipelines"`
+	TotalCount int        `json:"total_count"`
+}
+
 // PipelineStatusResponse represents pipeline status
 type PipelineStatusResponse struct {
 	Status          string     `json:"status"`
@@ -261,25 +283,23 @@ type PipelineStatusResponse struct {
 	LastEventAt     *time.Time `json:"last_event_at,omitempty"`
 }
 
-// CreateTableMappingRequest represents a request to add a table mapping
-type CreateTableMappingRequest struct {
-	SourceSchema      string `json:"source_schema"`
-	SourceTable       string `json:"source_table"`
-	DestinationSchema string `json:"destination_schema"`
-	DestinationTable  string `json:"destination_table"`
-	Enabled           bool   `json:"enabled"`
+// AddTableMappingRequest represents a request to add a table mapping
+type AddTableMappingRequest struct {
+	Schema  string         `json:"schema,omitempty"`
+	Table   string         `json:"table"`
+	Enabled *bool          `json:"enabled,omitempty"`
+	Config  map[string]any `json:"config,omitempty"`
 }
 
-// TableMappingResponse represents a table mapping in API responses
-type TableMappingResponse struct {
-	ID                string    `json:"id"`
-	PipelineID        string    `json:"pipeline_id"`
-	SourceSchema      string    `json:"source_schema"`
-	SourceTable       string    `json:"source_table"`
-	DestinationSchema string    `json:"destination_schema"`
-	DestinationTable  string    `json:"destination_table"`
-	Enabled           bool      `json:"enabled"`
-	CreatedAt         time.Time `json:"created_at"`
+// TableMapping represents a table mapping in API responses
+type TableMapping struct {
+	ID           string         `json:"id"`
+	PipelineID   string         `json:"pipeline_id"`
+	SourceSchema string         `json:"source_schema"`
+	SourceTable  string         `json:"source_table"`
+	Enabled      bool           `json:"enabled"`
+	Config       map[string]any `json:"config,omitempty"`
+	CreatedAt    time.Time      `json:"created_at"`
 }
 
 // TestConnectionResponse represents the response from testing a source connection
