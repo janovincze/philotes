@@ -49,10 +49,16 @@ var (
 func main() {
 	flag.Parse()
 
+	if err := run(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func run() error {
 	// Validate mode
 	validModes := map[string]bool{"insert": true, "update": true, "delete": true, "mixed": true}
 	if !validModes[*mode] {
-		log.Fatalf("Invalid mode: %s. Valid modes: insert, update, delete, mixed", *mode)
+		return fmt.Errorf("invalid mode: %s. Valid modes: insert, update, delete, mixed", *mode)
 	}
 
 	// Connect to database
@@ -63,13 +69,12 @@ func main() {
 
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		return fmt.Errorf("failed to connect to database: %w", err)
 	}
 	defer db.Close()
 
 	if err := db.Ping(); err != nil {
-		db.Close()
-		log.Fatalf("Failed to ping database: %v", err)
+		return fmt.Errorf("failed to ping database: %w", err)
 	}
 
 	log.Printf("Connected to database at %s:%s/%s", *host, *port, *dbname)
@@ -113,11 +118,11 @@ func main() {
 		select {
 		case <-ctx.Done():
 			printStats(startTime)
-			return
+			return nil
 		case <-ticker.C:
 			if *count > 0 && totalOps >= int64(*count) {
 				printStats(startTime)
-				return
+				return nil
 			}
 
 			totalOps++
