@@ -68,6 +68,7 @@ func main() {
 	defer db.Close()
 
 	if err := db.Ping(); err != nil {
+		db.Close()
 		log.Fatalf("Failed to ping database: %v", err)
 	}
 
@@ -185,7 +186,7 @@ func (g *DataGenerator) Insert(ctx context.Context) error {
 	email := fmt.Sprintf("%s.%s.%d@%s", firstName, lastName, rand.Int63(), domain)
 	phone := fmt.Sprintf("+1-555-%04d", rand.Intn(10000))
 	loyaltyTier := []string{"bronze", "silver", "gold"}[rand.Intn(3)]
-	metadata := fmt.Sprintf(`{"loyalty_tier": "%s", "generated": true}`, loyaltyTier)
+	metadata := fmt.Sprintf(`{"loyalty_tier": %q, "generated": true}`, loyaltyTier)
 
 	_, err := g.db.ExecContext(ctx, `
 		INSERT INTO customers (first_name, last_name, email, phone, metadata)

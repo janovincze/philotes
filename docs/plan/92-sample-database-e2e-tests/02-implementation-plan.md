@@ -207,11 +207,8 @@ POST /api/v1/pipelines
 ```json
 POST /api/v1/pipelines/:id/tables
 {
-  "source_schema": "public",
-  "source_table": "customers",
-  "destination_schema": "ecommerce",
-  "destination_table": "customers",
-  "enabled": true
+  "schema": "public",
+  "table": "customers"
 }
 ```
 
