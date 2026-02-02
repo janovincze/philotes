@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/janovincze/philotes/internal/api/models"
 	"github.com/janovincze/philotes/internal/config"
@@ -423,4 +424,245 @@ func (s *QueryService) executeQuery(ctx context.Context, query string) ([][]inte
 	}
 
 	return allData, nil
+}
+
+// Default and maximum limits for user queries.
+const (
+	DefaultQueryLimit = 100
+	MaxQueryLimit     = 1000
+)
+
+// dangerousKeywords contains SQL keywords that are not allowed in user queries.
+var dangerousKeywords = []string{
+	"INSERT", "UPDATE", "DELETE", "DROP", "CREATE", "ALTER", "TRUNCATE",
+	"GRANT", "REVOKE", "EXEC", "EXECUTE", "CALL", "SET", "MERGE",
+}
+
+// ExecuteUserQuery executes a user-provided SQL query with safety validations.
+func (s *QueryService) ExecuteUserQuery(ctx context.Context, req *models.QueryExecuteRequest) (*models.QueryExecuteResponse, error) {
+	if !s.cfg.Enabled {
+		return nil, fmt.Errorf("Trino query layer is not enabled")
+	}
+
+	startTime := time.Now()
+
+	// Validate and sanitize the query
+	if err := s.validateUserQuery(req.SQL); err != nil {
+		return &models.QueryExecuteResponse{
+			Error: err.Error(),
+		}, nil
+	}
+
+	// Apply default limit if not specified
+	limit := req.Limit
+	if limit <= 0 {
+		limit = DefaultQueryLimit
+	}
+	if limit > MaxQueryLimit {
+		limit = MaxQueryLimit
+	}
+
+	// Add LIMIT clause if not present
+	query := req.SQL
+	upperQuery := strings.ToUpper(strings.TrimSpace(query))
+	if !strings.Contains(upperQuery, " LIMIT ") {
+		query = fmt.Sprintf("%s LIMIT %d", strings.TrimSuffix(query, ";"), limit)
+	}
+
+	// Execute the query with optional catalog/schema context
+	rows, columns, err := s.executeQueryWithColumns(ctx, query, req.Catalog, req.Schema)
+	if err != nil {
+		return &models.QueryExecuteResponse{
+			Error: err.Error(),
+		}, nil
+	}
+
+	// Convert rows to map format for easier JSON handling
+	rowMaps := make([]map[string]interface{}, 0, len(rows))
+	for _, row := range rows {
+		rowMap := make(map[string]interface{})
+		for i, col := range columns {
+			if i < len(row) {
+				rowMap[col.Name] = row[i]
+			}
+		}
+		rowMaps = append(rowMaps, rowMap)
+	}
+
+	truncated := len(rows) >= limit
+
+	return &models.QueryExecuteResponse{
+		Columns:     columns,
+		Rows:        rowMaps,
+		RowCount:    len(rows),
+		QueryTimeMs: time.Since(startTime).Milliseconds(),
+		Truncated:   truncated,
+	}, nil
+}
+
+// validateUserQuery checks if the query is safe to execute.
+func (s *QueryService) validateUserQuery(query string) error {
+	if query == "" {
+		return fmt.Errorf("query cannot be empty")
+	}
+
+	// Normalize query for checking
+	upperQuery := strings.ToUpper(strings.TrimSpace(query))
+
+	// Must start with SELECT, WITH, or SHOW
+	validPrefixes := []string{"SELECT", "WITH", "SHOW", "DESCRIBE", "EXPLAIN"}
+	hasValidPrefix := false
+	for _, prefix := range validPrefixes {
+		if strings.HasPrefix(upperQuery, prefix) {
+			hasValidPrefix = true
+			break
+		}
+	}
+	if !hasValidPrefix {
+		return fmt.Errorf("only SELECT, WITH, SHOW, DESCRIBE, and EXPLAIN queries are allowed")
+	}
+
+	// Check for dangerous keywords
+	for _, keyword := range dangerousKeywords {
+		// Check if keyword appears as a word boundary (not part of another word)
+		pattern := fmt.Sprintf(`\b%s\b`, keyword)
+		matched, _ := regexp.MatchString(pattern, upperQuery)
+		if matched {
+			return fmt.Errorf("query contains disallowed keyword: %s", keyword)
+		}
+	}
+
+	return nil
+}
+
+// executeQueryWithColumns executes a query and returns both data and column info.
+func (s *QueryService) executeQueryWithColumns(ctx context.Context, query, catalog, schema string) ([][]interface{}, []models.QueryColumn, error) {
+	url := strings.TrimSuffix(s.cfg.URL, "/") + "/v1/statement"
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, strings.NewReader(query))
+	if err != nil {
+		return nil, nil, err
+	}
+
+	req.Header.Set("Content-Type", "text/plain")
+	user := s.cfg.Username
+	if user == "" {
+		user = "philotes"
+	}
+	req.Header.Set("X-Trino-User", user)
+
+	// Use provided catalog/schema or fall back to config defaults
+	if catalog != "" {
+		req.Header.Set("X-Trino-Catalog", catalog)
+	} else if s.cfg.Catalog != "" {
+		req.Header.Set("X-Trino-Catalog", s.cfg.Catalog)
+	}
+	if schema != "" {
+		req.Header.Set("X-Trino-Schema", schema)
+	} else if s.cfg.Schema != "" {
+		req.Header.Set("X-Trino-Schema", s.cfg.Schema)
+	}
+
+	if s.cfg.Username != "" && s.cfg.Password != "" {
+		req.SetBasicAuth(s.cfg.Username, s.cfg.Password)
+	}
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			return nil, nil, fmt.Errorf("query failed with status %d (failed to read body: %v)", resp.StatusCode, readErr)
+		}
+		return nil, nil, fmt.Errorf("query failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Parse initial response with columns
+	var result struct {
+		ID      string `json:"id"`
+		NextURI string `json:"nextUri"`
+		Columns []struct {
+			Name string `json:"name"`
+			Type string `json:"type"`
+		} `json:"columns"`
+		Data  [][]interface{} `json:"data"`
+		Error *struct {
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, nil, fmt.Errorf("failed to decode query response: %w", err)
+	}
+
+	if result.Error != nil {
+		return nil, nil, fmt.Errorf("query error: %s", result.Error.Message)
+	}
+
+	// Build column info
+	columns := make([]models.QueryColumn, len(result.Columns))
+	for i, col := range result.Columns {
+		columns[i] = models.QueryColumn{
+			Name: col.Name,
+			Type: col.Type,
+		}
+	}
+
+	allData := result.Data
+
+	// Follow nextUri to get all results
+	for result.NextURI != "" {
+		nextReq, err := http.NewRequestWithContext(ctx, http.MethodGet, result.NextURI, http.NoBody)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		if s.cfg.Username != "" && s.cfg.Password != "" {
+			nextReq.SetBasicAuth(s.cfg.Username, s.cfg.Password)
+		}
+
+		nextResp, err := s.httpClient.Do(nextReq)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		if nextResp.StatusCode != http.StatusOK {
+			nextResp.Body.Close()
+			return nil, nil, fmt.Errorf("query continuation failed with status %d", nextResp.StatusCode)
+		}
+
+		// Reset result and decode
+		result.NextURI = ""
+		result.Data = nil
+		if err := json.NewDecoder(nextResp.Body).Decode(&result); err != nil {
+			nextResp.Body.Close()
+			return nil, nil, fmt.Errorf("failed to decode query continuation: %w", err)
+		}
+		nextResp.Body.Close()
+
+		if result.Error != nil {
+			return nil, nil, fmt.Errorf("query error: %s", result.Error.Message)
+		}
+
+		// Update columns if not yet set (they come in the first response with data)
+		if len(columns) == 0 && len(result.Columns) > 0 {
+			columns = make([]models.QueryColumn, len(result.Columns))
+			for i, col := range result.Columns {
+				columns[i] = models.QueryColumn{
+					Name: col.Name,
+					Type: col.Type,
+				}
+			}
+		}
+
+		if result.Data != nil {
+			allData = append(allData, result.Data...)
+		}
+	}
+
+	return allData, columns, nil
 }
