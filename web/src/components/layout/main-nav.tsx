@@ -9,6 +9,7 @@ import {
   Scale,
   Bell,
   Settings,
+  Terminal,
   type LucideIcon,
 } from "lucide-react"
 
@@ -36,6 +37,11 @@ const navItems: NavItem[] = [
     title: "Pipelines",
     href: "/pipelines",
     icon: GitBranch,
+  },
+  {
+    title: "Query",
+    href: "/query",
+    icon: Terminal,
   },
   {
     title: "Scaling",
