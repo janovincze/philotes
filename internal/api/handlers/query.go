@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/janovincze/philotes/internal/api/models"
 	"github.com/janovincze/philotes/internal/api/services"
 )
 
@@ -37,6 +38,7 @@ func (h *QueryHandler) RegisterRoutes(r *gin.RouterGroup) {
 	query.GET("/catalogs/:catalog/schemas", h.ListSchemas)
 	query.GET("/catalogs/:catalog/schemas/:schema/tables", h.ListTables)
 	query.GET("/catalogs/:catalog/schemas/:schema/tables/:table", h.GetTableInfo)
+	query.POST("/execute", h.ExecuteQuery)
 }
 
 // GetStatus godoc
@@ -180,4 +182,44 @@ func (h *QueryHandler) GetTableInfo(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, info)
+}
+
+// ExecuteQuery godoc
+// @Summary Execute a SQL query
+// @Description Executes a user-provided SQL query against Trino and returns the results
+// @Tags query
+// @Accept json
+// @Produce json
+// @Param request body models.QueryExecuteRequest true "Query to execute"
+// @Success 200 {object} models.QueryExecuteResponse
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /query/execute [post]
+func (h *QueryHandler) ExecuteQuery(c *gin.Context) {
+	var req models.QueryExecuteRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		h.logger.Warn("invalid query execute request", "error", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request: " + err.Error()})
+		return
+	}
+
+	h.logger.Info("executing user query",
+		"sql_length", len(req.SQL),
+		"catalog", req.Catalog,
+		"schema", req.Schema,
+		"limit", req.Limit)
+
+	result, err := h.service.ExecuteUserQuery(c.Request.Context(), &req)
+	if err != nil {
+		h.logger.Error("failed to execute query", "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// If there's an error in the result, it's a query-level error (not HTTP error)
+	if result.Error != "" {
+		h.logger.Warn("query execution error", "error", result.Error)
+	}
+
+	c.JSON(http.StatusOK, result)
 }

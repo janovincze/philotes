@@ -121,3 +121,27 @@ type TrinoClusterStats struct {
 	TotalInputBytes  int64   `json:"totalInputBytes"`
 	TotalCPUTimeSecs float64 `json:"totalCpuTimeSecs"`
 }
+
+// QueryExecuteRequest represents a request to execute a SQL query.
+type QueryExecuteRequest struct {
+	SQL     string `json:"sql" binding:"required"`
+	Catalog string `json:"catalog,omitempty"`
+	Schema  string `json:"schema,omitempty"`
+	Limit   int    `json:"limit,omitempty"`
+}
+
+// QueryExecuteResponse represents the response from executing a SQL query.
+type QueryExecuteResponse struct {
+	Columns     []QueryColumn            `json:"columns"`
+	Rows        []map[string]interface{} `json:"rows"`
+	RowCount    int                      `json:"row_count"`
+	QueryTimeMs int64                    `json:"query_time_ms"`
+	Truncated   bool                     `json:"truncated"`
+	Error       string                   `json:"error,omitempty"`
+}
+
+// QueryColumn represents a column in query results.
+type QueryColumn struct {
+	Name string `json:"name"`
+	Type string `json:"type"`
+}

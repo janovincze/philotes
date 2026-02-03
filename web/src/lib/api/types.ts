@@ -791,3 +791,78 @@ export interface OIDCTestResponse {
   success: boolean
   message: string
 }
+
+// Query Execution Types
+
+export interface QueryColumn {
+  name: string
+  type: string
+}
+
+export interface QueryExecuteRequest {
+  sql: string
+  catalog?: string
+  schema?: string
+  limit?: number
+}
+
+export interface QueryExecuteResponse {
+  columns: QueryColumn[]
+  rows: Record<string, unknown>[]
+  row_count: number
+  query_time_ms: number
+  truncated: boolean
+  error?: string
+}
+
+export interface TrinoCatalog {
+  name: string
+  connector_name?: string
+}
+
+export interface CatalogListResponse {
+  catalogs: TrinoCatalog[]
+  total: number
+}
+
+export interface TrinoSchema {
+  name: string
+  catalog: string
+}
+
+export interface SchemaListResponse {
+  schemas: TrinoSchema[]
+  catalog: string
+  total: number
+}
+
+export interface TrinoTable {
+  name: string
+  schema: string
+  catalog: string
+  type?: string
+}
+
+export interface TableListResponse {
+  tables: TrinoTable[]
+  catalog: string
+  schema: string
+  total: number
+}
+
+export interface TrinoColumn {
+  name: string
+  type: string
+  nullable: boolean
+  comment?: string
+}
+
+export interface TableInfoResponse {
+  name: string
+  schema: string
+  catalog: string
+  type: string
+  columns: TrinoColumn[]
+  comment?: string
+  properties?: Record<string, string>
+}
