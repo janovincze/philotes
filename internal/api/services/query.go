@@ -526,7 +526,10 @@ func (s *QueryService) validateUserQuery(query string) error {
 	for _, keyword := range dangerousKeywords {
 		// Check if keyword appears as a word boundary (not part of another word)
 		pattern := fmt.Sprintf(`\b%s\b`, keyword)
-		matched, _ := regexp.MatchString(pattern, upperQuery)
+		matched, err := regexp.MatchString(pattern, upperQuery)
+		if err != nil {
+			return fmt.Errorf("invalid regex pattern for keyword %s: %w", keyword, err)
+		}
 		if matched {
 			return fmt.Errorf("query contains disallowed keyword: %s", keyword)
 		}
