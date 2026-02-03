@@ -849,3 +849,20 @@ export interface TableListResponse {
   schema: string
   total: number
 }
+
+export interface TrinoColumn {
+  name: string
+  type: string
+  nullable: boolean
+  comment?: string
+}
+
+export interface TableInfoResponse {
+  name: string
+  schema: string
+  catalog: string
+  type: string
+  columns: TrinoColumn[]
+  comment?: string
+  properties?: Record<string, string>
+}

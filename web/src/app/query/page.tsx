@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useMemo } from "react"
 import { Play, AlertCircle, Clock, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -8,12 +8,29 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { SqlEditor } from "@/components/query/sql-editor"
 import { ResultsTable } from "@/components/query/results-table"
 import { QueryTemplates } from "@/components/query/query-templates"
-import { useQueryExecute } from "@/lib/hooks/use-query"
+import { QueryHistory, type QueryHistoryEntry } from "@/components/query/query-history"
+import { useQueryExecute, useAutoCompleteMetadata } from "@/lib/hooks/use-query"
 import type { QueryColumn } from "@/lib/api/types"
 
 const DEFAULT_QUERY = `-- Write your SQL query here
 -- Press Ctrl+Enter to execute
 SELECT * FROM iceberg.public.customers LIMIT 10`
+
+// Parse error messages to extract line/column information
+function parseErrorLocation(error: string): { line: number; column: number; message: string } | null {
+  // Common Trino error patterns:
+  // "line 1:15: Column 'foo' cannot be resolved"
+  // "Query failed (#20240101_123456_00001_xxxxx): line 2:10: ..."
+  const lineColMatch = error.match(/line\s+(\d+):(\d+):\s*(.+)/i)
+  if (lineColMatch) {
+    return {
+      line: parseInt(lineColMatch[1], 10),
+      column: parseInt(lineColMatch[2], 10),
+      message: lineColMatch[3],
+    }
+  }
+  return null
+}
 
 export default function QueryPage() {
   const [sql, setSql] = useState(DEFAULT_QUERY)
@@ -22,11 +39,34 @@ export default function QueryPage() {
   const [queryTime, setQueryTime] = useState<number | null>(null)
   const [truncated, setTruncated] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [queryHistory, setQueryHistory] = useState<QueryHistoryEntry[]>([])
 
   const queryMutation = useQueryExecute()
+  const metadata = useAutoCompleteMetadata()
+
+  // Parse error for editor highlighting
+  const errorMarker = useMemo(() => {
+    if (!error) return null
+    return parseErrorLocation(error)
+  }, [error])
+
+  const addToHistory = useCallback((entry: Omit<QueryHistoryEntry, "id">) => {
+    setQueryHistory((prev) => {
+      const newEntry: QueryHistoryEntry = {
+        ...entry,
+        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      }
+      // Keep only last 20 queries
+      return [newEntry, ...prev].slice(0, 20)
+    })
+  }, [])
 
   const handleExecute = useCallback(() => {
     if (!sql.trim()) return
+
+    // Clear any comment-only lines for validation
+    const cleanedSql = sql.replace(/--.*$/gm, "").trim()
+    if (!cleanedSql) return
 
     setError(null)
     setColumns([])
@@ -40,22 +80,49 @@ export default function QueryPage() {
         onSuccess: (data) => {
           if (data.error) {
             setError(data.error)
+            addToHistory({
+              sql,
+              executedAt: new Date(),
+              error: data.error,
+            })
           } else {
             setColumns(data.columns || [])
             setRows(data.rows || [])
             setQueryTime(data.query_time_ms)
             setTruncated(data.truncated)
+            addToHistory({
+              sql,
+              executedAt: new Date(),
+              durationMs: data.query_time_ms,
+              rowCount: data.row_count,
+            })
           }
         },
         onError: (err) => {
-          setError(err instanceof Error ? err.message : "Query execution failed")
+          const errorMsg = err instanceof Error ? err.message : "Query execution failed"
+          setError(errorMsg)
+          addToHistory({
+            sql,
+            executedAt: new Date(),
+            error: errorMsg,
+          })
         },
       }
     )
-  }, [sql, queryMutation])
+  }, [sql, queryMutation, addToHistory])
 
   const handleTemplateSelect = useCallback((templateSql: string) => {
     setSql(templateSql)
+    setError(null)
+  }, [])
+
+  const handleHistorySelect = useCallback((historySql: string) => {
+    setSql(historySql)
+    setError(null)
+  }, [])
+
+  const handleClearHistory = useCallback(() => {
+    setQueryHistory([])
   }, [])
 
   const handleClear = useCallback(() => {
@@ -90,6 +157,11 @@ export default function QueryPage() {
                 </CardDescription>
               </div>
               <div className="flex items-center gap-2">
+                <QueryHistory
+                  history={queryHistory}
+                  onSelect={handleHistorySelect}
+                  onClear={handleClearHistory}
+                />
                 <QueryTemplates onSelect={handleTemplateSelect} />
                 <Button
                   variant="outline"
@@ -118,6 +190,8 @@ export default function QueryPage() {
               onExecute={handleExecute}
               disabled={queryMutation.isPending}
               height="200px"
+              metadata={metadata}
+              errorMarker={errorMarker}
             />
           </CardContent>
         </Card>
