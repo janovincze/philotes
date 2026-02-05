@@ -67,10 +67,12 @@ func (h *ProxyHandler) HandleWebSocket(c *gin.Context) {
 				h.cfg.Logger.Debug("upstream response", "status", resp.StatusCode, "body", string(body))
 			}
 		}
-		_ = clientConn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(
+		if writeErr := clientConn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(
 			websocket.CloseInternalServerErr,
 			"Failed to connect to Dagster",
-		))
+		)); writeErr != nil {
+			h.cfg.Logger.Debug("failed to send close message to client", "error", writeErr)
+		}
 		return
 	}
 	defer upstreamConn.Close()
