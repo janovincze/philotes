@@ -244,6 +244,78 @@ services:
       vault kv list secret/philotes/;
       "
 
+  # =========================================================================
+  # Dagster - Data orchestration platform
+  # =========================================================================
+
+  # Dagster PostgreSQL - Metadata database for Dagster
+  dagster-postgres:
+    image: postgres:16-alpine
+    container_name: philotes-dagster-postgres
+    environment:
+      POSTGRES_USER: dagster
+      POSTGRES_PASSWORD: dagster
+      POSTGRES_DB: dagster
+    volumes:
+      - dagster_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dagster -d dagster"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Dagster Webserver - UI and API
+  dagster-webserver:
+    image: dagster/dagster-webserver:latest
+    container_name: philotes-dagster-webserver
+    ports:
+      - "3001:3000"
+    environment:
+      DAGSTER_HOME: /opt/dagster/dagster_home
+      # Philotes connection (for dagster-philotes package)
+      PHILOTES_API_URL: http://philotes-api:8080
+      PHILOTES_API_KEY: ""
+    volumes:
+      - ./dagster/dagster.yaml:/opt/dagster/dagster_home/dagster.yaml:ro
+      - ./dagster/workspace.yaml:/opt/dagster/dagster_home/workspace.yaml:ro
+      - ../../dagster-philotes:/opt/dagster/app:ro
+      - dagster_compute_logs:/opt/dagster/dagster_home/compute_logs
+      - dagster_artifacts:/opt/dagster/dagster_home/artifacts
+    working_dir: /opt/dagster/app
+    command: >
+      sh -c "pip install -e /opt/dagster/app && dagster-webserver -h 0.0.0.0 -p 3000"
+    depends_on:
+      dagster-postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/server_info"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # Dagster Daemon - Schedules, sensors, and run queue
+  dagster-daemon:
+    image: dagster/dagster-daemon:latest
+    container_name: philotes-dagster-daemon
+    environment:
+      DAGSTER_HOME: /opt/dagster/dagster_home
+      PHILOTES_API_URL: http://philotes-api:8080
+      PHILOTES_API_KEY: ""
+    volumes:
+      - ./dagster/dagster.yaml:/opt/dagster/dagster_home/dagster.yaml:ro
+      - ./dagster/workspace.yaml:/opt/dagster/dagster_home/workspace.yaml:ro
+      - ../../dagster-philotes:/opt/dagster/app:ro
+      - dagster_compute_logs:/opt/dagster/dagster_home/compute_logs
+      - dagster_artifacts:/opt/dagster/dagster_home/artifacts
+    working_dir: /opt/dagster/app
+    command: >
+      sh -c "pip install -e /opt/dagster/app && dagster-daemon run"
+    depends_on:
+      dagster-postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   postgres_source_data:
@@ -251,6 +323,9 @@ volumes:
   prometheus_data:
   grafana_data:
   vault_data:
+  dagster_postgres_data:
+  dagster_compute_logs:
+  dagster_artifacts:
 
 networks:
   default:
