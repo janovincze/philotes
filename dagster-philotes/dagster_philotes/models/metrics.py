@@ -10,7 +10,9 @@ from dagster_philotes.models.pipeline import PipelineStatus
 class TableMetrics(BaseModel):
     """Metrics for a single table in a pipeline."""
 
-    schema_name: str = Field(alias="schema", description="Schema name")
+    # Note: Using 'schema' directly as field name (valid in Pydantic v2)
+    # This matches the JSON key from the Philotes API response
+    schema: str = Field(description="Database schema name")
     table: str = Field(description="Table name")
     events_processed: int = Field(default=0, description="Total events processed")
     lag_seconds: float = Field(default=0.0, description="Replication lag in seconds")
@@ -18,12 +20,10 @@ class TableMetrics(BaseModel):
         default=None, description="Timestamp of last event"
     )
 
-    model_config = {"populate_by_name": True}
-
     @property
     def full_name(self) -> str:
         """Get fully qualified table name."""
-        return f"{self.schema_name}.{self.table}"
+        return f"{self.schema}.{self.table}"
 
 
 class PipelineMetrics(BaseModel):

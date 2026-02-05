@@ -177,7 +177,7 @@ def philotes_table_asset(
         # Find table-specific metrics
         table_metrics = None
         for tm in metrics.tables:
-            if tm.schema_name == schema_name and tm.table == table_name:
+            if tm.schema == schema_name and tm.table == table_name:
                 table_metrics = tm
                 break
 
