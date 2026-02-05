@@ -113,6 +113,7 @@ func main() {
 	userRepo := repositories.NewUserRepository(db)
 	apiKeyRepo := repositories.NewAPIKeyRepository(db)
 	auditRepo := repositories.NewAuditRepository(db)
+	dagsterRBACRepo := repositories.NewDagsterRBACRepository(db)
 
 	// Create services
 	sourceService := services.NewSourceService(sourceRepo, logger)
@@ -163,13 +164,14 @@ func main() {
 
 	// Create server configuration
 	serverCfg := api.ServerConfig{
-		Config:          cfg,
-		Logger:          logger,
-		HealthManager:   healthManager,
-		SourceService:   sourceService,
-		PipelineService: pipelineService,
-		AuthService:     authService,
-		APIKeyService:   apiKeyService,
+		Config:                cfg,
+		Logger:                logger,
+		HealthManager:         healthManager,
+		SourceService:         sourceService,
+		PipelineService:       pipelineService,
+		AuthService:           authService,
+		APIKeyService:         apiKeyService,
+		DagsterRBACRepository: dagsterRBACRepo,
 		CORSConfig: middleware.CORSConfig{
 			AllowedOrigins:   cfg.API.CORSOrigins,
 			AllowCredentials: false,

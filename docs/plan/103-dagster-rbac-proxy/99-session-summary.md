@@ -9,9 +9,11 @@
 - [x] Plan approved
 - [x] Implementation complete
 - [x] Tests passing
+- [x] Dashboard UI for managing Dagster permissions
 
 ## Files Created
 
+### Core Proxy
 | File | Purpose |
 |------|---------|
 | `cmd/philotes-dagster-proxy/main.go` | Service entry point |
@@ -33,6 +35,19 @@
 | `deployments/docker/Dockerfile.dagster-proxy` | Docker build file |
 | `deployments/docker/init-scripts/04-dagster-rbac-schema.sql` | Database schema |
 
+### API Endpoints (for Dashboard)
+| File | Purpose |
+|------|---------|
+| `internal/api/repositories/dagster_rbac.go` | Repository for Dagster RBAC CRUD operations |
+| `internal/api/handlers/dagster_rbac.go` | REST API handlers for Dagster RBAC management |
+
+### Dashboard UI
+| File | Purpose |
+|------|---------|
+| `web/src/lib/api/dagster-rbac.ts` | API client for Dagster RBAC endpoints |
+| `web/src/lib/hooks/use-dagster-rbac.ts` | React hook for Dagster RBAC state management |
+| `web/src/app/settings/page.tsx` | Settings page with Dagster RBAC management UI |
+
 ## Files Modified
 
 | File | Changes |
@@ -40,6 +55,11 @@
 | `deployments/docker/docker-compose.yml` | Added dagster-proxy service |
 | `Makefile` | Added build-dagster-proxy target |
 | `go.mod` / `go.sum` | Added github.com/vektah/gqlparser/v2 dependency |
+| `internal/api/server.go` | Added DagsterRBACRepository and route registration |
+| `cmd/philotes-api/main.go` | Initialize DagsterRBACRepository |
+| `internal/api/models/auth.go` | Added Dagster RBAC models |
+| `web/src/lib/api/types.ts` | Added Dagster RBAC TypeScript types |
+| `web/src/lib/api/index.ts` | Export dagsterRbacApi |
 
 ## Features Implemented
 
@@ -67,6 +87,23 @@
 - [x] Allowed/denied tracking
 - [x] Integration with existing AuditRepository
 
+### API Endpoints
+- [x] GET /api/v1/users/:id/dagster-permissions - Get user's Dagster permissions
+- [x] POST /api/v1/users/:id/dagster-roles - Assign a Dagster role to user
+- [x] POST /api/v1/users/:id/dagster-permissions - Add custom permission
+- [x] DELETE /api/v1/dagster-roles/:id - Remove role assignment
+- [x] DELETE /api/v1/dagster-permissions/:id - Remove custom permission
+- [x] GET /api/v1/dagster-roles - List all role assignments (admin)
+- [x] GET /api/v1/dagster-roles/available - Get available roles info
+
+### Dashboard UI
+- [x] Settings page with Dagster RBAC tab
+- [x] Role info cards showing available roles and their permissions
+- [x] Role assignments table with user email/name
+- [x] Dialog to assign new roles with resource pattern support
+- [x] Remove role functionality
+- [x] Permission format documentation
+
 ## Verification
 
 ```bash
@@ -78,6 +115,9 @@ go test ./internal/dagster-proxy/... -v  # ✓ All 30+ tests pass
 
 # Full build
 make build  # ✓ All binaries build
+
+# Frontend build
+cd web && npm run build  # ✓ Builds successfully
 ```
 
 ## Docker Integration
@@ -124,10 +164,12 @@ dagster:*:*:*  # Full access
 3. Response filtering ensures users only see authorized resources
 4. All actions are audit logged for compliance
 5. The permission model covers ~95% of Dagster+ RBAC features
+6. Dashboard UI provides admin interface for managing user roles
 
 ## Next Steps (Future Enhancements)
 
-- Dashboard UI for managing Dagster permissions
+- ~~Dashboard UI for managing Dagster permissions~~ ✓ Completed
 - Multi-tenancy support (shared vs. isolated instances)
 - Code location-level permissions
 - Permission inheritance from Philotes pipeline permissions
+- User selection dropdown in assign role dialog (requires user list API)
