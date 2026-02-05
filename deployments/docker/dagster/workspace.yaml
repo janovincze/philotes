@@ -1,0 +1,9 @@
+# Dagster workspace configuration
+# https://docs.dagster.io/concepts/code-locations/workspace-files
+
+load_from:
+  # Load code from the dagster-philotes package
+  - python_package:
+      package_name: dagster_philotes.examples.definitions
+      location_name: philotes_examples
+      attribute: defs
