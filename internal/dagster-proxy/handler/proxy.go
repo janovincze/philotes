@@ -54,7 +54,7 @@ func NewProxyHandler(cfg ProxyConfig) *ProxyHandler {
 		cfg.Logger.Error("proxy error", "error", err, "path", r.URL.Path)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadGateway)
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"errors": []map[string]interface{}{
 				{
 					"message":    "Failed to connect to Dagster",
@@ -204,7 +204,7 @@ func (h *ProxyHandler) proxyRequest(c *gin.Context, body []byte, transform func(
 	// Write response
 	c.Writer.Header().Set("Content-Length", string(rune(len(transformedBody))))
 	c.Writer.WriteHeader(resp.StatusCode)
-	c.Writer.Write(transformedBody)
+	_, _ = c.Writer.Write(transformedBody)
 }
 
 // checkMutationPermissions checks if the user can perform the mutation.

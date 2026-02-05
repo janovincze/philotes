@@ -104,7 +104,7 @@ func (r *DagsterRBACRepository) GetUserPermissions(ctx context.Context, userID u
 }
 
 // AssignRole assigns a Dagster role to a user.
-func (r *DagsterRBACRepository) AssignRole(ctx context.Context, userID uuid.UUID, role string, resourcePattern string) (*models.DagsterRoleAssignment, error) {
+func (r *DagsterRBACRepository) AssignRole(ctx context.Context, userID uuid.UUID, role, resourcePattern string) (*models.DagsterRoleAssignment, error) {
 	query := `
 		INSERT INTO dagster_role_assignments (user_id, role, resource_pattern)
 		VALUES ($1, $2, NULLIF($3, ''))
@@ -220,8 +220,10 @@ func (r *DagsterRBACRepository) GetAllEffectivePermissions(ctx context.Context, 
 		for _, p := range rolePerms {
 			// Apply resource pattern if specified
 			if role.ResourcePattern != "" {
-				// For now, we just add the role permissions as-is
-				// Resource patterns are for scoped roles (future enhancement)
+				// TODO: Implement resource pattern filtering for scoped roles.
+				// For now, we just add the role permissions as-is.
+				// Resource patterns will be used in a future enhancement
+				// to scope permissions to specific resources.
 			}
 			permSet[p] = true
 		}

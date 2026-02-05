@@ -9,8 +9,8 @@ import (
 	"github.com/vektah/gqlparser/v2/parser"
 )
 
-// GraphQLRequest represents an incoming GraphQL request.
-type GraphQLRequest struct {
+// Request represents an incoming GraphQL request.
+type Request struct {
 	Query         string                 `json:"query"`
 	OperationName string                 `json:"operationName"`
 	Variables     map[string]interface{} `json:"variables"`
@@ -44,7 +44,7 @@ func NewParser() *Parser {
 // Parse parses a GraphQL request body and returns the parsed operation.
 func (p *Parser) Parse(body []byte) (*ParsedOperation, error) {
 	// Parse JSON request
-	var req GraphQLRequest
+	var req Request
 	if err := json.Unmarshal(body, &req); err != nil {
 		return nil, fmt.Errorf("failed to parse request body: %w", err)
 	}
@@ -191,7 +191,7 @@ func toOperationType(op ast.Operation) OperationType {
 
 // GetTopLevelFields returns the names of top-level fields in the operation.
 func (p *ParsedOperation) GetTopLevelFields() []string {
-	var names []string
+	names := make([]string, 0, len(p.Fields))
 	for _, f := range p.Fields {
 		names = append(names, f.Name)
 	}

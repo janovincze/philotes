@@ -31,7 +31,7 @@ func ExtractResources(op *ParsedOperation) []auth.ResourceRef {
 
 // extractMutationResources extracts resources from mutation operations.
 func extractMutationResources(op *ParsedOperation) []auth.ResourceRef {
-	var resources []auth.ResourceRef
+	resources := make([]auth.ResourceRef, 0, len(op.Fields))
 
 	for _, field := range op.Fields {
 		// Skip introspection fields
@@ -65,7 +65,7 @@ func extractMutationResources(op *ParsedOperation) []auth.ResourceRef {
 
 // extractQueryResources extracts resources from query operations.
 func extractQueryResources(op *ParsedOperation) []auth.ResourceRef {
-	var resources []auth.ResourceRef
+	resources := make([]auth.ResourceRef, 0, len(op.Fields))
 
 	for _, field := range op.Fields {
 		// Skip introspection fields

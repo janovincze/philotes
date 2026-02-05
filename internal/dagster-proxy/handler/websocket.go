@@ -4,7 +4,6 @@ package handler
 import (
 	"io"
 	"net/http"
-	"net/url"
 	"sync"
 
 	"github.com/gin-gonic/gin"
@@ -62,11 +61,13 @@ func (h *ProxyHandler) HandleWebSocket(c *gin.Context) {
 			"url", upstreamURL,
 		)
 		if resp != nil {
-			body, _ := io.ReadAll(resp.Body)
+			body, readErr := io.ReadAll(resp.Body)
 			resp.Body.Close()
-			h.cfg.Logger.Debug("upstream response", "status", resp.StatusCode, "body", string(body))
+			if readErr == nil {
+				h.cfg.Logger.Debug("upstream response", "status", resp.StatusCode, "body", string(body))
+			}
 		}
-		clientConn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(
+		_ = clientConn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(
 			websocket.CloseInternalServerErr,
 			"Failed to connect to Dagster",
 		))
@@ -180,21 +181,4 @@ func (h *ProxyHandler) proxyMessages(src, dst *websocket.Conn, direction string,
 			return
 		}
 	}
-}
-
-// parseWebSocketURL parses a URL and converts to WebSocket scheme.
-func parseWebSocketURL(rawURL string) (*url.URL, error) {
-	u, err := url.Parse(rawURL)
-	if err != nil {
-		return nil, err
-	}
-
-	switch u.Scheme {
-	case "http":
-		u.Scheme = "ws"
-	case "https":
-		u.Scheme = "wss"
-	}
-
-	return u, nil
 }

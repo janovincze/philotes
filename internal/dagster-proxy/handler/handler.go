@@ -92,16 +92,13 @@ func (s *Server) setupRoutes() {
 
 	// GraphQL proxy endpoint
 	graphql := s.router.Group("/graphql")
-	{
-		// Add auth middleware if enabled
-		if s.cfg.AuthEnabled {
-			graphql.Use(s.authMiddleware())
-		}
-
-		// Handle both GET (WebSocket upgrade) and POST (GraphQL)
-		graphql.GET("", s.proxy.HandleWebSocket)
-		graphql.POST("", s.proxy.HandleHTTP)
+	// Add auth middleware if enabled
+	if s.cfg.AuthEnabled {
+		graphql.Use(s.authMiddleware())
 	}
+	// Handle both GET (WebSocket upgrade) and POST (GraphQL)
+	graphql.GET("", s.proxy.HandleWebSocket)
+	graphql.POST("", s.proxy.HandleHTTP)
 
 	// Proxy all other requests to Dagster (static assets, etc.)
 	s.router.NoRoute(s.proxy.HandlePassthrough)

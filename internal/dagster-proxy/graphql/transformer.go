@@ -43,12 +43,6 @@ func TransformResponse(
 			continue
 		}
 
-		// Get the response field
-		responseField := queryOp.ResponseField
-		if responseField == "" {
-			responseField = field.Name
-		}
-
 		// Handle aliased fields
 		fieldKey := field.Name
 		if field.Alias != "" {
@@ -103,7 +97,10 @@ func filterMapResponse(
 	checker *auth.PermissionChecker,
 ) map[string]interface{} {
 	// Check __typename to determine structure
-	typename, _ := data["__typename"].(string)
+	typename, ok := data["__typename"].(string)
+	if !ok {
+		typename = ""
+	}
 
 	switch typename {
 	case "Jobs", "Pipelines":
@@ -260,8 +257,8 @@ func getResourceName(resource map[string]interface{}, resourceType auth.Resource
 		}
 
 	case auth.ResourceTypeRun:
-		if runId, ok := resource["runId"].(string); ok {
-			return runId
+		if runID, ok := resource["runId"].(string); ok {
+			return runID
 		}
 		if id, ok := resource["id"].(string); ok {
 			return id

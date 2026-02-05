@@ -329,10 +329,10 @@ type DagsterPermission struct {
 
 // DagsterUserPermissions represents all Dagster permissions for a user.
 type DagsterUserPermissions struct {
-	UserID              uuid.UUID               `json:"user_id"`
-	Roles               []DagsterRoleAssignment `json:"roles"`
-	CustomPermissions   []DagsterPermission     `json:"custom_permissions"`
-	EffectivePermissions []string               `json:"effective_permissions"`
+	UserID               uuid.UUID               `json:"user_id"`
+	Roles                []DagsterRoleAssignment `json:"roles"`
+	CustomPermissions    []DagsterPermission     `json:"custom_permissions"`
+	EffectivePermissions []string                `json:"effective_permissions"`
 }
 
 // AssignDagsterRoleRequest represents a request to assign a Dagster role.

@@ -125,10 +125,10 @@ func (h *DagsterRBACHandler) AssignRole(c *gin.Context) {
 	}
 
 	var req models.AssignDagsterRoleRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if bindErr := c.ShouldBindJSON(&req); bindErr != nil {
 		models.RespondWithError(c, models.NewBadRequestError(
 			c.Request.URL.Path,
-			"invalid request body: "+err.Error(),
+			"invalid request body: "+bindErr.Error(),
 		))
 		return
 	}
@@ -256,10 +256,10 @@ func (h *DagsterRBACHandler) AddPermission(c *gin.Context) {
 	}
 
 	var req models.AddDagsterPermissionRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if bindErr := c.ShouldBindJSON(&req); bindErr != nil {
 		models.RespondWithError(c, models.NewBadRequestError(
 			c.Request.URL.Path,
-			"invalid request body: "+err.Error(),
+			"invalid request body: "+bindErr.Error(),
 		))
 		return
 	}

@@ -1,7 +1,6 @@
 package graphql
 
 import (
-	"encoding/json"
 	"testing"
 )
 
@@ -16,29 +15,29 @@ func TestParseRequest(t *testing.T) {
 		wantErr  bool
 	}{
 		{
-			name: "simple query",
-			body: `{"query": "query GetJobs { jobsOrError { __typename } }"}`,
+			name:     "simple query",
+			body:     `{"query": "query GetJobs { jobsOrError { __typename } }"}`,
 			wantType: OperationQuery,
 			wantName: "GetJobs",
 			wantErr:  false,
 		},
 		{
-			name: "mutation",
-			body: `{"query": "mutation LaunchRun { launchRun(executionParams: {}) { __typename } }"}`,
+			name:     "mutation",
+			body:     `{"query": "mutation LaunchRun { launchRun(executionParams: {}) { __typename } }"}`,
 			wantType: OperationMutation,
 			wantName: "LaunchRun",
 			wantErr:  false,
 		},
 		{
-			name: "anonymous query",
-			body: `{"query": "{ jobsOrError { __typename } }"}`,
+			name:     "anonymous query",
+			body:     `{"query": "{ jobsOrError { __typename } }"}`,
 			wantType: OperationQuery,
 			wantName: "",
 			wantErr:  false,
 		},
 		{
-			name: "with operation name",
-			body: `{"query": "query A { a } query B { b }", "operationName": "B"}`,
+			name:     "with operation name",
+			body:     `{"query": "query A { a } query B { b }", "operationName": "B"}`,
 			wantType: OperationQuery,
 			wantName: "B",
 			wantErr:  false,
@@ -268,16 +267,8 @@ func BenchmarkParse(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = parser.Parse(body)
+		if _, err := parser.Parse(body); err != nil {
+			b.Fatalf("Parse() error = %v", err)
+		}
 	}
-}
-
-// Helper to create request body
-func makeRequestBody(query string, variables map[string]interface{}) []byte {
-	req := GraphQLRequest{
-		Query:     query,
-		Variables: variables,
-	}
-	body, _ := json.Marshal(req)
-	return body
 }

@@ -69,11 +69,13 @@ func main() {
 
 	// Verify database connection
 	dbCtx, dbCancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer dbCancel()
 	if err := db.PingContext(dbCtx); err != nil {
+		dbCancel()
+		db.Close()
 		logger.Error("failed to connect to database", "error", err)
 		os.Exit(1)
 	}
+	dbCancel()
 	logger.Info("database connection established")
 
 	// Create repositories
@@ -161,7 +163,6 @@ func main() {
 
 	if err := server.Stop(shutdownCtx); err != nil {
 		logger.Error("failed to stop server gracefully", "error", err)
-		os.Exit(1)
 	}
 
 	logger.Info("server stopped")
