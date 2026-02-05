@@ -16,6 +16,7 @@ GOLINT=golangci-lint
 BINARY_WORKER=philotes-worker
 BINARY_API=philotes-api
 BINARY_CLI=philotes
+BINARY_DAGSTER_PROXY=philotes-dagster-proxy
 
 # Build directories
 BUILD_DIR=./bin
@@ -43,7 +44,7 @@ help:
 	@sed -n 's/^##//p' $(MAKEFILE_LIST) | column -t -s ':' | sed -e 's/^/ /'
 
 ## build: Build all binaries
-build: build-worker build-api build-cli
+build: build-worker build-api build-cli build-dagster-proxy
 
 ## build-worker: Build the CDC worker
 build-worker:
@@ -62,6 +63,12 @@ build-cli:
 	@echo "Building $(BINARY_CLI)..."
 	@mkdir -p $(BUILD_DIR)
 	$(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_CLI) $(CMD_DIR)/philotes-cli
+
+## build-dagster-proxy: Build the Dagster RBAC proxy
+build-dagster-proxy:
+	@echo "Building $(BINARY_DAGSTER_PROXY)..."
+	@mkdir -p $(BUILD_DIR)
+	$(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_DAGSTER_PROXY) $(CMD_DIR)/philotes-dagster-proxy
 
 ## test: Run all tests
 test:
