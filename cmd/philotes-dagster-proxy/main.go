@@ -61,7 +61,6 @@ func main() {
 		logger.Error("failed to open database connection", "error", err)
 		os.Exit(1)
 	}
-	defer db.Close()
 
 	// Configure connection pool
 	db.SetMaxOpenConns(proxyCfg.Database.MaxOpenConn)
@@ -76,6 +75,7 @@ func main() {
 		os.Exit(1)
 	}
 	dbCancel()
+	defer db.Close()
 	logger.Info("database connection established")
 
 	// Create repositories

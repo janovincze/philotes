@@ -215,16 +215,12 @@ func (r *DagsterRBACRepository) GetAllEffectivePermissions(ctx context.Context, 
 	permSet := make(map[string]bool)
 
 	// Expand roles to permissions
+	// TODO: Implement resource pattern filtering for scoped roles.
+	// Currently, resource patterns are stored but not applied during permission expansion.
+	// Future enhancement will scope permissions to specific resources based on patterns.
 	for _, role := range roles {
 		rolePerms := expandRolePermissions(role.Role)
 		for _, p := range rolePerms {
-			// Apply resource pattern if specified
-			if role.ResourcePattern != "" {
-				// TODO: Implement resource pattern filtering for scoped roles.
-				// For now, we just add the role permissions as-is.
-				// Resource patterns will be used in a future enhancement
-				// to scope permissions to specific resources.
-			}
 			permSet[p] = true
 		}
 	}
