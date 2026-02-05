@@ -12,25 +12,26 @@ storage:
       port: 5432
 
 # Run launcher - use default process launcher for local dev
+# Using public API module path (dagster 1.6+)
 run_launcher:
-  module: dagster.core.launcher
+  module: dagster._core.launcher
   class: DefaultRunLauncher
 
 # Run coordinator - use default queued run coordinator
 run_coordinator:
-  module: dagster.core.run_coordinator
+  module: dagster._core.run_coordinator
   class: QueuedRunCoordinator
 
 # Compute log manager - store logs locally
 compute_logs:
-  module: dagster.core.storage.local_compute_log_manager
+  module: dagster._core.storage.local_compute_log_manager
   class: LocalComputeLogManager
   config:
     base_dir: /opt/dagster/dagster_home/compute_logs
 
 # Local artifact storage
 local_artifact_storage:
-  module: dagster.core.storage.root
+  module: dagster._core.storage.root
   class: LocalArtifactStorage
   config:
     base_dir: /opt/dagster/dagster_home/artifacts

@@ -229,7 +229,7 @@ services:
   # ... existing services ...
 
   dagster-webserver:
-    image: dagster/dagster-webserver:latest
+    image: dagster/dagster-webserver:1.9.6
     ports:
       - "3001:3000"
     environment:
@@ -247,7 +247,7 @@ services:
       - philotes-network
 
   dagster-daemon:
-    image: dagster/dagster-daemon:latest
+    image: dagster/dagster-daemon:1.9.6
     environment:
       DAGSTER_HOME: /opt/dagster/dagster_home
       PHILOTES_API_URL: http://philotes-api:8080

@@ -266,7 +266,7 @@ services:
 
   # Dagster Webserver - UI and API
   dagster-webserver:
-    image: dagster/dagster-webserver:latest
+    image: dagster/dagster-webserver:1.9.6
     container_name: philotes-dagster-webserver
     ports:
       - "3001:3000"
@@ -296,7 +296,7 @@ services:
 
   # Dagster Daemon - Schedules, sensors, and run queue
   dagster-daemon:
-    image: dagster/dagster-daemon:latest
+    image: dagster/dagster-daemon:1.9.6
     container_name: philotes-dagster-daemon
     environment:
       DAGSTER_HOME: /opt/dagster/dagster_home
