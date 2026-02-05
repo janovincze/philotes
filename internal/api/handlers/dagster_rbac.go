@@ -4,6 +4,7 @@ package handlers
 import (
 	"errors"
 	"net/http"
+	"regexp"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -13,14 +14,19 @@ import (
 	"github.com/janovincze/philotes/internal/api/repositories"
 )
 
+// resourcePatternRegex validates resource patterns for Dagster RBAC.
+// Allows alphanumeric, underscores, hyphens, slashes, and wildcards.
+var resourcePatternRegex = regexp.MustCompile(`^[a-zA-Z0-9_\-/*]+$`)
+
 // DagsterRBACHandler handles Dagster RBAC-related HTTP requests.
 type DagsterRBACHandler struct {
-	repo *repositories.DagsterRBACRepository
+	repo     *repositories.DagsterRBACRepository
+	userRepo *repositories.UserRepository
 }
 
 // NewDagsterRBACHandler creates a new DagsterRBACHandler.
-func NewDagsterRBACHandler(repo *repositories.DagsterRBACRepository) *DagsterRBACHandler {
-	return &DagsterRBACHandler{repo: repo}
+func NewDagsterRBACHandler(repo *repositories.DagsterRBACRepository, userRepo *repositories.UserRepository) *DagsterRBACHandler {
+	return &DagsterRBACHandler{repo: repo, userRepo: userRepo}
 }
 
 // GetUserPermissions returns all Dagster permissions for a user.
@@ -136,6 +142,38 @@ func (h *DagsterRBACHandler) AssignRole(c *gin.Context) {
 		return
 	}
 
+	// Validate resource pattern if provided
+	if req.ResourcePattern != "" {
+		if len(req.ResourcePattern) > 255 {
+			models.RespondWithError(c, models.NewBadRequestError(
+				c.Request.URL.Path,
+				"resource pattern too long (max 255 characters)",
+			))
+			return
+		}
+		if !resourcePatternRegex.MatchString(req.ResourcePattern) {
+			models.RespondWithError(c, models.NewBadRequestError(
+				c.Request.URL.Path,
+				"invalid resource pattern: only alphanumeric, underscore, hyphen, slash, and wildcard (*) allowed",
+			))
+			return
+		}
+	}
+
+	// Verify user exists
+	_, err = h.userRepo.GetByID(c.Request.Context(), userID)
+	if err != nil {
+		if errors.Is(err, repositories.ErrUserNotFound) {
+			models.RespondWithError(c, models.NewNotFoundError(
+				c.Request.URL.Path,
+				"user not found",
+			))
+			return
+		}
+		h.respondWithError(c, err)
+		return
+	}
+
 	assignment, err := h.repo.AssignRole(c.Request.Context(), userID, req.Role, req.ResourcePattern)
 	if err != nil {
 		h.respondWithError(c, err)
@@ -232,6 +270,20 @@ func (h *DagsterRBACHandler) AddPermission(c *gin.Context) {
 			c.Request.URL.Path,
 			errs,
 		))
+		return
+	}
+
+	// Verify user exists
+	_, err = h.userRepo.GetByID(c.Request.Context(), userID)
+	if err != nil {
+		if errors.Is(err, repositories.ErrUserNotFound) {
+			models.RespondWithError(c, models.NewNotFoundError(
+				c.Request.URL.Path,
+				"user not found",
+			))
+			return
+		}
+		h.respondWithError(c, err)
 		return
 	}
 

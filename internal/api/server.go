@@ -43,6 +43,7 @@ type Server struct {
 	queryScalingService   *services.QueryScalingService
 	tenantService         *services.TenantService
 	dagsterRBACRepo       *repositories.DagsterRBACRepository
+	userRepo              *repositories.UserRepository
 	httpServer            *http.Server
 	router                *gin.Engine
 }
@@ -108,6 +109,9 @@ type ServerConfig struct {
 
 	// DagsterRBACRepository is the repository for Dagster RBAC operations.
 	DagsterRBACRepository *repositories.DagsterRBACRepository
+
+	// UserRepository is the repository for user operations (needed for Dagster RBAC validation).
+	UserRepository *repositories.UserRepository
 
 	// CORSConfig is the CORS configuration.
 	CORSConfig middleware.CORSConfig
@@ -179,6 +183,7 @@ func NewServer(serverCfg ServerConfig) *Server {
 		queryScalingService:   serverCfg.QueryScalingService,
 		tenantService:         serverCfg.TenantService,
 		dagsterRBACRepo:       serverCfg.DagsterRBACRepository,
+		userRepo:              serverCfg.UserRepository,
 		router:                router,
 	}
 
@@ -363,8 +368,8 @@ func (s *Server) registerRoutes() {
 		}
 
 		// Dagster RBAC endpoints (protected, admin only for most operations)
-		if s.dagsterRBACRepo != nil {
-			dagsterRBACHandler := handlers.NewDagsterRBACHandler(s.dagsterRBACRepo)
+		if s.dagsterRBACRepo != nil && s.userRepo != nil {
+			dagsterRBACHandler := handlers.NewDagsterRBACHandler(s.dagsterRBACRepo, s.userRepo)
 			dagsterRoles := v1.Group("/dagster-roles")
 			dagsterRoles.Use(requireAuth)
 			dagsterRoles.GET("", dagsterRBACHandler.ListAllRoleAssignments)

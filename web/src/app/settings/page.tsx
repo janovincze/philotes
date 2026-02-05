@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Settings, Shield, Users, Trash2, Plus, Info } from "lucide-react"
+import { Settings, Shield, Users, Trash2, Plus, Info, AlertTriangle } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -11,10 +11,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useDagsterRbac } from "@/lib/hooks/use-dagster-rbac"
-import type { DagsterRole, DagsterRoleInfo } from "@/lib/api/types"
+import type { DagsterRole, DagsterRoleInfo, DagsterRoleAssignmentWithUser } from "@/lib/api/types"
+
+// UUID validation regex
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 function DagsterRbacSettings() {
   const {
@@ -30,21 +34,46 @@ function DagsterRbacSettings() {
   } = useDagsterRbac()
 
   const [assignDialogOpen, setAssignDialogOpen] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [roleToDelete, setRoleToDelete] = useState<DagsterRoleAssignmentWithUser | null>(null)
   const [newUserId, setNewUserId] = useState("")
   const [newRole, setNewRole] = useState<DagsterRole>("dagster-viewer")
   const [newResourcePattern, setNewResourcePattern] = useState("")
   const [assignError, setAssignError] = useState<string | null>(null)
+  const [isAssigning, setIsAssigning] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [initialLoading, setInitialLoading] = useState(true)
 
   useEffect(() => {
-    fetchAllRoleAssignments()
-    fetchAvailableRoles()
+    const loadData = async () => {
+      try {
+        await Promise.all([fetchAllRoleAssignments(), fetchAvailableRoles()])
+      } finally {
+        setInitialLoading(false)
+      }
+    }
+    loadData()
   }, [fetchAllRoleAssignments, fetchAvailableRoles])
 
+  const validateUserId = (id: string): string | null => {
+    if (!id.trim()) {
+      return "User ID is required"
+    }
+    if (!UUID_REGEX.test(id.trim())) {
+      return "Invalid UUID format"
+    }
+    return null
+  }
+
   const handleAssignRole = async () => {
-    if (!newUserId.trim()) {
-      setAssignError("User ID is required")
+    const validationError = validateUserId(newUserId)
+    if (validationError) {
+      setAssignError(validationError)
       return
     }
+
+    setIsAssigning(true)
+    setAssignError(null)
 
     try {
       await assignRole(
@@ -56,18 +85,32 @@ function DagsterRbacSettings() {
       setNewUserId("")
       setNewRole("dagster-viewer")
       setNewResourcePattern("")
-      setAssignError(null)
+      // Refresh the list after successful assignment
       await fetchAllRoleAssignments()
     } catch (err) {
       setAssignError(err instanceof Error ? err.message : "Failed to assign role")
+    } finally {
+      setIsAssigning(false)
     }
   }
 
-  const handleRemoveRole = async (roleId: string) => {
+  const handleDeleteClick = (assignment: DagsterRoleAssignmentWithUser) => {
+    setRoleToDelete(assignment)
+    setDeleteDialogOpen(true)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!roleToDelete) return
+
+    setIsDeleting(true)
     try {
-      await removeRole(roleId)
-    } catch {
-      // Error is handled by the hook
+      await removeRole(roleToDelete.id)
+      setDeleteDialogOpen(false)
+      setRoleToDelete(null)
+    } catch (err) {
+      console.error("Failed to remove role:", err)
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -89,7 +132,7 @@ function DagsterRbacSettings() {
     return roleInfo?.description || role
   }
 
-  if (loading && allRoleAssignments.length === 0) {
+  if (initialLoading) {
     return (
       <div className="space-y-4">
         <Skeleton className="h-10 w-full" />
@@ -169,10 +212,13 @@ function DagsterRbacSettings() {
                     <Label htmlFor="userId">User ID</Label>
                     <Input
                       id="userId"
-                      placeholder="Enter user UUID"
+                      placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
                       value={newUserId}
                       onChange={(e) => setNewUserId(e.target.value)}
                     />
+                    <p className="text-xs text-muted-foreground">
+                      Enter the UUID of the user to assign the role to
+                    </p>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="role">Role</Label>
@@ -181,24 +227,18 @@ function DagsterRbacSettings() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="dagster-viewer">
-                          <div className="flex items-center gap-2">
-                            <Badge variant="secondary">viewer</Badge>
-                            <span className="text-muted-foreground">View only</span>
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="dagster-operator">
-                          <div className="flex items-center gap-2">
-                            <Badge variant="default">operator</Badge>
-                            <span className="text-muted-foreground">View + Execute</span>
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="dagster-admin">
-                          <div className="flex items-center gap-2">
-                            <Badge variant="destructive">admin</Badge>
-                            <span className="text-muted-foreground">Full access</span>
-                          </div>
-                        </SelectItem>
+                        {availableRoles.map((roleInfo) => (
+                          <SelectItem key={roleInfo.role} value={roleInfo.role}>
+                            <div className="flex items-center gap-2">
+                              <Badge variant={getRoleBadgeVariant(roleInfo.role)}>
+                                {roleInfo.role.replace("dagster-", "")}
+                              </Badge>
+                              <span className="text-muted-foreground text-xs">
+                                {roleInfo.description.split(" ").slice(0, 3).join(" ")}...
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -219,8 +259,8 @@ function DagsterRbacSettings() {
                   <Button variant="outline" onClick={() => setAssignDialogOpen(false)}>
                     Cancel
                   </Button>
-                  <Button onClick={handleAssignRole} disabled={loading}>
-                    {loading ? "Assigning..." : "Assign Role"}
+                  <Button onClick={handleAssignRole} disabled={isAssigning}>
+                    {isAssigning ? "Assigning..." : "Assign Role"}
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -288,8 +328,9 @@ function DagsterRbacSettings() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => handleRemoveRole(assignment.id)}
-                        disabled={loading}
+                        onClick={() => handleDeleteClick(assignment)}
+                        disabled={loading || isDeleting}
+                        aria-label={`Remove ${assignment.role} role from ${assignment.user_email}`}
                       >
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
@@ -301,6 +342,37 @@ function DagsterRbacSettings() {
           )}
         </CardContent>
       </Card>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              Remove Role Assignment
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove the{" "}
+              <Badge variant={getRoleBadgeVariant(roleToDelete?.role || "")}>
+                {roleToDelete?.role.replace("dagster-", "")}
+              </Badge>{" "}
+              role from <strong>{roleToDelete?.user_email}</strong>?
+              <br /><br />
+              This will revoke their Dagster permissions immediately.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? "Removing..." : "Remove Role"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Permission Format Info */}
       <Card>

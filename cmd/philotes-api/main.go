@@ -172,6 +172,7 @@ func main() {
 		AuthService:           authService,
 		APIKeyService:         apiKeyService,
 		DagsterRBACRepository: dagsterRBACRepo,
+		UserRepository:        userRepo,
 		CORSConfig: middleware.CORSConfig{
 			AllowedOrigins:   cfg.API.CORSOrigins,
 			AllowCredentials: false,
