@@ -9,6 +9,9 @@ import (
 
 // Catalog defines the interface for Iceberg catalog operations.
 type Catalog interface {
+	// EnsureWarehouse ensures the warehouse exists in the catalog, creating it if necessary.
+	EnsureWarehouse(ctx context.Context) error
+
 	// CreateNamespace creates a new namespace if it doesn't exist.
 	CreateNamespace(ctx context.Context, namespace string, properties map[string]string) error
 
@@ -31,6 +34,22 @@ type Catalog interface {
 	Close() error
 }
 
+// StorageProfile holds S3-compatible storage configuration for warehouse creation.
+type StorageProfile struct {
+	// Bucket is the S3 bucket name.
+	Bucket string
+	// KeyPrefix is an optional path prefix within the bucket.
+	KeyPrefix string
+	// Region is the S3 region.
+	Region string
+	// Endpoint is the S3/MinIO endpoint URL.
+	Endpoint string
+	// AccessKey is the S3 access key.
+	AccessKey string
+	// SecretKey is the S3 secret key.
+	SecretKey string
+}
+
 // Config holds catalog configuration.
 type Config struct {
 	// CatalogURL is the REST catalog endpoint URL.
@@ -41,4 +60,7 @@ type Config struct {
 
 	// Credentials for authentication (optional).
 	Token string
+
+	// Storage holds S3-compatible storage configuration for warehouse bootstrap.
+	Storage StorageProfile
 }

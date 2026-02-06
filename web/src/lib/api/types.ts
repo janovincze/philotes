@@ -922,3 +922,98 @@ export interface DagsterRoleAssignmentsResponse {
 export interface AvailableDagsterRolesResponse {
   roles: DagsterRoleInfo[]
 }
+
+// Alert Types
+
+export type AlertSeverity = "info" | "warning" | "critical"
+export type AlertStatus = "firing" | "resolved" | "acknowledged"
+export type AlertOperator = "gt" | "lt" | "eq" | "gte" | "lte"
+export type ChannelType = "slack" | "email" | "webhook" | "pagerduty"
+
+export interface AlertRule {
+  id: string
+  name: string
+  description?: string
+  metric_name: string
+  operator: AlertOperator
+  threshold: number
+  duration_seconds: number
+  severity: AlertSeverity
+  labels?: Record<string, string>
+  annotations?: Record<string, string>
+  enabled: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateAlertRuleInput {
+  name: string
+  description?: string
+  metric_name: string
+  operator: AlertOperator
+  threshold: number
+  duration_seconds?: number
+  severity?: AlertSeverity
+  enabled?: boolean
+}
+
+export interface AlertInstance {
+  id: string
+  rule_id: string
+  fingerprint: string
+  status: AlertStatus
+  labels?: Record<string, string>
+  annotations?: Record<string, string>
+  current_value?: number
+  fired_at: string
+  resolved_at?: string
+  acknowledged_at?: string
+  acknowledged_by?: string
+  created_at: string
+  updated_at: string
+  rule?: AlertRule
+}
+
+export interface AlertSummary {
+  total_rules: number
+  enabled_rules: number
+  firing_alerts: number
+  acknowledged_alerts: number
+  resolved_alerts: number
+}
+
+export interface NotificationChannel {
+  id: string
+  name: string
+  type: ChannelType
+  config: Record<string, unknown>
+  enabled: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateChannelInput {
+  name: string
+  type: ChannelType
+  config: Record<string, unknown>
+  enabled?: boolean
+}
+
+export interface AlertRuleListResponse {
+  rules: AlertRule[]
+  total_count: number
+}
+
+export interface AlertInstanceListResponse {
+  alerts: AlertInstance[]
+  total_count: number
+}
+
+export interface AlertSummaryResponse {
+  summary: AlertSummary
+}
+
+export interface ChannelListResponse {
+  channels: NotificationChannel[]
+  total_count: number
+}

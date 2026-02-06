@@ -19,6 +19,7 @@ import (
 	"github.com/janovincze/philotes/internal/api/services"
 	"github.com/janovincze/philotes/internal/cdc/health"
 	"github.com/janovincze/philotes/internal/config"
+	"github.com/janovincze/philotes/internal/iceberg/catalog"
 	"github.com/janovincze/philotes/internal/vault"
 )
 
@@ -115,9 +116,22 @@ func main() {
 	auditRepo := repositories.NewAuditRepository(db)
 	dagsterRBACRepo := repositories.NewDagsterRBACRepository(db)
 
+	// Create Iceberg catalog client
+	icebergCatalog := catalog.NewRESTCatalog(catalog.Config{
+		CatalogURL: cfg.Iceberg.CatalogURL,
+		Warehouse:  cfg.Iceberg.Warehouse,
+		Storage: catalog.StorageProfile{
+			Bucket:    cfg.Storage.Bucket,
+			Endpoint:  cfg.Storage.Endpoint,
+			AccessKey: cfg.Storage.AccessKey,
+			SecretKey: cfg.Storage.SecretKey,
+		},
+	}, logger)
+	defer icebergCatalog.Close()
+
 	// Create services
 	sourceService := services.NewSourceService(sourceRepo, logger)
-	pipelineService := services.NewPipelineService(pipelineRepo, sourceRepo, logger)
+	pipelineService := services.NewPipelineService(pipelineRepo, sourceRepo, icebergCatalog, logger)
 
 	// Create auth services (only if auth is enabled or admin credentials are provided)
 	var authService *services.AuthService
@@ -162,6 +176,18 @@ func main() {
 		}))
 	}
 
+	// Create onboarding repository
+	onboardingRepo := repositories.NewOnboardingRepository(db)
+
+	// Create query service (for Trino integration)
+	var queryService *services.QueryService
+	if cfg.Trino.Enabled {
+		queryService = services.NewQueryService(cfg.Trino, logger)
+	}
+
+	// Create onboarding service
+	onboardingService := services.NewOnboardingService(onboardingRepo, userRepo, healthManager, queryService, logger)
+
 	// Create server configuration
 	serverCfg := api.ServerConfig{
 		Config:                cfg,
@@ -171,6 +197,8 @@ func main() {
 		PipelineService:       pipelineService,
 		AuthService:           authService,
 		APIKeyService:         apiKeyService,
+		OnboardingService:     onboardingService,
+		QueryService:          queryService,
 		DagsterRBACRepository: dagsterRBACRepo,
 		UserRepository:        userRepo,
 		CORSConfig: middleware.CORSConfig{

@@ -26,6 +26,7 @@ type OnboardingService struct {
 	onboardingRepo *repositories.OnboardingRepository
 	userRepo       *repositories.UserRepository
 	healthManager  *health.Manager
+	queryService   *QueryService
 	logger         *slog.Logger
 }
 
@@ -34,6 +35,7 @@ func NewOnboardingService(
 	onboardingRepo *repositories.OnboardingRepository,
 	userRepo *repositories.UserRepository,
 	healthManager *health.Manager,
+	queryService *QueryService,
 	logger *slog.Logger,
 ) *OnboardingService {
 	if logger == nil {
@@ -44,6 +46,7 @@ func NewOnboardingService(
 		onboardingRepo: onboardingRepo,
 		userRepo:       userRepo,
 		healthManager:  healthManager,
+		queryService:   queryService,
 		logger:         logger.With("component", "onboarding-service"),
 	}
 }
@@ -227,15 +230,13 @@ func (s *OnboardingService) CheckAdminExists(ctx context.Context) (bool, error) 
 	return s.userRepo.HasAdminUser(ctx)
 }
 
-// VerifyDataFlow verifies that data is flowing to Iceberg.
-// This is a placeholder implementation - full DuckDB integration would be added later.
+// VerifyDataFlow verifies that data is flowing to Iceberg by querying via Trino.
 func (s *OnboardingService) VerifyDataFlow(ctx context.Context, req *models.DataVerificationRequest) (*models.DataVerificationResponse, error) {
 	// Validate request
 	if errs := req.Validate(); len(errs) > 0 {
 		return nil, &ValidationError{Errors: errs}
 	}
 
-	// Set default max wait time
 	maxWait := 60
 	if req.MaxWaitSec > 0 {
 		maxWait = req.MaxWaitSec
@@ -243,31 +244,95 @@ func (s *OnboardingService) VerifyDataFlow(ctx context.Context, req *models.Data
 
 	startTime := time.Now()
 
-	// For now, return a placeholder response
-	// In a full implementation, this would:
-	// 1. Connect to DuckDB
-	// 2. Load the Iceberg extension
-	// 3. Query the specified table
-	// 4. Return sample rows
 	s.logger.Info("verifying data flow",
 		"pipeline_id", req.PipelineID,
 		"table_name", req.TableName,
 		"max_wait_sec", maxWait,
 	)
 
-	// Placeholder: simulate verification
-	// TODO: Implement actual DuckDB query when query package is added
-	response := &models.DataVerificationResponse{
-		Success:     true,
-		RowCount:    0, // Would be populated from actual query
-		QueryTimeMs: time.Since(startTime).Milliseconds(),
+	// If Trino query service is not available, return a graceful placeholder
+	if s.queryService == nil {
+		s.logger.Warn("query service not available, returning placeholder verification")
+		return &models.DataVerificationResponse{
+			Success:      false,
+			RowCount:     0,
+			QueryTimeMs:  time.Since(startTime).Milliseconds(),
+			ErrorMessage: "Query layer (Trino) is not configured; cannot verify data flow",
+		}, nil
 	}
 
-	// In actual implementation, if data not found after polling:
-	// response.Success = false
-	// response.ErrorMessage = "No data found in table after waiting"
+	// Build a count query for the target table
+	sql := "SELECT COUNT(*) as row_count FROM " + req.TableName
 
-	return response, nil
+	// Poll with 5-second intervals until data is found or maxWait is exceeded
+	pollInterval := 5 * time.Second
+	deadline := startTime.Add(time.Duration(maxWait) * time.Second)
+
+	for {
+		queryReq := &models.QueryExecuteRequest{
+			SQL:   sql,
+			Limit: 1,
+		}
+
+		result, err := s.queryService.ExecuteUserQuery(ctx, queryReq)
+		if err != nil {
+			s.logger.Warn("verification query failed", "error", err)
+		} else if result.Error == "" && result.RowCount > 0 && len(result.Rows) > 0 {
+			// Extract the count from the result
+			rowCount := int64(0)
+			if cnt, ok := result.Rows[0]["row_count"]; ok {
+				switch v := cnt.(type) {
+				case float64:
+					rowCount = int64(v)
+				case int64:
+					rowCount = v
+				}
+			}
+
+			if rowCount > 0 {
+				// Data found — fetch sample rows
+				sampleReq := &models.QueryExecuteRequest{
+					SQL:   "SELECT * FROM " + req.TableName,
+					Limit: 10,
+				}
+				sampleResult, sampleErr := s.queryService.ExecuteUserQuery(ctx, sampleReq)
+				var sampleRows []map[string]any
+				if sampleErr == nil && sampleResult.Error == "" {
+					sampleRows = sampleResult.Rows
+				}
+
+				return &models.DataVerificationResponse{
+					Success:     true,
+					RowCount:    rowCount,
+					SampleRows:  sampleRows,
+					QueryTimeMs: time.Since(startTime).Milliseconds(),
+				}, nil
+			}
+		}
+
+		// Check if we've exceeded the deadline
+		if time.Now().After(deadline) {
+			return &models.DataVerificationResponse{
+				Success:      false,
+				RowCount:     0,
+				QueryTimeMs:  time.Since(startTime).Milliseconds(),
+				ErrorMessage: "No data found in table after waiting",
+			}, nil
+		}
+
+		// Wait before next poll
+		select {
+		case <-ctx.Done():
+			return &models.DataVerificationResponse{
+				Success:      false,
+				RowCount:     0,
+				QueryTimeMs:  time.Since(startTime).Milliseconds(),
+				ErrorMessage: "Verification cancelled",
+			}, nil
+		case <-time.After(pollInterval):
+			// Continue polling
+		}
+	}
 }
 
 // GetOrCreateProgress gets existing progress or creates new one.

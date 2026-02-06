@@ -36,6 +36,84 @@ func NewRESTCatalog(cfg Config, logger *slog.Logger) *RESTCatalog {
 	}
 }
 
+// EnsureWarehouse ensures the warehouse exists in Lakekeeper, creating it via the management API if necessary.
+func (c *RESTCatalog) EnsureWarehouse(ctx context.Context) error {
+	// List existing warehouses
+	url := fmt.Sprintf("%s/management/v1/warehouse", c.config.CatalogURL)
+
+	resp, err := c.doRequest(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return fmt.Errorf("list warehouses request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusOK {
+		var listResp listWarehousesResponse
+		if decErr := json.NewDecoder(resp.Body).Decode(&listResp); decErr != nil {
+			return fmt.Errorf("decode warehouses response: %w", decErr)
+		}
+
+		for _, wh := range listResp.Warehouses {
+			if wh.Name == c.config.Warehouse {
+				c.logger.Debug("warehouse already exists", "warehouse", c.config.Warehouse)
+				return nil
+			}
+		}
+	} else if resp.StatusCode != http.StatusNotFound {
+		return c.parseError(resp)
+	}
+
+	// Warehouse doesn't exist, create it
+	c.logger.Info("creating warehouse", "warehouse", c.config.Warehouse)
+
+	storageProfile := map[string]any{
+		"type":   "s3",
+		"bucket": c.config.Storage.Bucket,
+		"flavor": "minio",
+	}
+	if c.config.Storage.KeyPrefix != "" {
+		storageProfile["key-prefix"] = c.config.Storage.KeyPrefix
+	}
+	if c.config.Storage.Region != "" {
+		storageProfile["region"] = c.config.Storage.Region
+	}
+	if c.config.Storage.Endpoint != "" {
+		storageProfile["endpoint"] = c.config.Storage.Endpoint
+	}
+
+	createBody := map[string]any{
+		"warehouse-name":  c.config.Warehouse,
+		"storage-profile": storageProfile,
+	}
+
+	if c.config.Storage.AccessKey != "" {
+		createBody["storage-credential"] = map[string]any{
+			"type":                 "s3",
+			"credential-type":     "access-key",
+			"aws-access-key-id":     c.config.Storage.AccessKey,
+			"aws-secret-access-key": c.config.Storage.SecretKey,
+		}
+	}
+
+	createResp, err := c.doRequest(ctx, http.MethodPost, url, createBody)
+	if err != nil {
+		return fmt.Errorf("create warehouse request: %w", err)
+	}
+	defer createResp.Body.Close()
+
+	if createResp.StatusCode == http.StatusConflict {
+		c.logger.Debug("warehouse already exists (race)", "warehouse", c.config.Warehouse)
+		return nil
+	}
+
+	if createResp.StatusCode != http.StatusOK && createResp.StatusCode != http.StatusCreated {
+		return c.parseError(createResp)
+	}
+
+	c.logger.Info("warehouse created", "warehouse", c.config.Warehouse)
+	return nil
+}
+
 // CreateNamespace creates a new namespace if it doesn't exist.
 func (c *RESTCatalog) CreateNamespace(ctx context.Context, namespace string, properties map[string]string) error {
 	// Check if namespace already exists
@@ -341,6 +419,17 @@ type restDataFile struct {
 	RecordCount     int64          `json:"record-count"`
 	FileSizeInBytes int64          `json:"file-size-in-bytes"`
 	Partition       map[string]any `json:"partition,omitempty"`
+}
+
+// Management API response types
+
+type listWarehousesResponse struct {
+	Warehouses []warehouseInfo `json:"warehouses"`
+}
+
+type warehouseInfo struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
 // Conversion functions

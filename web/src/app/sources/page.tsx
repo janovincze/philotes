@@ -1,12 +1,13 @@
 "use client"
 
+import { useState, useCallback } from "react"
 import Link from "next/link"
 import { Database, Plus, CheckCircle, XCircle, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useSources } from "@/lib/hooks/use-sources"
+import { useSources, useTestSourceConnection } from "@/lib/hooks/use-sources"
 import type { SourceStatus } from "@/lib/api/types"
 
 function SourceStatusBadge({ status }: { status: SourceStatus }) {
@@ -28,9 +29,31 @@ function SourceStatusBadge({ status }: { status: SourceStatus }) {
 
 function SourceCard({
   source,
+  onTestConnection,
 }: {
   source: { id: string; name: string; host: string; port: number; database_name: string; status: SourceStatus }
+  onTestConnection: (id: string) => Promise<void>
 }) {
+  const [testState, setTestState] = useState<"idle" | "testing" | "success" | "failure">("idle")
+
+  const handleTestConnection = useCallback(async () => {
+    setTestState("testing")
+    try {
+      await onTestConnection(source.id)
+      setTestState("success")
+    } catch {
+      setTestState("failure")
+    }
+    setTimeout(() => setTestState("idle"), 3000)
+  }, [onTestConnection, source.id])
+
+  const testButtonText = {
+    idle: "Test Connection",
+    testing: "Testing...",
+    success: "Connected!",
+    failure: "Failed",
+  }[testState]
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-start justify-between space-y-0">
@@ -52,8 +75,13 @@ function SourceCard({
           <Button variant="outline" size="sm" asChild>
             <Link href={`/sources/${source.id}`}>View Details</Link>
           </Button>
-          <Button variant="outline" size="sm">
-            Test Connection
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleTestConnection}
+            disabled={testState === "testing"}
+          >
+            {testButtonText}
           </Button>
         </div>
       </CardContent>
@@ -84,6 +112,14 @@ function SourcesListSkeleton() {
 
 export default function SourcesPage() {
   const { data: sources, isLoading, error } = useSources()
+  const testConnection = useTestSourceConnection()
+
+  const handleTestConnection = useCallback(
+    async (id: string) => {
+      await testConnection.mutateAsync(id)
+    },
+    [testConnection]
+  )
 
   return (
     <div className="space-y-6">
@@ -118,7 +154,7 @@ export default function SourcesPage() {
       ) : sources && sources.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2">
           {sources.map((source) => (
-            <SourceCard key={source.id} source={source} />
+            <SourceCard key={source.id} source={source} onTestConnection={handleTestConnection} />
           ))}
         </div>
       ) : (
