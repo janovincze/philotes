@@ -8,6 +8,7 @@ import {
   GitBranch,
   Scale,
   Bell,
+  BarChart3,
   Settings,
   Terminal,
   type LucideIcon,
@@ -54,6 +55,11 @@ const navItems: NavItem[] = [
     icon: Bell,
   },
   {
+    title: "Monitoring",
+    href: "http://localhost:3000",
+    icon: BarChart3,
+  },
+  {
     title: "Settings",
     href: "/settings",
     icon: Settings,
@@ -70,10 +76,11 @@ export function MainNav({ collapsed = false }: MainNavProps) {
   return (
     <nav className="flex flex-col gap-1 px-2">
       {navItems.map((item) => {
+        const isExternal = item.href.startsWith("http://") || item.href.startsWith("https://")
         // Use startsWith for nested route highlighting (e.g., /sources/new highlights "Sources")
         // Exact match for root path to avoid always being active
-        const isActive = pathname === item.href ||
-          (item.href !== "/" && pathname.startsWith(item.href))
+        const isActive = !isExternal && (pathname === item.href ||
+          (item.href !== "/" && pathname.startsWith(item.href)))
 
         return (
           <Button
@@ -85,10 +92,17 @@ export function MainNav({ collapsed = false }: MainNavProps) {
             )}
             asChild
           >
-            <Link href={item.href}>
-              <item.icon className={cn("h-4 w-4", !collapsed && "mr-2")} />
-              {!collapsed && <span>{item.title}</span>}
-            </Link>
+            {isExternal ? (
+              <a href={item.href} target="_blank" rel="noopener noreferrer">
+                <item.icon className={cn("h-4 w-4", !collapsed && "mr-2")} />
+                {!collapsed && <span>{item.title}</span>}
+              </a>
+            ) : (
+              <Link href={item.href}>
+                <item.icon className={cn("h-4 w-4", !collapsed && "mr-2")} />
+                {!collapsed && <span>{item.title}</span>}
+              </Link>
+            )}
           </Button>
         )
       })}

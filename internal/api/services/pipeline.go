@@ -12,12 +12,14 @@ import (
 
 	"github.com/janovincze/philotes/internal/api/models"
 	"github.com/janovincze/philotes/internal/api/repositories"
+	"github.com/janovincze/philotes/internal/iceberg/catalog"
 )
 
 // PipelineService provides business logic for pipeline operations.
 type PipelineService struct {
 	repo       *repositories.PipelineRepository
 	sourceRepo *repositories.SourceRepository
+	catalog    catalog.Catalog
 	logger     *slog.Logger
 }
 
@@ -25,11 +27,13 @@ type PipelineService struct {
 func NewPipelineService(
 	repo *repositories.PipelineRepository,
 	sourceRepo *repositories.SourceRepository,
+	catalog catalog.Catalog,
 	logger *slog.Logger,
 ) *PipelineService {
 	return &PipelineService{
 		repo:       repo,
 		sourceRepo: sourceRepo,
+		catalog:    catalog,
 		logger:     logger.With("component", "pipeline-service"),
 	}
 }
@@ -167,6 +171,19 @@ func (s *PipelineService) Start(ctx context.Context, id uuid.UUID) error {
 	// Check if already running
 	if pipeline.Status == models.PipelineStatusRunning || pipeline.Status == models.PipelineStatusStarting {
 		return &ConflictError{Message: "pipeline is already running"}
+	}
+
+	// Pre-flight checks
+	if len(pipeline.Tables) == 0 {
+		return &ValidationError{Errors: []models.FieldError{{Field: "tables", Message: "pipeline has no table mappings; add at least one table before starting"}}}
+	}
+
+	if s.catalog != nil {
+		if err := s.catalog.EnsureWarehouse(ctx); err != nil {
+			s.logger.Error("pre-flight: warehouse check failed", "error", err)
+			return &ValidationError{Errors: []models.FieldError{{Field: "warehouse", Message: "warehouse check failed; see server logs for details"}}}
+		}
+		s.logger.Debug("pre-flight: warehouse exists")
 	}
 
 	// Update status to starting
