@@ -181,7 +181,7 @@ func (s *PipelineService) Start(ctx context.Context, id uuid.UUID) error {
 	if s.catalog != nil {
 		if err := s.catalog.EnsureWarehouse(ctx); err != nil {
 			s.logger.Error("pre-flight: warehouse check failed", "error", err)
-			return &ValidationError{Errors: []models.FieldError{{Field: "warehouse", Message: fmt.Sprintf("warehouse check failed: %v", err)}}}
+			return &ValidationError{Errors: []models.FieldError{{Field: "warehouse", Message: "warehouse check failed; see server logs for details"}}}
 		}
 		s.logger.Debug("pre-flight: warehouse exists")
 	}

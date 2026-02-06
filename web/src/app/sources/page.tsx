@@ -118,7 +118,8 @@ export default function SourcesPage() {
     async (id: string) => {
       await testConnection.mutateAsync(id)
     },
-    [testConnection]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [testConnection.mutateAsync]
   )
 
   return (

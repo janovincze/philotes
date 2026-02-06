@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -241,6 +242,9 @@ func (s *OnboardingService) VerifyDataFlow(ctx context.Context, req *models.Data
 	if req.MaxWaitSec > 0 {
 		maxWait = req.MaxWaitSec
 	}
+	if maxWait > 300 {
+		maxWait = 300
+	}
 
 	startTime := time.Now()
 
@@ -259,6 +263,14 @@ func (s *OnboardingService) VerifyDataFlow(ctx context.Context, req *models.Data
 			QueryTimeMs:  time.Since(startTime).Milliseconds(),
 			ErrorMessage: "Query layer (Trino) is not configured; cannot verify data flow",
 		}, nil
+	}
+
+	// Validate table name to prevent SQL injection.
+	// TableName may be qualified (catalog.schema.table), so validate each segment.
+	for _, part := range strings.Split(req.TableName, ".") {
+		if err := validateIdentifier(part, "table"); err != nil {
+			return nil, &ValidationError{Errors: []models.FieldError{{Field: "table_name", Message: err.Error()}}}
+		}
 	}
 
 	// Build a count query for the target table
