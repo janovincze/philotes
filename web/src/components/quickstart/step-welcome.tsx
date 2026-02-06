@@ -215,6 +215,7 @@ export function StepWelcome({ onNext }: StepWelcomeProps) {
           onClick={onNext}
           disabled={!allCriticalReady}
           className="gap-2"
+          data-testid="get-started-button"
         >
           Get Started
           <ArrowRight className="h-4 w-4" />

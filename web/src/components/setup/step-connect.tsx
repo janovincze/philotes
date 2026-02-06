@@ -254,7 +254,7 @@ export function StepConnect({
 
       {/* Actions */}
       <div className="flex items-center justify-between pt-4">
-        <Button variant="outline" onClick={onBack}>
+        <Button variant="outline" onClick={onBack} data-testid="back-button">
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back
         </Button>
@@ -269,6 +269,7 @@ export function StepConnect({
             variant="outline"
             onClick={handleTestConnection}
             disabled={!isFormValid || isLoading}
+            data-testid="test-connection-button"
           >
             {isLoading ? (
               <>
@@ -279,7 +280,7 @@ export function StepConnect({
               "Test Connection"
             )}
           </Button>
-          <Button onClick={onNext} disabled={!connectionTested}>
+          <Button onClick={onNext} disabled={!connectionTested} data-testid="continue-button">
             Continue
             <ArrowRight className="ml-2 h-4 w-4" />
           </Button>

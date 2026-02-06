@@ -43,7 +43,7 @@ function PipelineCard({
   const metrics = metricsResponse?.metrics
 
   return (
-    <Card>
+    <Card data-testid="pipeline-card">
       <CardHeader className="flex flex-row items-start justify-between space-y-0">
         <div className="flex items-start gap-4">
           <div className="rounded-lg bg-primary/10 p-2">
@@ -90,6 +90,7 @@ function PipelineCard({
               size="sm"
               onClick={() => startPipeline.mutate(pipeline.id)}
               disabled={startPipeline.isPending}
+              data-testid="start-pipeline-button"
             >
               <Play className="mr-2 h-4 w-4" />
               Start
@@ -101,6 +102,7 @@ function PipelineCard({
               size="sm"
               onClick={() => stopPipeline.mutate(pipeline.id)}
               disabled={stopPipeline.isPending}
+              data-testid="stop-pipeline-button"
             >
               <Square className="mr-2 h-4 w-4" />
               Stop

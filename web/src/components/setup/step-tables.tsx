@@ -210,7 +210,7 @@ export function StepTables({
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back
         </Button>
-        <Button onClick={onNext} disabled={selectedTables.length === 0}>
+        <Button onClick={onNext} disabled={selectedTables.length === 0} data-testid="continue-button">
           Continue
           <ArrowRight className="ml-2 h-4 w-4" />
         </Button>

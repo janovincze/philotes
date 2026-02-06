@@ -191,6 +191,7 @@ export default function QueryPage() {
                   size="sm"
                   onClick={handleExecute}
                   disabled={queryMutation.isPending || !sql.trim()}
+                  data-testid="run-query-button"
                 >
                   <Play className="h-4 w-4 mr-2" />
                   {queryMutation.isPending ? "Running..." : "Run Query"}

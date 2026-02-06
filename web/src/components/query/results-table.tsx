@@ -109,12 +109,12 @@ export function ResultsTable({ columns, rows, isLoading }: ResultsTableProps) {
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" data-testid="results-table">
       <div className="flex items-center justify-between">
-        <span className="text-sm text-muted-foreground">
+        <span className="text-sm text-muted-foreground" data-testid="row-count">
           {rows.length} row{rows.length !== 1 ? "s" : ""}
         </span>
-        <Button variant="outline" size="sm" onClick={exportToCsv}>
+        <Button variant="outline" size="sm" onClick={exportToCsv} data-testid="export-csv-button">
           <Download className="h-4 w-4 mr-2" />
           Export CSV
         </Button>
