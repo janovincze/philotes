@@ -8,8 +8,8 @@ export class PipelinesPage {
 
   constructor(page: Page) {
     this.page = page
-    this.newPipelineButton = page.getByRole("link", { name: "New Pipeline" })
-    this.heading = page.getByRole("heading", { name: "Pipelines" })
+    this.newPipelineButton = page.getByRole("link", { name: "New Pipeline" }).first()
+    this.heading = page.getByRole("heading", { name: "Pipelines", exact: true })
   }
 
   async goto() {

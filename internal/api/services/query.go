@@ -462,10 +462,12 @@ func (s *QueryService) ExecuteUserQuery(ctx context.Context, req *models.QueryEx
 		limit = MaxQueryLimit
 	}
 
-	// Add LIMIT clause if not present
+	// Add LIMIT clause if not present (check for LIMIT preceded by any whitespace)
 	query := req.SQL
 	upperQuery := strings.ToUpper(strings.TrimSpace(query))
-	if !strings.Contains(upperQuery, " LIMIT ") {
+	hasLimit := regexp.MustCompile(`(?i)\bLIMIT\s+\d+`).MatchString(upperQuery)
+	isShowQuery := strings.HasPrefix(upperQuery, "SHOW ")
+	if !hasLimit && !isShowQuery {
 		query = fmt.Sprintf("%s LIMIT %d", strings.TrimSuffix(query, ";"), limit)
 	}
 

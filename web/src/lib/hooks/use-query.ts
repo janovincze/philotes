@@ -16,7 +16,7 @@ import type {
 export function useQueryExecute() {
   return useMutation({
     mutationFn: async (request: QueryExecuteRequest): Promise<QueryExecuteResponse> => {
-      const response = await apiClient.post<QueryExecuteResponse>("/query/execute", request)
+      const response = await apiClient.post<QueryExecuteResponse>("/api/v1/query/execute", request)
       return response
     },
   })
@@ -27,7 +27,7 @@ export function useCatalogs() {
   return useQuery({
     queryKey: ["query", "catalogs"],
     queryFn: async (): Promise<CatalogListResponse> => {
-      return apiClient.get<CatalogListResponse>("/query/catalogs")
+      return apiClient.get<CatalogListResponse>("/api/v1/query/catalogs")
     },
     staleTime: 60000, // Cache for 1 minute
   })

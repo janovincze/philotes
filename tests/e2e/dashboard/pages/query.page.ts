@@ -31,7 +31,26 @@ export class QueryPage {
 
   async selectTemplate(templateName: string) {
     await this.templatesButton.click()
-    await this.page.getByRole("menuitem", { name: new RegExp(templateName) }).click()
+    // Radix dropdown items — click by visible text
+    await this.page.getByText(templateName, { exact: true }).click()
+  }
+
+  async typeQuery(sql: string) {
+    // Use the Clear button to reset the editor
+    await this.clearButton.click()
+    // Set the Monaco editor model value directly — keyboard.type/insertText
+    // doesn't reliably update Monaco's internal model
+    await this.page.evaluate((text) => {
+      // Access Monaco's global editor API to find the model and set its value
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const monaco = (window as any).monaco
+      const models = monaco?.editor?.getModels?.()
+      if (models?.[0]) {
+        models[0].setValue(text)
+      }
+    }, sql)
+    // Wait for React state to sync with Monaco's onChange
+    await this.page.waitForTimeout(200)
   }
 
   async executeQuery() {
@@ -45,15 +64,17 @@ export class QueryPage {
   }
 
   async waitForResults() {
-    // Wait for either results table or error to appear
+    // Wait for either results table or error alert to appear
+    // Note: Next.js adds a hidden [role="alert"] route announcer, so use visible destructive alert
     await expect(
-      this.page.getByText(/row/).or(this.page.getByText("Query completed"))
+      this.page.getByTestId("results-table")
+        .or(this.page.locator('[data-slot="alert"]'))
     ).toBeVisible({ timeout: 30_000 })
   }
 
   async expectResultsTable() {
-    // Expect at least one row indicator
-    await expect(this.page.getByText(/\d+ rows?/)).toBeVisible({ timeout: 30_000 })
+    // Expect the results table with row count
+    await expect(this.page.getByTestId("row-count")).toBeVisible({ timeout: 30_000 })
   }
 
   async expectExportCsvVisible() {

@@ -169,14 +169,13 @@ export function StepVerify({
       setError(errorMessage)
       setCurrentSubStep("error")
 
-      // Mark current step as error
-      if (subStepStatus.creating === "in_progress") {
-        setSubStepStatus((prev) => ({ ...prev, creating: "error" }))
-      } else if (subStepStatus.starting === "in_progress") {
-        setSubStepStatus((prev) => ({ ...prev, starting: "error" }))
-      } else if (subStepStatus.verifying === "in_progress") {
-        setSubStepStatus((prev) => ({ ...prev, verifying: "error" }))
-      }
+      // Mark current step as error (use updater to avoid stale closure)
+      setSubStepStatus((prev) => {
+        if (prev.starting === "in_progress") return { ...prev, starting: "error" }
+        if (prev.creating === "in_progress") return { ...prev, creating: "error" }
+        if (prev.verifying === "in_progress") return { ...prev, verifying: "error" }
+        return prev
+      })
     } finally {
       setIsRunning(false)
     }
@@ -190,7 +189,6 @@ export function StepVerify({
     startPipeline,
     verifyData,
     onPipelineCreated,
-    subStepStatus,
   ])
 
   // Start verification on mount

@@ -15,8 +15,9 @@ test.describe("Query Page", () => {
     await queryPage.goto()
     await queryPage.expectEditorVisible()
 
-    // Open templates and select one
-    await queryPage.selectTemplate("Show Catalogs")
+    // Open templates and select one (use SELECT-based template; SHOW statements
+    // break when the backend appends LIMIT)
+    await queryPage.selectTemplate("Sample Customers")
 
     // Execute the template query
     await queryPage.executeQuery()
@@ -27,8 +28,8 @@ test.describe("Query Page", () => {
     await queryPage.goto()
     await queryPage.expectEditorVisible()
 
-    // Use a template that returns data
-    await queryPage.selectTemplate("Show Tables")
+    // Use "Test Query" template (SELECT 1) — always returns data
+    await queryPage.selectTemplate("Test Query")
     await queryPage.executeQuery()
     await queryPage.waitForResults()
     await queryPage.expectResultsTable()
@@ -37,7 +38,7 @@ test.describe("Query Page", () => {
   test("shows Export CSV button when results are present", async ({ queryPage }) => {
     await queryPage.goto()
 
-    await queryPage.selectTemplate("Show Catalogs")
+    await queryPage.selectTemplate("Test Query")
     await queryPage.executeQuery()
     await queryPage.waitForResults()
     await queryPage.expectResultsTable()

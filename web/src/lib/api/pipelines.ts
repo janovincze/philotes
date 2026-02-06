@@ -5,29 +5,33 @@ export const pipelinesApi = {
   /**
    * List all pipelines
    */
-  list(): Promise<Pipeline[]> {
-    return apiClient.get<Pipeline[]>("/api/v1/pipelines")
+  async list(): Promise<Pipeline[]> {
+    const resp = await apiClient.get<{ pipelines: Pipeline[]; total_count: number }>("/api/v1/pipelines")
+    return resp.pipelines
   },
 
   /**
    * Get a single pipeline by ID
    */
-  get(id: string): Promise<Pipeline> {
-    return apiClient.get<Pipeline>(`/api/v1/pipelines/${id}`)
+  async get(id: string): Promise<Pipeline> {
+    const resp = await apiClient.get<{ pipeline: Pipeline }>(`/api/v1/pipelines/${id}`)
+    return resp.pipeline
   },
 
   /**
    * Create a new pipeline
    */
-  create(input: CreatePipelineInput): Promise<Pipeline> {
-    return apiClient.post<Pipeline>("/api/v1/pipelines", input)
+  async create(input: CreatePipelineInput): Promise<Pipeline> {
+    const resp = await apiClient.post<{ pipeline: Pipeline }>("/api/v1/pipelines", input)
+    return resp.pipeline
   },
 
   /**
    * Update an existing pipeline
    */
-  update(id: string, input: Partial<CreatePipelineInput>): Promise<Pipeline> {
-    return apiClient.put<Pipeline>(`/api/v1/pipelines/${id}`, input)
+  async update(id: string, input: Partial<CreatePipelineInput>): Promise<Pipeline> {
+    const resp = await apiClient.put<{ pipeline: Pipeline }>(`/api/v1/pipelines/${id}`, input)
+    return resp.pipeline
   },
 
   /**
@@ -40,15 +44,15 @@ export const pipelinesApi = {
   /**
    * Start a pipeline
    */
-  start(id: string): Promise<Pipeline> {
-    return apiClient.post<Pipeline>(`/api/v1/pipelines/${id}/start`)
+  start(id: string): Promise<void> {
+    return apiClient.post(`/api/v1/pipelines/${id}/start`)
   },
 
   /**
    * Stop a pipeline
    */
-  stop(id: string): Promise<Pipeline> {
-    return apiClient.post<Pipeline>(`/api/v1/pipelines/${id}/stop`)
+  stop(id: string): Promise<void> {
+    return apiClient.post(`/api/v1/pipelines/${id}/stop`)
   },
 
   /**

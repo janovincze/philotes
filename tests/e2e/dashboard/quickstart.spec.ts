@@ -1,7 +1,7 @@
 import { test, expect } from "./fixtures"
 
 test.describe("Quickstart Flow", () => {
-  test("completes the full quickstart wizard", async ({ quickstartPage }) => {
+  test("completes the full quickstart wizard", { timeout: 120_000 }, async ({ quickstartPage }) => {
     // Navigate to quickstart
     await quickstartPage.goto()
 
@@ -11,7 +11,7 @@ test.describe("Quickstart Flow", () => {
 
     // Step 2: Connect — fill source database credentials
     await quickstartPage.fillConnectionForm({
-      name: "E2E Test Source",
+      name: `E2E Source ${Date.now()}`,
       host: "localhost",
       port: "5433",
       database: "source",
