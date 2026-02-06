@@ -86,10 +86,10 @@ func (c *RESTCatalog) EnsureWarehouse(ctx context.Context) error {
 		"storage-profile": storageProfile,
 	}
 
-	if c.config.Storage.AccessKey != "" {
+	if c.config.Storage.AccessKey != "" && c.config.Storage.SecretKey != "" {
 		createBody["storage-credential"] = map[string]any{
-			"type":                 "s3",
-			"credential-type":     "access-key",
+			"type":                  "s3",
+			"credential-type":       "access-key",
 			"aws-access-key-id":     c.config.Storage.AccessKey,
 			"aws-secret-access-key": c.config.Storage.SecretKey,
 		}

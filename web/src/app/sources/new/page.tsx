@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, type FormEvent } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { ArrowLeft, Database, Loader2 } from "lucide-react"
@@ -72,7 +72,7 @@ export default function SourceCreatePage() {
     formData.port > 0 &&
     formData.port <= 65535
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
 
     if (!isFormValid) return
@@ -174,9 +174,10 @@ export default function SourceCreatePage() {
                   type="number"
                   placeholder="5432"
                   value={formData.port}
-                  onChange={(e) =>
-                    updateField("port", parseInt(e.target.value) || 5432)
-                  }
+                  onChange={(e) => {
+                    const parsed = parseInt(e.target.value, 10)
+                    updateField("port", Number.isNaN(parsed) ? 5432 : parsed)
+                  }}
                   className="mt-1"
                   min={1}
                   max={65535}

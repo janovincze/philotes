@@ -2,10 +2,17 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { alertsApi } from "@/lib/api"
 import type { CreateAlertRuleInput, CreateChannelInput } from "@/lib/api/types"
 
+const alertKeys = {
+  rules: ["alert-rules"] as const,
+  alerts: ["alerts"] as const,
+  summary: ["alert-summary"] as const,
+  channels: ["notification-channels"] as const,
+}
+
 // Alert Rules
 export function useAlertRules() {
   return useQuery({
-    queryKey: ["alert-rules"],
+    queryKey: alertKeys.rules,
     queryFn: () => alertsApi.listRules(),
   })
 }
@@ -15,8 +22,8 @@ export function useCreateAlertRule() {
   return useMutation({
     mutationFn: (input: CreateAlertRuleInput) => alertsApi.createRule(input),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["alert-rules"] })
-      queryClient.invalidateQueries({ queryKey: ["alert-summary"] })
+      queryClient.invalidateQueries({ queryKey: alertKeys.rules })
+      queryClient.invalidateQueries({ queryKey: alertKeys.summary })
     },
   })
 }
@@ -27,8 +34,8 @@ export function useUpdateAlertRule() {
     mutationFn: ({ id, input }: { id: string; input: Partial<CreateAlertRuleInput> }) =>
       alertsApi.updateRule(id, input),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["alert-rules"] })
-      queryClient.invalidateQueries({ queryKey: ["alert-summary"] })
+      queryClient.invalidateQueries({ queryKey: alertKeys.rules })
+      queryClient.invalidateQueries({ queryKey: alertKeys.summary })
     },
   })
 }
@@ -38,8 +45,8 @@ export function useDeleteAlertRule() {
   return useMutation({
     mutationFn: (id: string) => alertsApi.deleteRule(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["alert-rules"] })
-      queryClient.invalidateQueries({ queryKey: ["alert-summary"] })
+      queryClient.invalidateQueries({ queryKey: alertKeys.rules })
+      queryClient.invalidateQueries({ queryKey: alertKeys.summary })
     },
   })
 }
@@ -47,7 +54,7 @@ export function useDeleteAlertRule() {
 // Alert Instances
 export function useAlerts() {
   return useQuery({
-    queryKey: ["alerts"],
+    queryKey: alertKeys.alerts,
     queryFn: () => alertsApi.listAlerts(),
     refetchInterval: 30000, // refresh every 30s
   })
@@ -59,15 +66,15 @@ export function useAcknowledgeAlert() {
     mutationFn: ({ id, acknowledgedBy, comment }: { id: string; acknowledgedBy: string; comment?: string }) =>
       alertsApi.acknowledgeAlert(id, acknowledgedBy, comment),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["alerts"] })
-      queryClient.invalidateQueries({ queryKey: ["alert-summary"] })
+      queryClient.invalidateQueries({ queryKey: alertKeys.alerts })
+      queryClient.invalidateQueries({ queryKey: alertKeys.summary })
     },
   })
 }
 
 export function useAlertSummary() {
   return useQuery({
-    queryKey: ["alert-summary"],
+    queryKey: alertKeys.summary,
     queryFn: () => alertsApi.getSummary(),
     refetchInterval: 30000,
   })
@@ -76,7 +83,7 @@ export function useAlertSummary() {
 // Notification Channels
 export function useNotificationChannels() {
   return useQuery({
-    queryKey: ["notification-channels"],
+    queryKey: alertKeys.channels,
     queryFn: () => alertsApi.listChannels(),
   })
 }
@@ -86,7 +93,7 @@ export function useCreateChannel() {
   return useMutation({
     mutationFn: (input: CreateChannelInput) => alertsApi.createChannel(input),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["notification-channels"] })
+      queryClient.invalidateQueries({ queryKey: alertKeys.channels })
     },
   })
 }
@@ -96,7 +103,7 @@ export function useDeleteChannel() {
   return useMutation({
     mutationFn: (id: string) => alertsApi.deleteChannel(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["notification-channels"] })
+      queryClient.invalidateQueries({ queryKey: alertKeys.channels })
     },
   })
 }

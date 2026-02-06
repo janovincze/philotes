@@ -339,7 +339,7 @@ func (s *OnboardingService) VerifyDataFlow(ctx context.Context, req *models.Data
 				Success:      false,
 				RowCount:     0,
 				QueryTimeMs:  time.Since(startTime).Milliseconds(),
-				ErrorMessage: "Verification cancelled",
+				ErrorMessage: "Verification canceled",
 			}, nil
 		case <-time.After(pollInterval):
 			// Continue polling

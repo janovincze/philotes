@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect, useRef } from "react"
 import Link from "next/link"
 import { Database, Plus, CheckCircle, XCircle, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -35,8 +35,16 @@ function SourceCard({
   onTestConnection: (id: string) => Promise<void>
 }) {
   const [testState, setTestState] = useState<"idle" | "testing" | "success" | "failure">("idle")
+  const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (resetTimerRef.current) clearTimeout(resetTimerRef.current)
+    }
+  }, [])
 
   const handleTestConnection = useCallback(async () => {
+    if (resetTimerRef.current) clearTimeout(resetTimerRef.current)
     setTestState("testing")
     try {
       await onTestConnection(source.id)
@@ -44,7 +52,7 @@ function SourceCard({
     } catch {
       setTestState("failure")
     }
-    setTimeout(() => setTestState("idle"), 3000)
+    resetTimerRef.current = setTimeout(() => setTestState("idle"), 3000)
   }, [onTestConnection, source.id])
 
   const testButtonText = {

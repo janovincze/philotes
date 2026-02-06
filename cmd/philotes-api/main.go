@@ -116,18 +116,23 @@ func main() {
 	auditRepo := repositories.NewAuditRepository(db)
 	dagsterRBACRepo := repositories.NewDagsterRBACRepository(db)
 
-	// Create Iceberg catalog client
-	icebergCatalog := catalog.NewRESTCatalog(catalog.Config{
-		CatalogURL: cfg.Iceberg.CatalogURL,
-		Warehouse:  cfg.Iceberg.Warehouse,
-		Storage: catalog.StorageProfile{
-			Bucket:    cfg.Storage.Bucket,
-			Endpoint:  cfg.Storage.Endpoint,
-			AccessKey: cfg.Storage.AccessKey,
-			SecretKey: cfg.Storage.SecretKey,
-		},
-	}, logger)
-	defer icebergCatalog.Close()
+	// Create Iceberg catalog client (only if configuration is present)
+	var icebergCatalog catalog.Catalog
+	if cfg.Iceberg.CatalogURL != "" && cfg.Iceberg.Warehouse != "" {
+		icebergCatalog = catalog.NewRESTCatalog(catalog.Config{
+			CatalogURL: cfg.Iceberg.CatalogURL,
+			Warehouse:  cfg.Iceberg.Warehouse,
+			Storage: catalog.StorageProfile{
+				Bucket:    cfg.Storage.Bucket,
+				Endpoint:  cfg.Storage.Endpoint,
+				AccessKey: cfg.Storage.AccessKey,
+				SecretKey: cfg.Storage.SecretKey,
+			},
+		}, logger)
+		defer icebergCatalog.Close()
+	} else {
+		logger.Info("iceberg catalog not configured; skipping warehouse integration")
+	}
 
 	// Create services
 	sourceService := services.NewSourceService(sourceRepo, logger)
