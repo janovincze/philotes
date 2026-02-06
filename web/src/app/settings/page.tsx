@@ -233,8 +233,8 @@ function DagsterRbacSettings() {
                               <Badge variant={getRoleBadgeVariant(roleInfo.role)}>
                                 {roleInfo.role.replace("dagster-", "")}
                               </Badge>
-                              <span className="text-muted-foreground text-xs">
-                                {roleInfo.description.split(" ").slice(0, 3).join(" ")}...
+                              <span className="text-muted-foreground text-xs truncate max-w-[150px]" title={roleInfo.description}>
+                                {roleInfo.description}
                               </span>
                             </div>
                           </SelectItem>

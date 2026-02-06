@@ -16,7 +16,12 @@ import (
 
 // resourcePatternRegex validates resource patterns for Dagster RBAC.
 // Allows alphanumeric, underscores, hyphens, slashes, and wildcards.
+// Wildcards (*) are only allowed at the start or end of a segment (e.g., "etl_*", "*/warehouse").
+// Path traversal sequences like ".." are explicitly rejected.
 var resourcePatternRegex = regexp.MustCompile(`^[a-zA-Z0-9_\-/*]+$`)
+
+// resourcePatternDangerousRegex detects potentially dangerous patterns like path traversal.
+var resourcePatternDangerousRegex = regexp.MustCompile(`\.\.`)
 
 // DagsterRBACHandler handles Dagster RBAC-related HTTP requests.
 type DagsterRBACHandler struct {
@@ -155,6 +160,13 @@ func (h *DagsterRBACHandler) AssignRole(c *gin.Context) {
 			models.RespondWithError(c, models.NewBadRequestError(
 				c.Request.URL.Path,
 				"invalid resource pattern: only alphanumeric, underscore, hyphen, slash, and wildcard (*) allowed",
+			))
+			return
+		}
+		if resourcePatternDangerousRegex.MatchString(req.ResourcePattern) {
+			models.RespondWithError(c, models.NewBadRequestError(
+				c.Request.URL.Path,
+				"invalid resource pattern: path traversal sequences are not allowed",
 			))
 			return
 		}

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -204,7 +205,7 @@ func (h *ProxyHandler) proxyRequest(c *gin.Context, body []byte, transform func(
 	}
 
 	// Write response
-	c.Writer.Header().Set("Content-Length", string(rune(len(transformedBody))))
+	c.Writer.Header().Set("Content-Length", strconv.Itoa(len(transformedBody)))
 	c.Writer.WriteHeader(resp.StatusCode)
 	if _, err := c.Writer.Write(transformedBody); err != nil {
 		h.cfg.Logger.Error("failed to write response body", "error", err)

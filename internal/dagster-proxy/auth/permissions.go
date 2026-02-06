@@ -42,6 +42,9 @@ type ResourceRef struct {
 //   - dagster:assets:warehouse/*:view - View assets in warehouse namespace
 //   - dagster:*:*:* - Full admin access
 
+// DagsterPermissionPrefix is the prefix for all Dagster permissions.
+const DagsterPermissionPrefix = "dagster:"
+
 // Pre-built role names
 const (
 	RoleDagsterViewer   = "dagster-viewer"
@@ -106,8 +109,9 @@ func (c *Context) GetDagsterPermissions() []string {
 	}
 
 	var dagsterPerms []string
+	prefixLen := len(DagsterPermissionPrefix)
 	for _, p := range c.Permissions {
-		if len(p) > 8 && p[:8] == "dagster:" {
+		if len(p) > prefixLen && p[:prefixLen] == DagsterPermissionPrefix {
 			dagsterPerms = append(dagsterPerms, p)
 		}
 	}
