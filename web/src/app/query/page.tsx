@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useMemo } from "react"
+import { useState, useCallback, useEffect, useMemo } from "react"
 import { useSearchParams } from "next/navigation"
 import { Play, AlertCircle, Clock, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -35,11 +35,20 @@ function parseErrorLocation(error: string): { line: number; column: number; mess
 
 export default function QueryPage() {
   const searchParams = useSearchParams()
-  const tableParam = searchParams.get("table")
-  const initialQuery = tableParam
-    ? `SELECT * FROM ${tableParam} LIMIT 10`
-    : DEFAULT_QUERY
-  const [sql, setSql] = useState(initialQuery)
+  const rawTableParam = searchParams.get("table")
+  const tableParam =
+    rawTableParam && /^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$/.test(rawTableParam.trim())
+      ? rawTableParam.trim()
+      : null
+  const [sql, setSql] = useState(
+    tableParam ? `SELECT * FROM ${tableParam} LIMIT 10` : DEFAULT_QUERY
+  )
+
+  useEffect(() => {
+    if (tableParam) {
+      setSql(`SELECT * FROM ${tableParam} LIMIT 10`)
+    }
+  }, [tableParam])
   const [columns, setColumns] = useState<QueryColumn[]>([])
   const [rows, setRows] = useState<Record<string, unknown>[]>([])
   const [queryTime, setQueryTime] = useState<number | null>(null)

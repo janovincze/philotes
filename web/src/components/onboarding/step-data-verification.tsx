@@ -327,12 +327,14 @@ function DataPreview({
       )}
 
       {/* Open in Query Editor */}
-      <Button variant="outline" size="sm" asChild>
-        <Link href={`/query?table=${encodeURIComponent(tableName)}`}>
-          <ExternalLink className="mr-2 h-4 w-4" />
-          Open in Query Editor
-        </Link>
-      </Button>
+      {tableName && (
+        <Button variant="outline" size="sm" asChild>
+          <Link href={`/query?table=${encodeURIComponent(tableName)}`}>
+            <ExternalLink className="mr-2 h-4 w-4" />
+            Open in Query Editor
+          </Link>
+        </Button>
+      )}
     </div>
   )
 }
