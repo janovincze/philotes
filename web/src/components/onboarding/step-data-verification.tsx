@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
@@ -14,10 +15,12 @@ import {
   RefreshCw,
   Database,
   Table,
+  ExternalLink,
 } from "lucide-react"
 import { useVerifyDataFlow } from "@/lib/hooks/use-onboarding"
 import { usePipelineStatus } from "@/lib/hooks/use-pipelines"
-import type { Pipeline } from "@/lib/api/types"
+import { ResultsTable } from "@/components/query/results-table"
+import type { Pipeline, QueryColumn } from "@/lib/api/types"
 
 interface StepDataVerificationProps {
   pipeline: Pipeline | null
@@ -213,17 +216,16 @@ export function StepDataVerification({
         </Alert>
       )}
 
-      {/* Verification Details */}
+      {/* Data Preview */}
       {verifyMutation.data && verified && (
-        <div className="rounded-lg border p-4 space-y-3">
-          <h3 className="font-medium">Verification Results</h3>
-          <dl className="grid grid-cols-2 gap-2 text-sm">
-            <dt className="text-muted-foreground">Rows found:</dt>
-            <dd className="font-medium">{verifyMutation.data.row_count}</dd>
-            <dt className="text-muted-foreground">Query time:</dt>
-            <dd className="font-medium">{verifyMutation.data.query_time_ms}ms</dd>
-          </dl>
-        </div>
+        <DataPreview
+          data={verifyMutation.data}
+          tableName={
+            pipeline.tables?.[0]?.target_table ||
+            pipeline.tables?.[0]?.source_table ||
+            ""
+          }
+        />
       )}
 
       <div className="flex justify-between pt-4">
@@ -259,6 +261,78 @@ export function StepDataVerification({
           </Button>
         </div>
       </div>
+    </div>
+  )
+}
+
+function inferColumnType(value: unknown): string {
+  if (value === null || value === undefined) return "unknown"
+  if (typeof value === "number") return Number.isInteger(value) ? "integer" : "double"
+  if (typeof value === "boolean") return "boolean"
+  return "varchar"
+}
+
+function DataPreview({
+  data,
+  tableName,
+}: {
+  data: { row_count: number; query_time_ms: number; sample_rows?: Record<string, unknown>[] }
+  tableName: string
+}) {
+  const sampleRows = data.sample_rows ?? []
+
+  const columns: QueryColumn[] = useMemo(() => {
+    if (sampleRows.length === 0) return []
+    const firstRow = sampleRows[0]
+    return Object.keys(firstRow).map((key) => ({
+      name: key,
+      type: inferColumnType(firstRow[key]),
+    }))
+  }, [sampleRows])
+
+  return (
+    <div className="space-y-4">
+      {/* Summary stats */}
+      <div className="flex items-center gap-3">
+        <Badge variant="default" className="gap-1">
+          <Database className="h-3 w-3" />
+          {data.row_count.toLocaleString()} row{data.row_count !== 1 ? "s" : ""} replicated
+        </Badge>
+        <Badge variant="secondary">
+          {columns.length} column{columns.length !== 1 ? "s" : ""}
+        </Badge>
+        <span className="text-xs text-muted-foreground">
+          Query completed in {data.query_time_ms}ms
+        </span>
+      </div>
+
+      {/* Data table */}
+      {sampleRows.length > 0 ? (
+        <div className="rounded-lg border p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="font-medium">Sample Data</h3>
+            <span className="text-xs text-muted-foreground">
+              Showing {sampleRows.length} of {data.row_count.toLocaleString()} rows
+            </span>
+          </div>
+          <ResultsTable columns={columns} rows={sampleRows} />
+        </div>
+      ) : (
+        <div className="rounded-lg border p-4 text-center">
+          <Table className="mx-auto h-8 w-8 text-muted-foreground" />
+          <p className="mt-2 text-sm text-muted-foreground">
+            {data.row_count} rows replicated, but no sample data available for preview.
+          </p>
+        </div>
+      )}
+
+      {/* Open in Query Editor */}
+      <Button variant="outline" size="sm" asChild>
+        <Link href={`/query?table=${encodeURIComponent(tableName)}`}>
+          <ExternalLink className="mr-2 h-4 w-4" />
+          Open in Query Editor
+        </Link>
+      </Button>
     </div>
   )
 }
