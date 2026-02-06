@@ -13,6 +13,7 @@ import (
 
 	"github.com/janovincze/philotes/internal/api/handlers"
 	"github.com/janovincze/philotes/internal/api/middleware"
+	"github.com/janovincze/philotes/internal/api/repositories"
 	"github.com/janovincze/philotes/internal/api/services"
 	"github.com/janovincze/philotes/internal/cdc/health"
 	"github.com/janovincze/philotes/internal/config"
@@ -41,6 +42,8 @@ type Server struct {
 	queryService          *services.QueryService
 	queryScalingService   *services.QueryScalingService
 	tenantService         *services.TenantService
+	dagsterRBACRepo       *repositories.DagsterRBACRepository
+	userRepo              *repositories.UserRepository
 	httpServer            *http.Server
 	router                *gin.Engine
 }
@@ -103,6 +106,12 @@ type ServerConfig struct {
 
 	// TenantService is the tenant service for multi-tenancy operations.
 	TenantService *services.TenantService
+
+	// DagsterRBACRepository is the repository for Dagster RBAC operations.
+	DagsterRBACRepository *repositories.DagsterRBACRepository
+
+	// UserRepository is the repository for user operations (needed for Dagster RBAC validation).
+	UserRepository *repositories.UserRepository
 
 	// CORSConfig is the CORS configuration.
 	CORSConfig middleware.CORSConfig
@@ -173,6 +182,8 @@ func NewServer(serverCfg ServerConfig) *Server {
 		queryService:          serverCfg.QueryService,
 		queryScalingService:   serverCfg.QueryScalingService,
 		tenantService:         serverCfg.TenantService,
+		dagsterRBACRepo:       serverCfg.DagsterRBACRepository,
+		userRepo:              serverCfg.UserRepository,
 		router:                router,
 	}
 
@@ -354,6 +365,27 @@ func (s *Server) registerRoutes() {
 		if s.queryScalingService != nil {
 			queryScalingHandler := handlers.NewQueryScalingHandler(s.queryScalingService, s.logger)
 			queryScalingHandler.RegisterRoutes(v1, requireAuth)
+		}
+
+		// Dagster RBAC endpoints (protected, admin only for most operations)
+		if s.dagsterRBACRepo != nil && s.userRepo != nil {
+			dagsterRBACHandler := handlers.NewDagsterRBACHandler(s.dagsterRBACRepo, s.userRepo)
+			dagsterRoles := v1.Group("/dagster-roles")
+			dagsterRoles.Use(requireAuth)
+			dagsterRoles.GET("", dagsterRBACHandler.ListAllRoleAssignments)
+			dagsterRoles.GET("/available", dagsterRBACHandler.GetAvailableRoles)
+			dagsterRoles.DELETE("/:id", dagsterRBACHandler.RemoveRole)
+
+			dagsterPerms := v1.Group("/dagster-permissions")
+			dagsterPerms.Use(requireAuth)
+			dagsterPerms.DELETE("/:id", dagsterRBACHandler.RemovePermission)
+
+			// User-scoped Dagster endpoints
+			users := v1.Group("/users")
+			users.Use(requireAuth)
+			users.GET("/:id/dagster-permissions", dagsterRBACHandler.GetUserPermissions)
+			users.POST("/:id/dagster-roles", dagsterRBACHandler.AssignRole)
+			users.POST("/:id/dagster-permissions", dagsterRBACHandler.AddPermission)
 		}
 
 		// Installer endpoints

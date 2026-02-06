@@ -316,6 +316,37 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # Dagster Proxy - RBAC authorization proxy for Dagster OSS
+  dagster-proxy:
+    build:
+      context: ../..
+      dockerfile: deployments/docker/Dockerfile.dagster-proxy
+    container_name: philotes-dagster-proxy
+    ports:
+      - "3002:8080"
+    environment:
+      DAGSTER_PROXY_LISTEN_ADDR: ":8080"
+      DAGSTER_PROXY_UPSTREAM_URL: http://dagster-webserver:3000
+      PHILOTES_DATABASE_HOST: postgres
+      PHILOTES_DATABASE_PORT: 5432
+      PHILOTES_DATABASE_USER: philotes
+      PHILOTES_DATABASE_PASSWORD: philotes
+      PHILOTES_DATABASE_NAME: philotes
+      PHILOTES_AUTH_ENABLED: "true"
+      PHILOTES_AUTH_JWT_SECRET: ${PHILOTES_AUTH_JWT_SECRET:-your-secret-key-min-32-chars-long}
+      PHILOTES_LOG_LEVEL: ${PHILOTES_LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      dagster-webserver:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   postgres_source_data:

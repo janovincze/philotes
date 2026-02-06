@@ -866,3 +866,59 @@ export interface TableInfoResponse {
   comment?: string
   properties?: Record<string, string>
 }
+
+// Dagster RBAC Types
+
+export type DagsterRole = "dagster-viewer" | "dagster-operator" | "dagster-admin"
+
+export interface DagsterRoleAssignment {
+  id: string
+  user_id: string
+  role: DagsterRole
+  resource_pattern?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface DagsterRoleAssignmentWithUser extends DagsterRoleAssignment {
+  user_email: string
+  user_name?: string
+}
+
+export interface DagsterPermission {
+  id: string
+  user_id: string
+  permission: string
+  created_at: string
+}
+
+export interface DagsterUserPermissions {
+  user_id: string
+  roles: DagsterRoleAssignment[]
+  custom_permissions: DagsterPermission[]
+  effective_permissions: string[]
+}
+
+export interface DagsterRoleInfo {
+  role: DagsterRole
+  description: string
+  permissions: string[]
+}
+
+export interface AssignDagsterRoleRequest {
+  role: DagsterRole
+  resource_pattern?: string
+}
+
+export interface AddDagsterPermissionRequest {
+  permission: string
+}
+
+export interface DagsterRoleAssignmentsResponse {
+  role_assignments: DagsterRoleAssignmentWithUser[]
+  total_count: number
+}
+
+export interface AvailableDagsterRolesResponse {
+  roles: DagsterRoleInfo[]
+}

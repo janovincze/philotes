@@ -290,3 +290,131 @@ func (a *AuthContext) HasPermission(permission string) bool {
 	}
 	return false
 }
+
+// Dagster RBAC Models
+
+// DagsterRole represents the available Dagster roles.
+type DagsterRole string
+
+const (
+	DagsterRoleViewer   DagsterRole = "dagster-viewer"
+	DagsterRoleOperator DagsterRole = "dagster-operator"
+	DagsterRoleAdmin    DagsterRole = "dagster-admin"
+)
+
+// DagsterRoleAssignment represents a Dagster role assigned to a user.
+type DagsterRoleAssignment struct {
+	ID              uuid.UUID `json:"id"`
+	UserID          uuid.UUID `json:"user_id"`
+	Role            string    `json:"role"`
+	ResourcePattern string    `json:"resource_pattern,omitempty"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
+}
+
+// DagsterRoleAssignmentWithUser includes user info for admin views.
+type DagsterRoleAssignmentWithUser struct {
+	DagsterRoleAssignment
+	UserEmail string `json:"user_email"`
+	UserName  string `json:"user_name,omitempty"`
+}
+
+// DagsterPermission represents a custom Dagster permission for a user.
+type DagsterPermission struct {
+	ID         uuid.UUID `json:"id"`
+	UserID     uuid.UUID `json:"user_id"`
+	Permission string    `json:"permission"`
+	CreatedAt  time.Time `json:"created_at"`
+}
+
+// DagsterUserPermissions represents all Dagster permissions for a user.
+type DagsterUserPermissions struct {
+	UserID               uuid.UUID               `json:"user_id"`
+	Roles                []DagsterRoleAssignment `json:"roles"`
+	CustomPermissions    []DagsterPermission     `json:"custom_permissions"`
+	EffectivePermissions []string                `json:"effective_permissions"`
+}
+
+// AssignDagsterRoleRequest represents a request to assign a Dagster role.
+type AssignDagsterRoleRequest struct {
+	Role            string `json:"role" binding:"required"`
+	ResourcePattern string `json:"resource_pattern,omitempty"`
+}
+
+// Validate validates the assign role request.
+func (r *AssignDagsterRoleRequest) Validate() []FieldError {
+	var errors []FieldError
+	validRoles := map[string]bool{
+		"dagster-viewer":   true,
+		"dagster-operator": true,
+		"dagster-admin":    true,
+	}
+	if !validRoles[r.Role] {
+		errors = append(errors, FieldError{
+			Field:   "role",
+			Message: "invalid role, must be dagster-viewer, dagster-operator, or dagster-admin",
+		})
+	}
+	return errors
+}
+
+// AddDagsterPermissionRequest represents a request to add a custom permission.
+type AddDagsterPermissionRequest struct {
+	Permission string `json:"permission" binding:"required"`
+}
+
+// Validate validates the add permission request.
+func (r *AddDagsterPermissionRequest) Validate() []FieldError {
+	var errors []FieldError
+	if r.Permission == "" {
+		errors = append(errors, FieldError{Field: "permission", Message: "permission is required"})
+	} else if len(r.Permission) < 10 || r.Permission[:8] != "dagster:" {
+		errors = append(errors, FieldError{
+			Field:   "permission",
+			Message: "permission must start with 'dagster:' and follow format dagster:{type}:{name}:{action}",
+		})
+	}
+	return errors
+}
+
+// DagsterRoleInfo provides information about a Dagster role.
+type DagsterRoleInfo struct {
+	Role        string   `json:"role"`
+	Description string   `json:"description"`
+	Permissions []string `json:"permissions"`
+}
+
+// AvailableDagsterRoles returns info about all available roles.
+var AvailableDagsterRoles = []DagsterRoleInfo{
+	{
+		Role:        "dagster-viewer",
+		Description: "View all Dagster resources (jobs, assets, schedules, sensors, runs)",
+		Permissions: []string{
+			"dagster:jobs:*:view",
+			"dagster:assets:*:view",
+			"dagster:schedules:*:view",
+			"dagster:sensors:*:view",
+			"dagster:runs:*:view",
+		},
+	},
+	{
+		Role:        "dagster-operator",
+		Description: "View + execute jobs and materialize assets",
+		Permissions: []string{
+			"dagster:jobs:*:view",
+			"dagster:jobs:*:execute",
+			"dagster:assets:*:view",
+			"dagster:assets:*:materialize",
+			"dagster:schedules:*:view",
+			"dagster:sensors:*:view",
+			"dagster:runs:*:view",
+		},
+	},
+	{
+		Role:        "dagster-admin",
+		Description: "Full access to all Dagster resources and operations",
+		Permissions: []string{
+			"dagster:*:*:*",
+		},
+	},
+}
