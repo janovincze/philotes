@@ -209,8 +209,16 @@ export function ResultsTable({ columns, rows, isLoading }: ResultsTableProps) {
                   return (
                     <TableCell
                       key={column.name}
-                      className="whitespace-nowrap cursor-pointer hover:bg-muted/30"
+                      className="whitespace-nowrap cursor-pointer hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
                       onClick={() => handleCellCopy(value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault()
+                          handleCellCopy(value)
+                        }
+                      }}
+                      role="button"
+                      tabIndex={0}
                       title="Click to copy"
                     >
                       {isNull ? (

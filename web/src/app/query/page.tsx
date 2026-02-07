@@ -362,7 +362,7 @@ export default function QueryPage() {
           {/* Editor Section */}
           <Card
             role="tabpanel"
-            id={`query-tabpanel-${activeTabId}`}
+            id="query-tabpanel"
             aria-labelledby={`query-tab-${activeTabId}`}
           >
             {/* Tab Bar */}
