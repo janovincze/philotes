@@ -38,7 +38,7 @@ export function useSchemas(catalog: string | null) {
   return useQuery({
     queryKey: ["query", "schemas", catalog],
     queryFn: async (): Promise<SchemaListResponse> => {
-      return apiClient.get<SchemaListResponse>(`/query/catalogs/${catalog}/schemas`)
+      return apiClient.get<SchemaListResponse>(`/api/v1/query/catalogs/${catalog}/schemas`)
     },
     enabled: !!catalog,
     staleTime: 60000,
@@ -50,7 +50,7 @@ export function useTables(catalog: string | null, schema: string | null) {
   return useQuery({
     queryKey: ["query", "tables", catalog, schema],
     queryFn: async (): Promise<TableListResponse> => {
-      return apiClient.get<TableListResponse>(`/query/catalogs/${catalog}/schemas/${schema}/tables`)
+      return apiClient.get<TableListResponse>(`/api/v1/query/catalogs/${catalog}/schemas/${schema}/tables`)
     },
     enabled: !!catalog && !!schema,
     staleTime: 60000,
@@ -63,7 +63,7 @@ export function useTableInfo(catalog: string | null, schema: string | null, tabl
     queryKey: ["query", "tableInfo", catalog, schema, table],
     queryFn: async (): Promise<TableInfoResponse> => {
       return apiClient.get<TableInfoResponse>(
-        `/query/catalogs/${catalog}/schemas/${schema}/tables/${table}`
+        `/api/v1/query/catalogs/${catalog}/schemas/${schema}/tables/${table}`
       )
     },
     enabled: !!catalog && !!schema && !!table,
@@ -90,7 +90,7 @@ export function useAutoCompleteMetadata(): AutoCompleteMetadata {
     queries: catalogs.map((catalog) => ({
       queryKey: ["query", "schemas", catalog.name],
       queryFn: async (): Promise<SchemaListResponse> => {
-        return apiClient.get<SchemaListResponse>(`/query/catalogs/${catalog.name}/schemas`)
+        return apiClient.get<SchemaListResponse>(`/api/v1/query/catalogs/${catalog.name}/schemas`)
       },
       staleTime: 60000,
       enabled: !!catalog.name,
@@ -119,7 +119,7 @@ export function useAutoCompleteMetadata(): AutoCompleteMetadata {
       queryKey: ["query", "tables", catalog, schema],
       queryFn: async (): Promise<TableListResponse> => {
         return apiClient.get<TableListResponse>(
-          `/query/catalogs/${catalog}/schemas/${schema}/tables`
+          `/api/v1/query/catalogs/${catalog}/schemas/${schema}/tables`
         )
       },
       staleTime: 60000,
@@ -151,7 +151,7 @@ export function useAutoCompleteMetadata(): AutoCompleteMetadata {
       queryKey: ["query", "tableInfo", catalog, schema, name],
       queryFn: async (): Promise<TableInfoResponse> => {
         return apiClient.get<TableInfoResponse>(
-          `/query/catalogs/${catalog}/schemas/${schema}/tables/${name}`
+          `/api/v1/query/catalogs/${catalog}/schemas/${schema}/tables/${name}`
         )
       },
       staleTime: 60000,
