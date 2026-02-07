@@ -19,6 +19,11 @@ interface QueryTemplate {
 
 const defaultTemplates: QueryTemplate[] = [
   {
+    name: "Test Query",
+    description: "Verify Trino connectivity",
+    sql: "SELECT 1 AS connected",
+  },
+  {
     name: "Show Catalogs",
     description: "List all available catalogs",
     sql: "SHOW CATALOGS",

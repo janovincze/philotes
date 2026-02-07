@@ -66,19 +66,26 @@ func (c *RESTCatalog) EnsureWarehouse(ctx context.Context) error {
 	// Warehouse doesn't exist, create it
 	c.logger.Info("creating warehouse", "warehouse", c.config.Warehouse)
 
+	region := c.config.Storage.Region
+	if region == "" {
+		region = "us-east-1" // Default for MinIO and AWS
+	}
 	storageProfile := map[string]any{
-		"type":   "s3",
-		"bucket": c.config.Storage.Bucket,
-		"flavor": "minio",
+		"type":        "s3",
+		"bucket":      c.config.Storage.Bucket,
+		"flavor":      "minio",
+		"region":      region,
+		"sts-enabled": false,
 	}
 	if c.config.Storage.KeyPrefix != "" {
 		storageProfile["key-prefix"] = c.config.Storage.KeyPrefix
 	}
-	if c.config.Storage.Region != "" {
-		storageProfile["region"] = c.config.Storage.Region
-	}
 	if c.config.Storage.Endpoint != "" {
-		storageProfile["endpoint"] = c.config.Storage.Endpoint
+		endpoint := c.config.Storage.Endpoint
+		if !strings.HasPrefix(endpoint, "http://") && !strings.HasPrefix(endpoint, "https://") {
+			endpoint = "http://" + endpoint
+		}
+		storageProfile["endpoint"] = endpoint
 	}
 
 	createBody := map[string]any{

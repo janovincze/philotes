@@ -87,7 +87,7 @@ func (s *OnboardingService) GetClusterHealth(ctx context.Context) *models.Cluste
 
 		// Set specific ready flags based on component names
 		switch name {
-		case "buffer_db", "buffer-db", "postgres", "postgresql":
+		case "buffer_db", "buffer-db", "postgres", "postgresql", "database":
 			response.BufferDBReady = result.Status == health.StatusHealthy
 		case "minio", "object_storage", "s3":
 			response.MinIOReady = result.Status == health.StatusHealthy

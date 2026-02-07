@@ -181,7 +181,7 @@ export function QuickstartWizard() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8" data-testid="quickstart-wizard">
       <div className="text-center">
         <h1 className="text-3xl font-bold">Quick Start</h1>
         <p className="text-muted-foreground mt-2">
