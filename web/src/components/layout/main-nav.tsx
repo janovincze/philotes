@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation"
 import {
   LayoutDashboard,
   Database,
+  DatabaseZap,
   GitBranch,
   Scale,
   Bell,
@@ -43,6 +44,11 @@ const navItems: NavItem[] = [
     title: "Query",
     href: "/query",
     icon: Terminal,
+  },
+  {
+    title: "Data Sources",
+    href: "/data-sources",
+    icon: DatabaseZap,
   },
   {
     title: "Scaling",

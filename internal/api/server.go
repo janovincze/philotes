@@ -39,8 +39,9 @@ type Server struct {
 	oidcService           *services.OIDCService
 	onboardingService     *services.OnboardingService
 	nodePoolService       *services.NodePoolService
-	queryService          *services.QueryService
-	queryScalingService   *services.QueryScalingService
+	queryService              *services.QueryService
+	queryDataSourceService    *services.QueryDataSourceService
+	queryScalingService       *services.QueryScalingService
 	tenantService         *services.TenantService
 	dagsterRBACRepo       *repositories.DagsterRBACRepository
 	userRepo              *repositories.UserRepository
@@ -100,6 +101,9 @@ type ServerConfig struct {
 
 	// QueryService is the query service for Trino query layer operations.
 	QueryService *services.QueryService
+
+	// QueryDataSourceService is the query data source service for query federation.
+	QueryDataSourceService *services.QueryDataSourceService
 
 	// QueryScalingService is the query scaling service for query engine auto-scaling.
 	QueryScalingService *services.QueryScalingService
@@ -179,8 +183,9 @@ func NewServer(serverCfg ServerConfig) *Server {
 		oidcService:           serverCfg.OIDCService,
 		onboardingService:     serverCfg.OnboardingService,
 		nodePoolService:       serverCfg.NodePoolService,
-		queryService:          serverCfg.QueryService,
-		queryScalingService:   serverCfg.QueryScalingService,
+		queryService:              serverCfg.QueryService,
+		queryDataSourceService:    serverCfg.QueryDataSourceService,
+		queryScalingService:       serverCfg.QueryScalingService,
 		tenantService:         serverCfg.TenantService,
 		dagsterRBACRepo:       serverCfg.DagsterRBACRepository,
 		userRepo:              serverCfg.UserRepository,
@@ -359,6 +364,20 @@ func (s *Server) registerRoutes() {
 			protected := v1.Group("")
 			protected.Use(requireAuth)
 			queryHandler.RegisterRoutes(protected)
+		}
+
+		// Query data source endpoints (protected when auth is enabled)
+		if s.queryDataSourceService != nil {
+			dsHandler := handlers.NewQueryDataSourceHandler(s.queryDataSourceService)
+			protected := v1.Group("")
+			protected.Use(requireAuth)
+			ds := protected.Group("/query/datasources")
+			ds.POST("", dsHandler.Create)
+			ds.GET("", dsHandler.List)
+			ds.GET("/:id", dsHandler.Get)
+			ds.PUT("/:id", dsHandler.Update)
+			ds.DELETE("/:id", dsHandler.Delete)
+			ds.POST("/:id/test", dsHandler.TestConnection)
 		}
 
 		// Query scaling endpoints (protected when auth is enabled)

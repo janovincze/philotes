@@ -261,6 +261,13 @@ func main() {
 		queryService = services.NewQueryService(cfg.Trino, logger)
 	}
 
+	// Create query data source service (for query federation)
+	var queryDataSourceService *services.QueryDataSourceService
+	if cfg.Trino.Enabled {
+		queryDataSourceRepo := repositories.NewQueryDataSourceRepository(db)
+		queryDataSourceService = services.NewQueryDataSourceService(queryDataSourceRepo, queryService, logger)
+	}
+
 	// Create onboarding service
 	onboardingService := services.NewOnboardingService(onboardingRepo, userRepo, healthManager, queryService, logger)
 
@@ -274,8 +281,9 @@ func main() {
 		AuthService:           authService,
 		APIKeyService:         apiKeyService,
 		OnboardingService:     onboardingService,
-		QueryService:          queryService,
-		DagsterRBACRepository: dagsterRBACRepo,
+		QueryService:           queryService,
+		QueryDataSourceService: queryDataSourceService,
+		DagsterRBACRepository:  dagsterRBACRepo,
 		UserRepository:        userRepo,
 		CORSConfig: middleware.CORSConfig{
 			AllowedOrigins:   cfg.API.CORSOrigins,
