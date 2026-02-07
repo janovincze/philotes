@@ -29,7 +29,7 @@ const dataSourceSchema = z.object({
   port: z.number().int().min(1).max(65535),
   database_name: z.string().min(1, "Database name is required"),
   username: z.string().min(1, "Username is required"),
-  password: z.string().min(1, "Password is required"),
+  password: z.string().optional(),
   ssl_mode: z.string().optional(),
 })
 
@@ -76,8 +76,16 @@ export function DataSourceForm({
     }
   }
 
+  const handleFormSubmit = (values: DataSourceFormValues) => {
+    if (!isEdit && !values.password) {
+      form.setError("password", { message: "Password is required" })
+      return
+    }
+    onSubmit(values)
+  }
+
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+    <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="name">Name</Label>

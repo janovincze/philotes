@@ -56,7 +56,19 @@ import {
   useDeleteQueryDataSource,
   useTestQueryDataSourceConnection,
 } from "@/lib/hooks/use-query-data-sources"
-import type { QueryDataSource, QueryDataSourceStatus } from "@/lib/api/types"
+import type { QueryDataSource, QueryDataSourceStatus, CreateQueryDataSourceRequest, UpdateQueryDataSourceRequest } from "@/lib/api/types"
+
+type DataSourceFormValues = {
+  name: string
+  type: "postgresql" | "mysql"
+  catalog_name: string
+  host: string
+  port: number
+  database_name: string
+  username: string
+  password?: string
+  ssl_mode?: string
+}
 
 function StatusBadge({ status }: { status: QueryDataSourceStatus }) {
   const config = {
@@ -120,27 +132,25 @@ export default function DataSourcesPage() {
   }, [])
 
   const handleCreate = useCallback(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    async (values: any) => {
+    async (values: DataSourceFormValues) => {
       try {
-        await createMutation.mutateAsync(values)
+        // Password is guaranteed by form validation for create flow
+        await createMutation.mutateAsync(values as CreateQueryDataSourceRequest)
         toast.success("Data source created successfully")
         setCreateDialogOpen(false)
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Failed to create data source")
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [createMutation.mutateAsync]
+    [createMutation]
   )
 
   const handleUpdate = useCallback(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    async (values: any) => {
+    async (values: DataSourceFormValues) => {
       if (!editingSource) return
       try {
         // Only send changed fields for update
-        const input: Record<string, unknown> = {}
+        const input: UpdateQueryDataSourceRequest = {}
         if (values.name !== editingSource.name) input.name = values.name
         if (values.host !== editingSource.host) input.host = values.host
         if (values.port !== editingSource.port) input.port = values.port
@@ -156,8 +166,7 @@ export default function DataSourcesPage() {
         toast.error(err instanceof Error ? err.message : "Failed to update data source")
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [editingSource, updateMutation.mutateAsync]
+    [editingSource, updateMutation]
   )
 
   const handleDelete = useCallback(async () => {
@@ -169,8 +178,7 @@ export default function DataSourcesPage() {
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to delete data source")
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [deletingSource, deleteMutation.mutateAsync])
+  }, [deletingSource, deleteMutation])
 
   const handleTestConnection = useCallback(
     async (id: string) => {
@@ -188,8 +196,7 @@ export default function DataSourcesPage() {
       }
       resetTimerRef.current = setTimeout(() => setTestingId(null), 2000)
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [testConnectionMutation.mutateAsync]
+    [testConnectionMutation]
   )
 
   return (

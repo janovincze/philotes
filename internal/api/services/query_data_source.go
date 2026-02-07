@@ -147,7 +147,7 @@ func (s *QueryDataSourceService) Update(ctx context.Context, id uuid.UUID, req *
 		updatedDS, password, err := s.repo.GetByIDWithPassword(ctx, id)
 		if err != nil {
 			s.logger.Error("failed to get updated data source with password", "id", id, "error", err)
-			return ds, nil
+			return nil, fmt.Errorf("failed to get updated data source: %w", err)
 		}
 
 		// Recreate catalog
@@ -250,9 +250,21 @@ func (s *QueryDataSourceService) createTrinoCatalog(ctx context.Context, ds *mod
 	case "postgresql":
 		connectorName = "postgresql"
 		jdbcURL = fmt.Sprintf("jdbc:postgresql://%s:%d/%s", ds.Host, ds.Port, ds.DatabaseName)
+		if ds.SSLMode != "" {
+			jdbcURL += "?sslmode=" + ds.SSLMode
+		}
 	case "mysql":
 		connectorName = "mysql"
 		jdbcURL = fmt.Sprintf("jdbc:mysql://%s:%d/%s", ds.Host, ds.Port, ds.DatabaseName)
+		if ds.SSLMode != "" && ds.SSLMode != "prefer" {
+			// MySQL JDBC uses useSSL/requireSSL parameters
+			switch ds.SSLMode {
+			case "disable":
+				jdbcURL += "?useSSL=false"
+			case "require", "verify-ca", "verify-full":
+				jdbcURL += "?useSSL=true&requireSSL=true"
+			}
+		}
 	default:
 		return fmt.Errorf("unsupported data source type: %s", ds.Type)
 	}

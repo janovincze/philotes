@@ -86,13 +86,13 @@ func (r *queryDataSourceRow) toModel() *models.QueryDataSource {
 
 // Create creates a new query data source in the database.
 func (r *QueryDataSourceRepository) Create(ctx context.Context, req *models.CreateQueryDataSourceRequest) (*models.QueryDataSource, error) {
-	var extraConfigJSON sql.NullString
+	extraConfigJSON := "{}"
 	if req.ExtraConfig != nil {
 		data, err := json.Marshal(req.ExtraConfig)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal extra_config: %w", err)
 		}
-		extraConfigJSON = sql.NullString{String: string(data), Valid: true}
+		extraConfigJSON = string(data)
 	}
 
 	query := `
@@ -319,19 +319,38 @@ func (r *QueryDataSourceRepository) Update(ctx context.Context, id uuid.UUID, re
 		argIdx++
 	}
 	if req.ExtraConfig != nil {
-		data, err := json.Marshal(req.ExtraConfig)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal extra_config: %w", err)
+		extraData, marshalErr := json.Marshal(req.ExtraConfig)
+		if marshalErr != nil {
+			return nil, fmt.Errorf("failed to marshal extra_config: %w", marshalErr)
 		}
 		query += fmt.Sprintf(", extra_config = $%d", argIdx)
-		args = append(args, string(data))
+		args = append(args, string(extraData))
 		argIdx++
 	}
 
 	query += fmt.Sprintf(" WHERE id = $%d", argIdx)
 	args = append(args, id)
+	query += ` RETURNING id, name, type, catalog_name, host, port, database_name, username, password,
+		ssl_mode, extra_config, status, error_message, created_at, updated_at`
 
-	_, err = r.db.ExecContext(ctx, query, args...)
+	var row queryDataSourceRow
+	err = r.db.QueryRowContext(ctx, query, args...).Scan(
+		&row.ID,
+		&row.Name,
+		&row.Type,
+		&row.CatalogName,
+		&row.Host,
+		&row.Port,
+		&row.DatabaseName,
+		&row.Username,
+		&row.Password,
+		&row.SSLMode,
+		&row.ExtraConfig,
+		&row.Status,
+		&row.ErrorMessage,
+		&row.CreatedAt,
+		&row.UpdatedAt,
+	)
 	if err != nil {
 		if isUniqueViolation(err) {
 			return nil, ErrQueryDataSourceNameExists
@@ -339,11 +358,11 @@ func (r *QueryDataSourceRepository) Update(ctx context.Context, id uuid.UUID, re
 		return nil, fmt.Errorf("failed to update query data source: %w", err)
 	}
 
-	return r.GetByID(ctx, id)
+	return row.toModel(), nil
 }
 
 // UpdateStatus updates the status and error message of a query data source.
-func (r *QueryDataSourceRepository) UpdateStatus(ctx context.Context, id uuid.UUID, status string, errorMessage string) error {
+func (r *QueryDataSourceRepository) UpdateStatus(ctx context.Context, id uuid.UUID, status, errorMessage string) error {
 	query := `
 		UPDATE philotes.query_data_sources
 		SET status = $1, error_message = $2, updated_at = NOW()

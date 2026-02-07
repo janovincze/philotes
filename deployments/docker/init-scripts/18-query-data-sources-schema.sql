@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS philotes.query_data_sources (
     port INTEGER NOT NULL,
     database_name TEXT NOT NULL,
     username TEXT NOT NULL,
-    password TEXT NOT NULL,
+    password TEXT NOT NULL, -- TODO: encrypt at rest via Vault transit engine (see Issue #70 follow-up)
     ssl_mode TEXT NOT NULL DEFAULT 'prefer',
     extra_config JSONB NOT NULL DEFAULT '{}',
     status TEXT NOT NULL DEFAULT 'inactive' CHECK (status IN ('inactive', 'active', 'error')),
