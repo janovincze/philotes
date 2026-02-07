@@ -10,6 +10,8 @@ interface SqlEditorProps {
   value: string
   onChange: (value: string) => void
   onExecute?: () => void
+  onExecuteSelection?: (sql: string) => void
+  onFormat?: () => void
   disabled?: boolean
   height?: string
   metadata?: AutoCompleteMetadata
@@ -24,6 +26,8 @@ export function SqlEditor({
   value,
   onChange,
   onExecute,
+  onExecuteSelection,
+  onFormat,
   disabled = false,
   height = "300px",
   metadata,
@@ -32,6 +36,14 @@ export function SqlEditor({
   const { resolvedTheme } = useTheme()
   const editorRef = useRef<monacoEditor.editor.IStandaloneCodeEditor | null>(null)
   const monacoRef = useRef<Monaco | null>(null)
+  const onExecuteRef = useRef(onExecute)
+  const onExecuteSelectionRef = useRef(onExecuteSelection)
+  const onFormatRef = useRef(onFormat)
+
+  // Keep refs in sync with latest callbacks
+  useEffect(() => { onExecuteRef.current = onExecute }, [onExecute])
+  useEffect(() => { onExecuteSelectionRef.current = onExecuteSelection }, [onExecuteSelection])
+  useEffect(() => { onFormatRef.current = onFormat }, [onFormat])
 
   // Update global metadata when it changes
   useEffect(() => {
@@ -65,10 +77,36 @@ export function SqlEditor({
     editorRef.current = editor as monacoEditor.editor.IStandaloneCodeEditor
     monacoRef.current = monaco
 
-    // Add Ctrl+Enter keybinding to execute
+    // Ctrl/Cmd+Enter — Execute full query
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
-      onExecute?.()
+      onExecuteRef.current?.()
     })
+
+    // Ctrl/Cmd+Shift+Enter — Execute selected text
+    editor.addCommand(
+      monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.Enter,
+      () => {
+        const selection = editor.getSelection()
+        const model = editor.getModel()
+        if (selection && model && !selection.isEmpty()) {
+          const selectedText = model.getValueInRange(selection).trim()
+          if (selectedText) {
+            onExecuteSelectionRef.current?.(selectedText)
+            return
+          }
+        }
+        // Fallback to full query execution
+        onExecuteRef.current?.()
+      }
+    )
+
+    // Ctrl/Cmd+Shift+F — Format SQL
+    editor.addCommand(
+      monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyF,
+      () => {
+        onFormatRef.current?.()
+      }
+    )
 
     // Configure SQL language features
     configureSqlLanguage(monaco)
@@ -82,38 +120,48 @@ export function SqlEditor({
   )
 
   return (
-    <div className="rounded-md border overflow-hidden">
-      <Editor
-        height={height}
-        defaultLanguage="sql"
-        value={value}
-        onChange={handleChange}
-        onMount={handleEditorMount}
-        theme={resolvedTheme === "dark" ? "vs-dark" : "light"}
-        options={{
-          minimap: { enabled: false },
-          fontSize: 14,
-          lineNumbers: "on",
-          scrollBeyondLastLine: false,
-          wordWrap: "on",
-          automaticLayout: true,
-          tabSize: 2,
-          readOnly: disabled,
-          scrollbar: {
-            vertical: "auto",
-            horizontal: "auto",
-          },
-          suggestOnTriggerCharacters: true,
-          quickSuggestions: true,
-          formatOnPaste: true,
-          formatOnType: true,
-        }}
-        loading={
-          <div className="flex items-center justify-center h-full text-muted-foreground">
-            Loading editor...
-          </div>
-        }
-      />
+    <div className="flex flex-col gap-1">
+      <div className="rounded-md border overflow-hidden">
+        <Editor
+          height={height}
+          defaultLanguage="sql"
+          value={value}
+          onChange={handleChange}
+          onMount={handleEditorMount}
+          theme={resolvedTheme === "dark" ? "vs-dark" : "light"}
+          options={{
+            minimap: { enabled: false },
+            fontSize: 14,
+            lineNumbers: "on",
+            scrollBeyondLastLine: false,
+            wordWrap: "on",
+            automaticLayout: true,
+            tabSize: 2,
+            readOnly: disabled,
+            folding: true,
+            foldingStrategy: "indentation",
+            scrollbar: {
+              vertical: "auto",
+              horizontal: "auto",
+            },
+            suggestOnTriggerCharacters: true,
+            quickSuggestions: true,
+            formatOnPaste: true,
+            formatOnType: true,
+          }}
+          loading={
+            <div className="flex items-center justify-center h-full text-muted-foreground">
+              Loading editor...
+            </div>
+          }
+        />
+      </div>
+      <div className="flex items-center gap-3 text-[10px] text-muted-foreground px-1">
+        <span>Ctrl+Enter: Run</span>
+        <span>Ctrl+Shift+Enter: Run Selection</span>
+        <span>Ctrl+Shift+F: Format</span>
+        <span>Ctrl+/: Comment</span>
+      </div>
     </div>
   )
 }

@@ -2,7 +2,8 @@
 
 import { useState, useCallback, useEffect, useMemo } from "react"
 import { useSearchParams } from "next/navigation"
-import { Play, AlertCircle, Clock, RotateCcw, PanelLeftOpen } from "lucide-react"
+import { Play, AlertCircle, Clock, RotateCcw, PanelLeftOpen, WandSparkles } from "lucide-react"
+import { format as formatSql } from "sql-formatter"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -10,6 +11,7 @@ import { SqlEditor } from "@/components/query/sql-editor"
 import { ResultsTable } from "@/components/query/results-table"
 import { QueryTemplates } from "@/components/query/query-templates"
 import { QueryHistory, type QueryHistoryEntry } from "@/components/query/query-history"
+import { QueryTabBar, type QueryTab } from "@/components/query/query-tabs"
 import { SchemaBrowser } from "@/components/schema-browser/schema-browser"
 import { useQueryExecute, useAutoCompleteMetadata } from "@/lib/hooks/use-query"
 import type { QueryColumn } from "@/lib/api/types"
@@ -19,12 +21,55 @@ const DEFAULT_QUERY = `-- Write your SQL query here
 SELECT * FROM iceberg.public.customers LIMIT 10`
 
 const SIDEBAR_STORAGE_KEY = "philotes-schema-browser-open"
+const TABS_STORAGE_KEY = "philotes-query-tabs"
+
+// --- Tab runtime state (not persisted) ---
+interface TabRuntime {
+  columns: QueryColumn[]
+  rows: Record<string, unknown>[]
+  queryTime: number | null
+  truncated: boolean
+  error: string | null
+}
+
+// --- Persistence helpers ---
+interface PersistedTabState {
+  activeTabId: string
+  tabs: QueryTab[]
+}
+
+function generateTabId(): string {
+  return `tab-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+}
+
+function loadTabState(): { tabs: QueryTab[]; activeTabId: string } {
+  if (typeof window === "undefined") {
+    return { tabs: [{ id: "tab-1", name: "Query 1", sql: DEFAULT_QUERY }], activeTabId: "tab-1" }
+  }
+  try {
+    const stored = localStorage.getItem(TABS_STORAGE_KEY)
+    if (stored) {
+      const parsed: PersistedTabState = JSON.parse(stored)
+      if (parsed.tabs?.length > 0) {
+        return { tabs: parsed.tabs, activeTabId: parsed.activeTabId || parsed.tabs[0].id }
+      }
+    }
+  } catch {
+    // ignore parse errors
+  }
+  return { tabs: [{ id: "tab-1", name: "Query 1", sql: DEFAULT_QUERY }], activeTabId: "tab-1" }
+}
+
+function saveTabState(tabs: QueryTab[], activeTabId: string) {
+  try {
+    localStorage.setItem(TABS_STORAGE_KEY, JSON.stringify({ activeTabId, tabs }))
+  } catch {
+    // ignore quota errors
+  }
+}
 
 // Parse error messages to extract line/column information
 function parseErrorLocation(error: string): { line: number; column: number; message: string } | null {
-  // Common Trino error patterns:
-  // "line 1:15: Column 'foo' cannot be resolved"
-  // "Query failed (#20240101_123456_00001_xxxxx): line 2:10: ..."
   const lineColMatch = error.match(/line\s+(\d+):(\d+):\s*(.+)/i)
   if (lineColMatch) {
     return {
@@ -43,20 +88,102 @@ export default function QueryPage() {
     rawTableParam && /^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$/.test(rawTableParam.trim())
       ? rawTableParam.trim()
       : null
-  const [sql, setSql] = useState(
-    tableParam ? `SELECT * FROM ${tableParam} LIMIT 10` : DEFAULT_QUERY
-  )
 
+  // --- Tab state (single loadTabState call to avoid divergence) ---
+  const [initialState] = useState(loadTabState)
+  const [tabs, setTabs] = useState<QueryTab[]>(initialState.tabs)
+  const [activeTabId, setActiveTabId] = useState<string>(initialState.activeTabId)
+  const [runtimeState, setRuntimeState] = useState<Map<string, TabRuntime>>(() => new Map())
+
+  // Persist tabs on change
+  useEffect(() => {
+    saveTabState(tabs, activeTabId)
+  }, [tabs, activeTabId])
+
+  // Handle URL table parameter — update active tab SQL
   useEffect(() => {
     if (tableParam) {
-      setSql(`SELECT * FROM ${tableParam} LIMIT 10`)
+      setTabs((prev) =>
+        prev.map((t) =>
+          t.id === activeTabId ? { ...t, sql: `SELECT * FROM ${tableParam} LIMIT 10` } : t
+        )
+      )
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tableParam])
-  const [columns, setColumns] = useState<QueryColumn[]>([])
-  const [rows, setRows] = useState<Record<string, unknown>[]>([])
-  const [queryTime, setQueryTime] = useState<number | null>(null)
-  const [truncated, setTruncated] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+
+  const activeTab = tabs.find((t) => t.id === activeTabId) || tabs[0]
+  const activeRuntime = runtimeState.get(activeTabId) || {
+    columns: [],
+    rows: [],
+    queryTime: null,
+    truncated: false,
+    error: null,
+  }
+
+  const updateActiveTab = useCallback(
+    (updates: Partial<QueryTab>) => {
+      setTabs((prev) =>
+        prev.map((t) => (t.id === activeTabId ? { ...t, ...updates } : t))
+      )
+    },
+    [activeTabId]
+  )
+
+  const updateActiveRuntime = useCallback(
+    (updates: Partial<TabRuntime>) => {
+      setRuntimeState((prev) => {
+        const next = new Map(prev)
+        const current = next.get(activeTabId) || {
+          columns: [],
+          rows: [],
+          queryTime: null,
+          truncated: false,
+          error: null,
+        }
+        next.set(activeTabId, { ...current, ...updates })
+        return next
+      })
+    },
+    [activeTabId]
+  )
+
+  // --- Tab operations ---
+  const handleAddTab = useCallback(() => {
+    const newId = generateTabId()
+    const tabNumber = tabs.length + 1
+    setTabs((prev) => [...prev, { id: newId, name: `Query ${tabNumber}`, sql: "" }])
+    setActiveTabId(newId)
+  }, [tabs.length])
+
+  const handleCloseTab = useCallback(
+    (id: string) => {
+      setTabs((prev) => {
+        if (prev.length <= 1) return prev // never close last tab
+        const idx = prev.findIndex((t) => t.id === id)
+        const filtered = prev.filter((t) => t.id !== id)
+        // If closing the active tab, switch to the adjacent tab
+        if (id === activeTabId) {
+          const newActive = filtered[Math.min(idx, filtered.length - 1)] || filtered[0]
+          setActiveTabId(newActive.id)
+        }
+        return filtered
+      })
+      // Clean up runtime state
+      setRuntimeState((prev) => {
+        const next = new Map(prev)
+        next.delete(id)
+        return next
+      })
+    },
+    [activeTabId]
+  )
+
+  const handleRenameTab = useCallback((id: string, name: string) => {
+    setTabs((prev) => prev.map((t) => (t.id === id ? { ...t, name } : t)))
+  }, [])
+
+  // --- Query history (shared across tabs) ---
   const [queryHistory, setQueryHistory] = useState<QueryHistoryEntry[]>([])
 
   // Schema browser sidebar state
@@ -74,103 +201,125 @@ export default function QueryPage() {
 
   // Parse error for editor highlighting
   const errorMarker = useMemo(() => {
-    if (!error) return null
-    return parseErrorLocation(error)
-  }, [error])
+    if (!activeRuntime.error) return null
+    return parseErrorLocation(activeRuntime.error)
+  }, [activeRuntime.error])
 
   const addToHistory = useCallback((entry: Omit<QueryHistoryEntry, "id">) => {
     setQueryHistory((prev) => {
       const newEntry: QueryHistoryEntry = {
         ...entry,
-        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
       }
-      // Keep only last 20 queries
       return [newEntry, ...prev].slice(0, 20)
     })
   }, [])
 
+  const executeQuery = useCallback(
+    (sqlToExecute: string) => {
+      if (!sqlToExecute.trim()) return
+
+      const cleanedSql = sqlToExecute.replace(/--.*$/gm, "").trim()
+      if (!cleanedSql) return
+
+      updateActiveRuntime({ error: null, columns: [], rows: [], queryTime: null, truncated: false })
+
+      queryMutation.mutate(
+        { sql: sqlToExecute, limit: 100 },
+        {
+          onSuccess: (data) => {
+            if (data.error) {
+              updateActiveRuntime({ error: data.error })
+              addToHistory({ sql: sqlToExecute, executedAt: new Date(), error: data.error })
+            } else {
+              updateActiveRuntime({
+                columns: data.columns || [],
+                rows: data.rows || [],
+                queryTime: data.query_time_ms,
+                truncated: data.truncated,
+              })
+              addToHistory({
+                sql: sqlToExecute,
+                executedAt: new Date(),
+                durationMs: data.query_time_ms,
+                rowCount: data.row_count,
+              })
+            }
+          },
+          onError: (err) => {
+            const errorMsg = err instanceof Error ? err.message : "Query execution failed"
+            updateActiveRuntime({ error: errorMsg })
+            addToHistory({ sql: sqlToExecute, executedAt: new Date(), error: errorMsg })
+          },
+        }
+      )
+    },
+    [queryMutation, addToHistory, updateActiveRuntime]
+  )
+
   const handleExecute = useCallback(() => {
-    if (!sql.trim()) return
+    executeQuery(activeTab.sql)
+  }, [executeQuery, activeTab.sql])
 
-    // Clear any comment-only lines for validation
-    const cleanedSql = sql.replace(/--.*$/gm, "").trim()
-    if (!cleanedSql) return
+  const handleExecuteSelection = useCallback(
+    (selectedSql: string) => {
+      executeQuery(selectedSql)
+    },
+    [executeQuery]
+  )
 
-    setError(null)
-    setColumns([])
-    setRows([])
-    setQueryTime(null)
-    setTruncated(false)
+  const handleFormat = useCallback(() => {
+    try {
+      const formatted = formatSql(activeTab.sql, {
+        language: "trino",
+        keywordCase: "upper",
+        tabWidth: 2,
+      })
+      updateActiveTab({ sql: formatted })
+    } catch {
+      // If formatting fails (e.g., invalid SQL), keep original
+    }
+  }, [activeTab.sql, updateActiveTab])
 
-    queryMutation.mutate(
-      { sql, limit: 100 },
-      {
-        onSuccess: (data) => {
-          if (data.error) {
-            setError(data.error)
-            addToHistory({
-              sql,
-              executedAt: new Date(),
-              error: data.error,
-            })
-          } else {
-            setColumns(data.columns || [])
-            setRows(data.rows || [])
-            setQueryTime(data.query_time_ms)
-            setTruncated(data.truncated)
-            addToHistory({
-              sql,
-              executedAt: new Date(),
-              durationMs: data.query_time_ms,
-              rowCount: data.row_count,
-            })
+  const handleInsertSql = useCallback(
+    (sqlToInsert: string) => {
+      updateActiveTab({
+        sql: (() => {
+          const stripped = activeTab.sql.replace(/--.*$/gm, "").trim()
+          if (stripped) {
+            return activeTab.sql + "\n" + sqlToInsert
           }
-        },
-        onError: (err) => {
-          const errorMsg = err instanceof Error ? err.message : "Query execution failed"
-          setError(errorMsg)
-          addToHistory({
-            sql,
-            executedAt: new Date(),
-            error: errorMsg,
-          })
-        },
-      }
-    )
-  }, [sql, queryMutation, addToHistory])
+          return sqlToInsert
+        })(),
+      })
+    },
+    [activeTab.sql, updateActiveTab]
+  )
 
-  const handleInsertSql = useCallback((sqlToInsert: string) => {
-    setSql((prev) => {
-      const stripped = prev.replace(/--.*$/gm, "").trim()
-      if (stripped) {
-        return prev + "\n" + sqlToInsert
-      }
-      return sqlToInsert
-    })
-  }, [])
+  const handleTemplateSelect = useCallback(
+    (templateSql: string) => {
+      updateActiveTab({ sql: templateSql })
+      updateActiveRuntime({ error: null })
+    },
+    [updateActiveTab, updateActiveRuntime]
+  )
 
-  const handleTemplateSelect = useCallback((templateSql: string) => {
-    setSql(templateSql)
-    setError(null)
-  }, [])
-
-  const handleHistorySelect = useCallback((historySql: string) => {
-    setSql(historySql)
-    setError(null)
-  }, [])
+  const handleHistorySelect = useCallback(
+    (historySql: string) => {
+      updateActiveTab({ sql: historySql })
+      updateActiveRuntime({ error: null })
+    },
+    [updateActiveTab, updateActiveRuntime]
+  )
 
   const handleClearHistory = useCallback(() => {
     setQueryHistory([])
   }, [])
 
   const handleClear = useCallback(() => {
-    setSql("")
-    setColumns([])
-    setRows([])
-    setQueryTime(null)
-    setTruncated(false)
-    setError(null)
-  }, [])
+    updateActiveTab({ sql: "" })
+    updateActiveRuntime({ columns: [], rows: [], queryTime: null, truncated: false, error: null })
+  }, [updateActiveTab, updateActiveRuntime])
 
   return (
     <div className="flex h-full">
@@ -183,7 +332,7 @@ export default function QueryPage() {
 
       {/* Main Content */}
       <div className="flex flex-col flex-1 min-w-0">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             {!schemaBrowserOpen && (
               <Button
@@ -208,6 +357,15 @@ export default function QueryPage() {
         <div className="flex-1 grid grid-rows-[auto_1fr] gap-4 min-h-0">
           {/* Editor Section */}
           <Card>
+            {/* Tab Bar */}
+            <QueryTabBar
+              tabs={tabs}
+              activeTabId={activeTabId}
+              onSelectTab={setActiveTabId}
+              onAddTab={handleAddTab}
+              onCloseTab={handleCloseTab}
+              onRenameTab={handleRenameTab}
+            />
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <div>
@@ -226,6 +384,16 @@ export default function QueryPage() {
                   <Button
                     variant="outline"
                     size="sm"
+                    onClick={handleFormat}
+                    disabled={queryMutation.isPending || !activeTab.sql.trim()}
+                    title="Format SQL (Ctrl+Shift+F)"
+                  >
+                    <WandSparkles className="h-4 w-4 mr-2" />
+                    Format
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={handleClear}
                     disabled={queryMutation.isPending}
                   >
@@ -235,7 +403,7 @@ export default function QueryPage() {
                   <Button
                     size="sm"
                     onClick={handleExecute}
-                    disabled={queryMutation.isPending || !sql.trim()}
+                    disabled={queryMutation.isPending || !activeTab.sql.trim()}
                     data-testid="run-query-button"
                   >
                     <Play className="h-4 w-4 mr-2" />
@@ -246,9 +414,11 @@ export default function QueryPage() {
             </CardHeader>
             <CardContent>
               <SqlEditor
-                value={sql}
-                onChange={setSql}
+                value={activeTab.sql}
+                onChange={(newSql) => updateActiveTab({ sql: newSql })}
                 onExecute={handleExecute}
+                onExecuteSelection={handleExecuteSelection}
+                onFormat={handleFormat}
                 disabled={queryMutation.isPending}
                 height="200px"
                 metadata={metadata}
@@ -263,26 +433,26 @@ export default function QueryPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="text-lg">Results</CardTitle>
-                  {queryTime !== null && (
+                  {activeRuntime.queryTime !== null && (
                     <CardDescription className="flex items-center gap-1">
                       <Clock className="h-3 w-3" />
-                      Query completed in {queryTime}ms
-                      {truncated && " (results truncated to 100 rows)"}
+                      Query completed in {activeRuntime.queryTime}ms
+                      {activeRuntime.truncated && " (results truncated to 100 rows)"}
                     </CardDescription>
                   )}
                 </div>
               </div>
             </CardHeader>
             <CardContent className="flex-1 min-h-0 overflow-auto">
-              {error && (
+              {activeRuntime.error && (
                 <Alert variant="destructive" className="mb-4">
                   <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{error}</AlertDescription>
+                  <AlertDescription>{activeRuntime.error}</AlertDescription>
                 </Alert>
               )}
               <ResultsTable
-                columns={columns}
-                rows={rows}
+                columns={activeRuntime.columns}
+                rows={activeRuntime.rows}
                 isLoading={queryMutation.isPending}
               />
             </CardContent>
