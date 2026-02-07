@@ -141,7 +141,8 @@ export default function QueryPage() {
 
   const handleInsertSql = useCallback((sqlToInsert: string) => {
     setSql((prev) => {
-      if (prev.trim() && !prev.trim().startsWith("--")) {
+      const stripped = prev.replace(/--.*$/gm, "").trim()
+      if (stripped) {
         return prev + "\n" + sqlToInsert
       }
       return sqlToInsert

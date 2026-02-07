@@ -7,6 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Copy, FileCode, AlertCircle } from "lucide-react"
 import { toast } from "sonner"
+import { quoteIdent } from "@/lib/utils"
 
 interface DdlTabProps {
   catalog: string
@@ -21,9 +22,9 @@ export function DdlTab({ catalog, schema, table, onInsertSql }: DdlTabProps) {
   const ddl = useMemo(() => {
     if (!data?.columns?.length) return ""
 
-    const qualifiedName = `${catalog}.${schema}.${table}`
+    const qualifiedName = `${quoteIdent(catalog)}.${quoteIdent(schema)}.${quoteIdent(table)}`
     const columnDefs = data.columns.map((col) => {
-      let def = `  ${col.name} ${col.type}`
+      let def = `  ${quoteIdent(col.name)} ${col.type}`
       if (col.nullable === false) def += " NOT NULL"
       if (col.comment) def += ` COMMENT '${col.comment.replace(/'/g, "''")}'`
       return def

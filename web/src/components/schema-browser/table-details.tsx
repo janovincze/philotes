@@ -23,7 +23,7 @@ export function TableDetails({ catalog, schema, table, onInsertSql, onInsertColu
         <span className="text-xs font-medium truncate" title={`${catalog}.${schema}.${table}`}>
           {schema}.{table}
         </span>
-        <Button variant="ghost" size="icon" className="h-5 w-5" onClick={onClose}>
+        <Button variant="ghost" size="icon" className="h-5 w-5" onClick={onClose} aria-label="Close table details">
           <X className="h-3 w-3" />
         </Button>
       </div>

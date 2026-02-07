@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useCatalogs, useSchemas, useTables, useTableInfo } from "@/lib/hooks/use-query"
 import { toast } from "sonner"
-import { cn } from "@/lib/utils"
+import { cn, quoteIdent } from "@/lib/utils"
 
 interface SchemaTreeProps {
   searchQuery: string
@@ -338,6 +338,7 @@ function TableNode({
 }: TableNodeProps) {
   const [open, setOpen] = useState(false)
   const qualifiedName = `${catalog}.${schema}.${name}`
+  const quotedName = `${quoteIdent(catalog)}.${quoteIdent(schema)}.${quoteIdent(name)}`
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
@@ -346,6 +347,7 @@ function TableNode({
           <ChevronRight className={cn("h-3 w-3 shrink-0 transition-transform", open && "rotate-90")} />
         </CollapsibleTrigger>
         <button
+          type="button"
           className="flex items-center gap-1 flex-1 py-0.5 text-sm hover:bg-accent rounded-r transition-colors min-w-0"
           onClick={() => onSelectTable(catalog, schema, name)}
         >
@@ -353,6 +355,7 @@ function TableNode({
           <span className="truncate">{name}</span>
         </button>
         <button
+          type="button"
           className="shrink-0 p-0.5 hover:bg-accent rounded"
           aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
           onClick={(e) => {
@@ -363,17 +366,19 @@ function TableNode({
           <Star className={cn("h-3 w-3", isFavorite ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground opacity-0 group-hover:opacity-100")} />
         </button>
         <button
+          type="button"
           className="shrink-0 p-0.5 hover:bg-accent rounded opacity-0 group-hover:opacity-100"
           aria-label="Generate SELECT query"
           onClick={(e) => {
             e.stopPropagation()
-            onInsertSql(`SELECT * FROM ${qualifiedName} LIMIT 100`)
+            onInsertSql(`SELECT * FROM ${quotedName} LIMIT 100`)
           }}
           title="Generate SELECT"
         >
           <Play className="h-3 w-3 text-muted-foreground" />
         </button>
         <button
+          type="button"
           className="shrink-0 p-0.5 mr-1 hover:bg-accent rounded opacity-0 group-hover:opacity-100"
           aria-label="Copy qualified name"
           onClick={(e) => {
@@ -433,6 +438,7 @@ function ColumnLeaves({ catalog, schema, table, onInsertColumn }: ColumnLeavesPr
     <div className="space-y-0">
       {columns.map((col) => (
         <button
+          type="button"
           key={col.name}
           className="flex items-center gap-1.5 w-full px-1 py-0.5 text-xs hover:bg-accent rounded transition-colors"
           onClick={() => onInsertColumn(col.name)}

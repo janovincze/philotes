@@ -6,6 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
 import { AlertCircle, RefreshCw } from "lucide-react"
+import { quoteIdent } from "@/lib/utils"
 
 interface PreviewTabProps {
   catalog: string
@@ -13,17 +14,12 @@ interface PreviewTabProps {
   table: string
 }
 
-const IDENTIFIER_RE = /^[A-Za-z_][A-Za-z0-9_]*$/
-
 export function PreviewTab({ catalog, schema, table }: PreviewTabProps) {
   const mutation = useQueryExecute()
 
   const runPreview = useCallback(() => {
-    if (!IDENTIFIER_RE.test(catalog) || !IDENTIFIER_RE.test(schema) || !IDENTIFIER_RE.test(table)) {
-      return
-    }
     mutation.mutate({
-      sql: `SELECT * FROM ${catalog}.${schema}.${table} LIMIT 100`,
+      sql: `SELECT * FROM ${quoteIdent(catalog)}.${quoteIdent(schema)}.${quoteIdent(table)} LIMIT 100`,
       limit: 100,
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
