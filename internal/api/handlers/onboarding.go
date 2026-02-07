@@ -10,25 +10,38 @@ import (
 
 	"github.com/janovincze/philotes/internal/api/models"
 	"github.com/janovincze/philotes/internal/api/services"
+	"github.com/janovincze/philotes/internal/config"
 )
 
 // OnboardingHandler handles onboarding wizard HTTP requests.
 type OnboardingHandler struct {
 	service *services.OnboardingService
+	cfg     *config.Config
 }
 
 // NewOnboardingHandler creates a new OnboardingHandler.
-func NewOnboardingHandler(service *services.OnboardingService) *OnboardingHandler {
-	return &OnboardingHandler{service: service}
+func NewOnboardingHandler(service *services.OnboardingService, cfg *config.Config) *OnboardingHandler {
+	return &OnboardingHandler{service: service, cfg: cfg}
 }
 
 // Register adds all onboarding routes to the router.
 func (h *OnboardingHandler) Register(rg *gin.RouterGroup) {
 	rg.GET("/onboarding/cluster/health", h.GetClusterHealth)
+	rg.GET("/onboarding/config", h.GetOnboardingConfig)
 	rg.GET("/onboarding/progress", h.GetProgress)
 	rg.POST("/onboarding/progress", h.SaveProgress)
 	rg.POST("/onboarding/data/verify", h.VerifyDataFlow)
 	rg.GET("/onboarding/admin/exists", h.CheckAdminExists)
+}
+
+// GetOnboardingConfig returns wizard-relevant configuration.
+// GET /api/v1/onboarding/config
+func (h *OnboardingHandler) GetOnboardingConfig(c *gin.Context) {
+	c.JSON(http.StatusOK, models.OnboardingConfigResponse{
+		AuthEnabled:  h.cfg.Auth.Enabled,
+		OIDCEnabled:  h.cfg.OIDC.Enabled,
+		TrinoEnabled: h.cfg.Trino.Enabled,
+	})
 }
 
 // GetClusterHealth returns extended cluster health for onboarding.
@@ -106,7 +119,7 @@ func (h *OnboardingHandler) SaveProgress(c *gin.Context) {
 	}
 
 	// Check if completed (all required steps done)
-	if isOnboardingComplete(updated.CompletedSteps) {
+	if h.isOnboardingComplete(updated.CompletedSteps) {
 		updated, err = h.service.CompleteOnboarding(c.Request.Context(), progress.ID)
 		if err != nil {
 			respondWithServiceError(c, err)
@@ -151,15 +164,18 @@ func (h *OnboardingHandler) CheckAdminExists(c *gin.Context) {
 }
 
 // isOnboardingComplete checks if all required steps are completed.
-func isOnboardingComplete(completedSteps []int) bool {
-	// Required steps: 1 (health), 2 (admin), 4 (source), 5 (pipeline), 6 (verify)
+func (h *OnboardingHandler) isOnboardingComplete(completedSteps []int) bool {
+	// Required steps: 1 (health), 4 (source), 5 (pipeline), 6 (verify)
+	// Step 2 (admin) is required only when auth is enabled
 	// Optional steps: 3 (SSO), 7 (alerts)
 	required := map[int]bool{
 		1: true,
-		2: true,
 		4: true,
 		5: true,
 		6: true,
+	}
+	if h.cfg.Auth.Enabled {
+		required[2] = true
 	}
 
 	for _, step := range completedSteps {

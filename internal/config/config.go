@@ -494,8 +494,19 @@ type IcebergConfig struct {
 
 // StorageConfig holds object storage configuration.
 type StorageConfig struct {
-	// Endpoint is the S3/MinIO endpoint
+	// Endpoint is the S3/MinIO endpoint as seen from the API process, as a full URL
+	// including scheme (e.g., http://localhost:9000). If the scheme is omitted it will
+	// be normalised to http:// at runtime.
 	Endpoint string
+
+	// DockerEndpoint is the S3/MinIO endpoint as seen from Docker containers (e.g., Lakekeeper),
+	// as a full URL including scheme (e.g., http://minio:9000).
+	// This is the endpoint passed to Lakekeeper during warehouse creation.
+	// When empty, falls back to Endpoint.
+	DockerEndpoint string
+
+	// Region is the S3 region (default: us-east-1)
+	Region string
 
 	// AccessKey is the access key
 	AccessKey string
@@ -776,11 +787,13 @@ func Load() (*Config, error) {
 		},
 
 		Storage: StorageConfig{
-			Endpoint:  getEnv("PHILOTES_STORAGE_ENDPOINT", "localhost:9000"),
-			AccessKey: getEnv("PHILOTES_STORAGE_ACCESS_KEY", "minioadmin"),
-			SecretKey: getEnv("PHILOTES_STORAGE_SECRET_KEY", "minioadmin"),
-			Bucket:    getEnv("PHILOTES_STORAGE_BUCKET", "philotes"),
-			UseSSL:    getBoolEnv("PHILOTES_STORAGE_USE_SSL", false),
+			Endpoint:       getEnv("PHILOTES_STORAGE_ENDPOINT", "localhost:9000"),
+			DockerEndpoint: getEnv("PHILOTES_STORAGE_DOCKER_ENDPOINT", "http://minio:9000"),
+			Region:         getEnv("PHILOTES_STORAGE_REGION", "us-east-1"),
+			AccessKey:      getEnv("PHILOTES_STORAGE_ACCESS_KEY", "minioadmin"),
+			SecretKey:      getEnv("PHILOTES_STORAGE_SECRET_KEY", "minioadmin"),
+			Bucket:         getEnv("PHILOTES_STORAGE_BUCKET", "philotes"),
+			UseSSL:         getBoolEnv("PHILOTES_STORAGE_USE_SSL", false),
 		},
 
 		Metrics: MetricsConfig{

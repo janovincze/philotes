@@ -6,8 +6,12 @@ import (
 	"context"
 	"database/sql"
 	"log/slog"
+	"fmt"
+	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -119,17 +123,37 @@ func main() {
 	// Create Iceberg catalog client (only if configuration is present)
 	var icebergCatalog catalog.Catalog
 	if cfg.Iceberg.CatalogURL != "" && cfg.Iceberg.Warehouse != "" {
+		// DockerEndpoint is the endpoint Lakekeeper (inside Docker) uses to reach MinIO.
+		// Falls back to the host-facing Endpoint if not set.
+		catalogEndpoint := cfg.Storage.DockerEndpoint
+		if catalogEndpoint == "" {
+			catalogEndpoint = cfg.Storage.Endpoint
+		}
+		if !strings.HasPrefix(catalogEndpoint, "http") {
+			catalogEndpoint = "http://" + catalogEndpoint
+		}
+
 		icebergCatalog = catalog.NewRESTCatalog(catalog.Config{
 			CatalogURL: cfg.Iceberg.CatalogURL,
 			Warehouse:  cfg.Iceberg.Warehouse,
 			Storage: catalog.StorageProfile{
 				Bucket:    cfg.Storage.Bucket,
-				Endpoint:  cfg.Storage.Endpoint,
+				Endpoint:  catalogEndpoint,
+				Region:    cfg.Storage.Region,
 				AccessKey: cfg.Storage.AccessKey,
 				SecretKey: cfg.Storage.SecretKey,
 			},
 		}, logger)
 		defer icebergCatalog.Close()
+
+		// Auto-bootstrap warehouse on startup (best-effort)
+		bootstrapCtx, bootstrapCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer bootstrapCancel()
+		if err := icebergCatalog.EnsureWarehouse(bootstrapCtx); err != nil {
+			logger.Warn("failed to ensure warehouse on startup (will retry when pipeline starts)", "error", err)
+		} else {
+			logger.Info("warehouse ensured", "warehouse", cfg.Iceberg.Warehouse)
+		}
 	} else {
 		logger.Info("iceberg catalog not configured; skipping warehouse integration")
 	}
@@ -178,6 +202,53 @@ func main() {
 				return health.StatusDegraded, "vault connection degraded", err
 			}
 			return health.StatusHealthy, "vault connection OK", nil
+		}))
+	}
+
+	// HTTP client with timeout for health checks
+	healthHTTPClient := &http.Client{Timeout: 5 * time.Second}
+
+	// Register MinIO health checker
+	if cfg.Storage.Endpoint != "" {
+		minioURL := cfg.Storage.Endpoint
+		if !strings.HasPrefix(minioURL, "http") {
+			minioURL = "http://" + minioURL
+		}
+		minioHealthURL, _ := url.JoinPath(minioURL, "minio", "health", "live")
+		healthManager.Register(health.NewComponentChecker("minio", func(ctx context.Context) (health.Status, string, error) {
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, minioHealthURL, http.NoBody)
+			if err != nil {
+				return health.StatusUnhealthy, "MinIO unreachable", err
+			}
+			resp, err := healthHTTPClient.Do(req)
+			if err != nil {
+				return health.StatusUnhealthy, "MinIO unreachable", err
+			}
+			resp.Body.Close()
+			if resp.StatusCode == http.StatusOK {
+				return health.StatusHealthy, "MinIO is healthy", nil
+			}
+			return health.StatusUnhealthy, fmt.Sprintf("MinIO returned HTTP %d", resp.StatusCode), nil
+		}))
+	}
+
+	// Register Lakekeeper health checker
+	if cfg.Iceberg.CatalogURL != "" {
+		lakekeeperHealthURL, _ := url.JoinPath(cfg.Iceberg.CatalogURL, "health")
+		healthManager.Register(health.NewComponentChecker("lakekeeper", func(ctx context.Context) (health.Status, string, error) {
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, lakekeeperHealthURL, http.NoBody)
+			if err != nil {
+				return health.StatusUnhealthy, "Lakekeeper unreachable", err
+			}
+			resp, err := healthHTTPClient.Do(req)
+			if err != nil {
+				return health.StatusUnhealthy, "Lakekeeper unreachable", err
+			}
+			resp.Body.Close()
+			if resp.StatusCode == http.StatusOK {
+				return health.StatusHealthy, "Lakekeeper is healthy", nil
+			}
+			return health.StatusUnhealthy, fmt.Sprintf("Lakekeeper returned HTTP %d", resp.StatusCode), nil
 		}))
 	}
 

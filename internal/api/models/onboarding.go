@@ -146,6 +146,13 @@ type DataVerificationResponse struct {
 	ErrorMessage string                   `json:"error_message,omitempty"`
 }
 
+// OnboardingConfigResponse provides wizard-relevant configuration to the frontend.
+type OnboardingConfigResponse struct {
+	AuthEnabled  bool `json:"auth_enabled"`
+	OIDCEnabled  bool `json:"oidc_enabled"`
+	TrinoEnabled bool `json:"trino_enabled"`
+}
+
 // RegisterRequest represents a user registration request.
 type RegisterRequest struct {
 	Email           string `json:"email" binding:"required,email"`
