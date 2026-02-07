@@ -153,7 +153,7 @@ export function ResultsTable({ columns, rows, isLoading }: ResultsTableProps) {
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" data-testid="export-csv-button">
+              <Button variant="outline" size="sm" data-testid="export-button">
                 <Download className="h-4 w-4 mr-2" />
                 Export
                 <ChevronDown className="h-3 w-3 ml-1" />

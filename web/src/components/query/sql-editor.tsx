@@ -157,10 +157,10 @@ export function SqlEditor({
         />
       </div>
       <div className="flex items-center gap-3 text-[10px] text-muted-foreground px-1">
-        <span>Ctrl+Enter: Run</span>
-        <span>Ctrl+Shift+Enter: Run Selection</span>
-        <span>Ctrl+Shift+F: Format</span>
-        <span>Ctrl+/: Comment</span>
+        <span>Ctrl/Cmd+Enter: Run</span>
+        <span>Ctrl/Cmd+Shift+Enter: Run Selection</span>
+        <span>Ctrl/Cmd+Shift+F: Format</span>
+        <span>Ctrl/Cmd+/: Comment</span>
       </div>
     </div>
   )

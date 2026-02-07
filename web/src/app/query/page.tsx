@@ -51,7 +51,10 @@ function loadTabState(): { tabs: QueryTab[]; activeTabId: string } {
     if (stored) {
       const parsed: PersistedTabState = JSON.parse(stored)
       if (parsed.tabs?.length > 0) {
-        return { tabs: parsed.tabs, activeTabId: parsed.activeTabId || parsed.tabs[0].id }
+        const hasValidActiveTab =
+          !!parsed.activeTabId && parsed.tabs.some((tab) => tab.id === parsed.activeTabId)
+        const activeTabId = hasValidActiveTab ? parsed.activeTabId : parsed.tabs[0].id
+        return { tabs: parsed.tabs, activeTabId }
       }
     }
   } catch {
@@ -100,17 +103,18 @@ export default function QueryPage() {
     saveTabState(tabs, activeTabId)
   }, [tabs, activeTabId])
 
-  // Handle URL table parameter — update active tab SQL
+  // Handle URL table parameter — update active tab SQL.
+  // Intentionally calls setState in effect to sync URL search params into tab state.
   useEffect(() => {
     if (tableParam) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing URL state into tab state
       setTabs((prev) =>
         prev.map((t) =>
           t.id === activeTabId ? { ...t, sql: `SELECT * FROM ${tableParam} LIMIT 10` } : t
         )
       )
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tableParam])
+  }, [tableParam, activeTabId])
 
   const activeTab = tabs.find((t) => t.id === activeTabId) || tabs[0]
   const activeRuntime = runtimeState.get(activeTabId) || {
@@ -356,7 +360,11 @@ export default function QueryPage() {
 
         <div className="flex-1 grid grid-rows-[auto_1fr] gap-4 min-h-0">
           {/* Editor Section */}
-          <Card>
+          <Card
+            role="tabpanel"
+            id={`query-tabpanel-${activeTabId}`}
+            aria-labelledby={`query-tab-${activeTabId}`}
+          >
             {/* Tab Bar */}
             <QueryTabBar
               tabs={tabs}

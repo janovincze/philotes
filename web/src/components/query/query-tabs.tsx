@@ -57,7 +57,9 @@ export function QueryTabBar({
         <div
           key={tab.id}
           role="tab"
+          id={`query-tab-${tab.id}`}
           aria-selected={tab.id === activeTabId}
+          aria-controls={`query-tabpanel-${tab.id}`}
           tabIndex={tab.id === activeTabId ? 0 : -1}
           className={cn(
             "group flex items-center gap-1 px-3 py-1.5 text-sm cursor-pointer border-b-2 transition-colors shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-ring",
