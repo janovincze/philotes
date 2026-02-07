@@ -873,6 +873,60 @@ export interface TableInfoResponse {
   properties?: Record<string, string>
 }
 
+// Query Data Source Types
+
+export type QueryDataSourceType = "postgresql" | "mysql"
+export type QueryDataSourceStatus = "inactive" | "active" | "error"
+
+export interface QueryDataSource {
+  id: string
+  tenant_id?: string
+  name: string
+  type: QueryDataSourceType
+  catalog_name: string
+  host: string
+  port: number
+  database_name: string
+  username: string
+  ssl_mode: string
+  extra_config?: Record<string, unknown>
+  status: QueryDataSourceStatus
+  error_message?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateQueryDataSourceRequest {
+  name: string
+  type: QueryDataSourceType
+  catalog_name: string
+  host: string
+  port?: number
+  database_name: string
+  username: string
+  password: string
+  ssl_mode?: string
+  extra_config?: Record<string, unknown>
+}
+
+export interface UpdateQueryDataSourceRequest {
+  name?: string
+  host?: string
+  port?: number
+  database_name?: string
+  username?: string
+  password?: string
+  ssl_mode?: string
+  extra_config?: Record<string, unknown>
+}
+
+export interface QueryDataSourceTestResult {
+  success: boolean
+  message: string
+  latency_ms?: number
+  error_detail?: string
+}
+
 // Dagster RBAC Types
 
 export type DagsterRole = "dagster-viewer" | "dagster-operator" | "dagster-admin"

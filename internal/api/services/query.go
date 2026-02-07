@@ -426,6 +426,13 @@ func (s *QueryService) executeQuery(ctx context.Context, query string) ([][]inte
 	return allData, nil
 }
 
+// ExecuteAdminQuery executes an administrative SQL statement via Trino.
+// Used for catalog management (CREATE/DROP CATALOG).
+func (s *QueryService) ExecuteAdminQuery(ctx context.Context, query string) error {
+	_, err := s.executeQuery(ctx, query)
+	return err
+}
+
 // Default and maximum limits for user queries.
 const (
 	DefaultQueryLimit = 100
