@@ -6,7 +6,9 @@ import (
 	"context"
 	"database/sql"
 	"log/slog"
+	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"strings"
@@ -127,6 +129,9 @@ func main() {
 		if catalogEndpoint == "" {
 			catalogEndpoint = cfg.Storage.Endpoint
 		}
+		if !strings.HasPrefix(catalogEndpoint, "http") {
+			catalogEndpoint = "http://" + catalogEndpoint
+		}
 
 		icebergCatalog = catalog.NewRESTCatalog(catalog.Config{
 			CatalogURL: cfg.Iceberg.CatalogURL,
@@ -209,8 +214,9 @@ func main() {
 		if !strings.HasPrefix(minioURL, "http") {
 			minioURL = "http://" + minioURL
 		}
+		minioHealthURL, _ := url.JoinPath(minioURL, "minio", "health", "live")
 		healthManager.Register(health.NewComponentChecker("minio", func(ctx context.Context) (health.Status, string, error) {
-			req, err := http.NewRequestWithContext(ctx, http.MethodGet, minioURL+"/minio/health/live", http.NoBody)
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, minioHealthURL, http.NoBody)
 			if err != nil {
 				return health.StatusUnhealthy, "MinIO unreachable", err
 			}
@@ -222,14 +228,15 @@ func main() {
 			if resp.StatusCode == http.StatusOK {
 				return health.StatusHealthy, "MinIO is healthy", nil
 			}
-			return health.StatusUnhealthy, "MinIO returned non-OK status", nil
+			return health.StatusUnhealthy, fmt.Sprintf("MinIO returned HTTP %d", resp.StatusCode), nil
 		}))
 	}
 
 	// Register Lakekeeper health checker
 	if cfg.Iceberg.CatalogURL != "" {
+		lakekeeperHealthURL, _ := url.JoinPath(cfg.Iceberg.CatalogURL, "health")
 		healthManager.Register(health.NewComponentChecker("lakekeeper", func(ctx context.Context) (health.Status, string, error) {
-			req, err := http.NewRequestWithContext(ctx, http.MethodGet, cfg.Iceberg.CatalogURL+"/health", http.NoBody)
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, lakekeeperHealthURL, http.NoBody)
 			if err != nil {
 				return health.StatusUnhealthy, "Lakekeeper unreachable", err
 			}
@@ -241,7 +248,7 @@ func main() {
 			if resp.StatusCode == http.StatusOK {
 				return health.StatusHealthy, "Lakekeeper is healthy", nil
 			}
-			return health.StatusUnhealthy, "Lakekeeper returned non-OK status", nil
+			return health.StatusUnhealthy, fmt.Sprintf("Lakekeeper returned HTTP %d", resp.StatusCode), nil
 		}))
 	}
 

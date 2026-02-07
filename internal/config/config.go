@@ -494,10 +494,13 @@ type IcebergConfig struct {
 
 // StorageConfig holds object storage configuration.
 type StorageConfig struct {
-	// Endpoint is the S3/MinIO endpoint as seen from the API process (e.g., localhost:9000)
+	// Endpoint is the S3/MinIO endpoint as seen from the API process, as a full URL
+	// including scheme (e.g., http://localhost:9000). If the scheme is omitted it will
+	// be normalised to http:// at runtime.
 	Endpoint string
 
-	// DockerEndpoint is the S3/MinIO endpoint as seen from Docker containers (e.g., Lakekeeper).
+	// DockerEndpoint is the S3/MinIO endpoint as seen from Docker containers (e.g., Lakekeeper),
+	// as a full URL including scheme (e.g., http://minio:9000).
 	// This is the endpoint passed to Lakekeeper during warehouse creation.
 	// When empty, falls back to Endpoint.
 	DockerEndpoint string
