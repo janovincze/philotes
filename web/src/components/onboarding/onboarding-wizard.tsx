@@ -13,13 +13,14 @@ import { StepDataVerification } from "./step-data-verification"
 import { StepAlertConfig } from "./step-alert-config"
 import { StepComplete } from "./step-complete"
 import {
+  useOnboardingConfig,
   useOnboardingProgress,
   useSaveOnboardingProgress,
   getOnboardingSessionId,
 } from "@/lib/hooks/use-onboarding"
 import type { Source, Pipeline } from "@/lib/api/types"
 
-const ONBOARDING_STEPS: OnboardingStepInfo[] = [
+const DEFAULT_STEPS: OnboardingStepInfo[] = [
   { id: 1, title: "Health Check" },
   { id: 2, title: "Admin User" },
   { id: 3, title: "SSO Setup", optional: true },
@@ -50,8 +51,23 @@ export interface OnboardingState {
 export function OnboardingWizard() {
   const router = useRouter()
   const sessionId = getOnboardingSessionId()
+  const { data: onboardingConfig, isLoading: isLoadingConfig } = useOnboardingConfig()
   const { data: progressData, isLoading: isLoadingProgress } = useOnboardingProgress(sessionId)
   const saveProgressMutation = useSaveOnboardingProgress()
+
+  // Auth steps are auto-skipped when auth is disabled
+  const authDisabled = onboardingConfig ? !onboardingConfig.auth_enabled : false
+
+  // Compute steps dynamically based on config
+  const ONBOARDING_STEPS = useMemo(() => {
+    if (!authDisabled) return DEFAULT_STEPS
+    return DEFAULT_STEPS.map((step) => {
+      if (step.id === 2 || step.id === 3) {
+        return { ...step, optional: true }
+      }
+      return step
+    })
+  }, [authDisabled])
 
   // Compute initial state based on progress data
   const computedInitialState = useMemo(() => {
@@ -93,12 +109,12 @@ export function OnboardingWizard() {
     // Ready if not loading and either:
     // 1. We have progress data and it's been applied to state
     // 2. We don't have progress data (new user)
-    if (isLoadingProgress) return false
+    if (isLoadingProgress || isLoadingConfig) return false
     if (progressData?.progress) {
       return state.initialStateApplied || state.currentStep === computedInitialState.currentStep
     }
     return true
-  }, [isLoadingProgress, progressData, state.initialStateApplied, state.currentStep, computedInitialState.currentStep])
+  }, [isLoadingProgress, isLoadingConfig, progressData, state.initialStateApplied, state.currentStep, computedInitialState.currentStep])
 
   // Handle state update when progress data arrives after initial render
   // This is a controlled way to sync external data - using the query's onSuccess would be cleaner
@@ -248,7 +264,9 @@ export function OnboardingWizard() {
           <StepAdminUser
             onNext={nextStep}
             onBack={prevStep}
+            onSkip={authDisabled ? skipStep : undefined}
             onAdminCreated={setAdminCreated}
+            authDisabled={authDisabled}
           />
         )
       case 3:

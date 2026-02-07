@@ -1,6 +1,7 @@
 import { apiClient } from "./client"
 import type {
   ClusterHealthResponse,
+  OnboardingConfig,
   OnboardingProgressResponse,
   SaveOnboardingProgressRequest,
   DataVerificationRequest,
@@ -11,6 +12,13 @@ import type {
 } from "./types"
 
 export const onboardingApi = {
+  /**
+   * Get wizard-relevant configuration (auth, OIDC, Trino enabled flags)
+   */
+  getConfig(): Promise<OnboardingConfig> {
+    return apiClient.get<OnboardingConfig>("/api/v1/onboarding/config")
+  },
+
   /**
    * Get extended cluster health for onboarding wizard
    */

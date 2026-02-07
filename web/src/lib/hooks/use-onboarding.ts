@@ -7,6 +7,18 @@ import {
 } from "@/lib/api"
 
 /**
+ * Hook to fetch onboarding configuration (auth, OIDC, Trino flags).
+ * Config doesn't change during a session.
+ */
+export function useOnboardingConfig() {
+  return useQuery({
+    queryKey: ["onboarding", "config"],
+    queryFn: () => onboardingApi.getConfig(),
+    staleTime: Infinity,
+  })
+}
+
+/**
  * Hook to fetch cluster health for onboarding
  * Polls every 3 seconds by default
  */

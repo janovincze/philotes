@@ -704,6 +704,12 @@ export interface AdminExistsResponse {
   exists: boolean
 }
 
+export interface OnboardingConfig {
+  auth_enabled: boolean
+  oidc_enabled: boolean
+  trino_enabled: boolean
+}
+
 // OIDC SSO Types
 
 export type OIDCProviderType = "google" | "okta" | "azure_ad" | "auth0" | "generic"

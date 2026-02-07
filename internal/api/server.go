@@ -236,7 +236,7 @@ func (s *Server) registerRoutes() {
 	// Create onboarding handler
 	var onboardingHandler *handlers.OnboardingHandler
 	if s.onboardingService != nil {
-		onboardingHandler = handlers.NewOnboardingHandler(s.onboardingService)
+		onboardingHandler = handlers.NewOnboardingHandler(s.onboardingService, s.cfg)
 	}
 
 	// Create OIDC handler

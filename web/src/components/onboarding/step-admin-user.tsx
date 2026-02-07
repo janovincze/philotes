@@ -17,7 +17,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form"
-import { ArrowLeft, ArrowRight, Loader2, CheckCircle2, Copy, Key, AlertCircle } from "lucide-react"
+import { ArrowLeft, ArrowRight, Loader2, CheckCircle2, Copy, Key, AlertCircle, Info } from "lucide-react"
 import { useAdminExists, useRegisterAdmin } from "@/lib/hooks/use-onboarding"
 import { ApiClientError } from "@/lib/api"
 import { toast } from "sonner"
@@ -38,10 +38,12 @@ type FormValues = z.infer<typeof formSchema>
 interface StepAdminUserProps {
   onNext: (data?: Record<string, unknown>) => void
   onBack: () => void
+  onSkip?: () => void
   onAdminCreated: (created: boolean, apiKey?: string) => void
+  authDisabled?: boolean
 }
 
-export function StepAdminUser({ onNext, onBack, onAdminCreated }: StepAdminUserProps) {
+export function StepAdminUser({ onNext, onBack, onSkip, onAdminCreated, authDisabled }: StepAdminUserProps) {
   const { data: adminExistsData, isLoading: isCheckingAdmin } = useAdminExists()
   const registerMutation = useRegisterAdmin()
   const [apiKey, setApiKey] = useState<string | null>(null)
@@ -59,6 +61,42 @@ export function StepAdminUser({ onNext, onBack, onAdminCreated }: StepAdminUserP
       generateApiKey: true,
     },
   })
+
+  // When auth is disabled, show an info message and allow skipping
+  if (authDisabled) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-semibold tracking-tight">Admin User</h2>
+          <p className="text-muted-foreground mt-2">
+            Configure the first administrator account for Philotes.
+          </p>
+        </div>
+
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertTitle>Authentication is disabled</AlertTitle>
+          <AlertDescription>
+            Authentication is currently disabled. You can skip this step and enable it later
+            by setting <code className="text-xs bg-muted px-1 py-0.5 rounded">PHILOTES_AUTH_ENABLED=true</code>.
+          </AlertDescription>
+        </Alert>
+
+        <div className="flex justify-between pt-4">
+          <Button variant="outline" onClick={onBack}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back
+          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={onSkip ?? onBack}>
+              Skip
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   const onSubmit = async (values: FormValues) => {
     try {
