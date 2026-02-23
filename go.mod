@@ -20,7 +20,7 @@ require (
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/scaleway/scaleway-sdk-go v1.0.0-beta.36
 	github.com/vektah/gqlparser/v2 v2.5.31
-	github.com/xataio/pgstream v1.0.0
+	github.com/xataio/pgstream v1.0.1
 	github.com/xitongsys/parquet-go v1.6.2
 	github.com/xitongsys/parquet-go-source v0.0.0-20241021075129-b732d2ac9c9b
 	golang.org/x/crypto v0.47.0
